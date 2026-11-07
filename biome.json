@@ -6,7 +6,8 @@
       "!**/node_modules",
       "!**/dist",
       "!**/coverage",
-      "!**/.agents"
+      "!**/.agents",
+      "!**/tests/eval/results"
     ]
   },
   "formatter": {

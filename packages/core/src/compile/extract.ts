@@ -53,16 +53,32 @@ export async function extractFacts(
   const result = extractionResultSchema.safeParse(parsed);
   if (!result.success) throw new CompileError();
   const texts = new Map(chunks.map((chunk) => [chunk.chunkUuid, chunk.text]));
-  const facts = result.data.facts.filter((fact): fact is ExtractedFact => {
+  const facts = result.data.facts.flatMap<ExtractedFact>((fact) => {
     const { evidence } = fact;
-    if (evidence === undefined) return false;
+    if (evidence === undefined) return [];
     const text = texts.get(evidence.chunkUuid);
-    return (
-      text !== undefined &&
+    if (text === undefined) return [];
+    if (
       evidence.charEnd > evidence.charStart &&
       evidence.charEnd <= text.length &&
       text.slice(evidence.charStart, evidence.charEnd) === evidence.quote
-    );
+    ) {
+      return [{ ...fact, evidence }];
+    }
+    let charStart = text.indexOf(evidence.quote);
+    if (charStart === -1) return [];
+    for (
+      let occurrence = text.indexOf(evidence.quote, charStart + 1);
+      occurrence !== -1;
+      occurrence = text.indexOf(evidence.quote, occurrence + 1)
+    ) {
+      if (Math.abs(occurrence - evidence.charStart) < Math.abs(charStart - evidence.charStart)) {
+        charStart = occurrence;
+      }
+    }
+    return [
+      { ...fact, evidence: { ...evidence, charStart, charEnd: charStart + evidence.quote.length } },
+    ];
   });
   return {
     facts,

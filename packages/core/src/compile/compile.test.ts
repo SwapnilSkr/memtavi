@@ -38,11 +38,9 @@ test("claims without evidence are dropped while supported facts survive", async 
 
 test.each([
   ["unknown chunk", { chunkUuid: "missing" }],
-  ["empty range", { charEnd: 0 }],
-  ["reversed range", { charStart: 6 }],
   ["absent quote", { quote: "Invented" }],
-  ["wrong offsets even when quote exists", { charStart: 1, charEnd: 6 }],
-  ["out of bounds end", { charEnd: 100 }],
+  ["different case", { quote: "alpha" }],
+  ["different whitespace", { quote: "Alpha  beta" }],
 ])("drops unsupported evidence: %s", async (_name, evidence) => {
   const provider = createFakeProvider({
     chatResponses: [
@@ -54,6 +52,55 @@ test.each([
   expect(result.droppedFacts).toBe(1);
 });
 
+test("keeps an exact reported span unchanged even when the quote repeats", async () => {
+  const supported = { ...fact, evidence: { ...fact.evidence, charStart: 6, charEnd: 11 } };
+  const provider = createFakeProvider({
+    chatResponses: [JSON.stringify({ facts: [supported] })],
+  });
+  const result = await extractFacts(provider, [{ chunkUuid: "a", text: "Alpha Alpha" }], config);
+  expect(result.facts[0]?.evidence).toEqual(supported.evidence);
+  expect(result.facts[0]?.claim).toBe(supported.claim);
+  expect(result.droppedFacts).toBe(0);
+});
+
+test.each([
+  ["shifted span", "Alpha beta", "Alpha", 1, 6, 0],
+  ["zero-length span", "Alpha beta", "Alpha", 0, 0, 0],
+  ["reversed span", "Alpha beta", "Alpha", 6, 5, 0],
+  ["out-of-range end", "Alpha beta", "Alpha", 0, 100, 0],
+  ["out-of-range start", "Alpha beta", "Alpha", 100, 105, 0],
+  ["nearest later occurrence", "Alpha-----Alpha-----Alpha", "Alpha", 8, 13, 10],
+  ["nearest earlier occurrence", "Alpha-----Alpha-----Alpha", "Alpha", 12, 17, 10],
+  ["earliest occurrence on a tie", "Alpha-----Alpha-----Alpha", "Alpha", 15, 20, 10],
+  ["overlapping occurrences", "ababa", "aba", 3, 6, 2],
+  ["quote ending at the chunk boundary", "beta Alpha", "Alpha", 0, 5, 5],
+  ["Unicode offsets use chunk string indices", "😀 Alpha", "Alpha", 2, 7, 3],
+] as const)(
+  "re-anchors exact quotes: %s",
+  async (_name, text, quote, charStart, charEnd, expected) => {
+    const provider = createFakeProvider({
+      chatResponses: [
+        JSON.stringify({
+          facts: [{ ...fact, evidence: { ...fact.evidence, quote, charStart, charEnd } }],
+        }),
+      ],
+    });
+    const result = await extractFacts(provider, [{ chunkUuid: "a", text }], config);
+    const evidence = result.facts[0]?.evidence;
+    expect(result.facts).toHaveLength(1);
+    expect(evidence).toEqual({
+      chunkUuid: "a",
+      quote,
+      charStart: expected,
+      charEnd: expected + quote.length,
+    });
+    expect(result.facts[0]?.claim).toBe(fact.claim);
+    expect(text.slice(evidence?.charStart, evidence?.charEnd)).toBe(quote);
+    expect(evidence?.charEnd).toBeLessThanOrEqual(text.length);
+    expect(result.droppedFacts).toBe(0);
+  },
+);
+
 test.each([
   "not json",
   "{}",
@@ -61,6 +108,9 @@ test.each([
   JSON.stringify({ facts: [{ ...fact, confidence: 1.1 }] }),
   JSON.stringify({ facts: [{ ...fact, kind: "fact" }] }),
   JSON.stringify({ facts: [{ ...fact, sensitivity: "public" }] }),
+  JSON.stringify({ facts: [{ ...fact, evidence: { ...fact.evidence, quote: "" } }] }),
+  JSON.stringify({ facts: [{ ...fact, evidence: { ...fact.evidence, charStart: -1 } }] }),
+  JSON.stringify({ facts: [{ ...fact, evidence: { ...fact.evidence, charEnd: 1.5 } }] }),
   JSON.stringify({ facts: [{ ...fact, validFrom: "yesterday" }] }),
   JSON.stringify({
     facts: [{ ...fact, validFrom: "2026-02-01T00:00:00Z", validTo: "2026-01-01T00:00:00Z" }],
