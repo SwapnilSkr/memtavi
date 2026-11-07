@@ -1,0 +1,309 @@
+import { createHash } from "node:crypto";
+import { newId } from "@memtavi/shared/ids";
+import type { Static } from "elysia";
+import type { PoolClient } from "pg";
+import type { Auth } from "../middleware/auth";
+import { DomainError } from "../middleware/errors";
+import type { captureCreate } from "./schemas";
+
+const fields = [
+  "id",
+  "brainId",
+  "kind",
+  "content",
+  "contentHash",
+  "originRef",
+  "label",
+  "bucket",
+  "metadata",
+  "status",
+  "attempts",
+  "lastError",
+  "affectedPageIds",
+  "originalBytes",
+  "createdAt",
+  "compiledAt",
+  "deletedAt",
+] as const;
+
+const columns = `id, brain_id AS "brainId", kind, content, content_hash AS "contentHash",
+  origin_ref AS "originRef", label, bucket, metadata, status, attempts,
+  last_error AS "lastError", affected_page_ids AS "affectedPageIds",
+  original_bytes AS "originalBytes", created_at AS "createdAt", compiled_at AS "compiledAt",
+  deleted_at AS "deletedAt"`;
+
+type Row = Record<string, unknown>;
+
+interface StoredResponse {
+  status: number;
+  body: Record<string, unknown>;
+}
+
+function sourceBody(row: Row): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  for (const field of fields) body[field] = row[field] ?? null;
+  return body;
+}
+
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+      .map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`);
+    return `{${entries.join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
+
+function hash(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function normalize(body: Static<typeof captureCreate>) {
+  const content = body.content ?? null;
+  const fetchUrl = body.fetchUrl ?? null;
+  if (content === null ? fetchUrl === null : fetchUrl !== null) {
+    throw new DomainError("BadRequestError", 400, "Supply exactly one of content or fetchUrl");
+  }
+  if (content !== null && content.length > 50_000) {
+    throw new DomainError("BadRequestError", 400, "Inline content exceeds 50000 characters");
+  }
+  if (fetchUrl !== null) {
+    let url: URL;
+    try {
+      url = new URL(fetchUrl);
+    } catch {
+      throw new DomainError("BadRequestError", 400, "Invalid fetchUrl");
+    }
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      throw new DomainError("BadRequestError", 400, "fetchUrl must be http or https");
+    }
+  }
+  return { content, fetchUrl };
+}
+
+async function requireBrain(
+  client: PoolClient,
+  tenantId: string,
+  subjectId: string,
+  brainId: string,
+): Promise<void> {
+  const result = await client.query(
+    "SELECT id FROM brains WHERE tenant_id = $1 AND subject_id = $2 AND id = $3",
+    [tenantId, subjectId, brainId],
+  );
+  if (!result.rowCount) throw new DomainError("NotFoundError", 404, "Not found");
+}
+
+async function replay(
+  client: PoolClient,
+  tenantId: string,
+  scope: string,
+  key: string,
+  requestHash: string,
+): Promise<StoredResponse | null> {
+  const result = await client.query<{
+    requestHash: string;
+    responseStatus: number;
+    responseBody: Row;
+    live: boolean;
+  }>(
+    `SELECT request_hash AS "requestHash", response_status AS "responseStatus",
+       response_body AS "responseBody", expires_at > now() AS live
+     FROM idempotency_keys WHERE tenant_id = $1 AND scope = $2 AND key = $3 FOR UPDATE`,
+    [tenantId, scope, key],
+  );
+  const row = result.rows[0];
+  if (!row) return null;
+  if (!row.live) {
+    await client.query(
+      "DELETE FROM idempotency_keys WHERE tenant_id = $1 AND scope = $2 AND key = $3",
+      [tenantId, scope, key],
+    );
+    return null;
+  }
+  if (row.requestHash !== requestHash) {
+    throw new DomainError("ConflictError", 409, "Idempotency-Key reused with a different request");
+  }
+  return { status: row.responseStatus, body: sourceBody(row.responseBody) };
+}
+
+async function remember(
+  client: PoolClient,
+  tenantId: string,
+  scope: string,
+  key: string,
+  requestHash: string,
+  stored: StoredResponse,
+): Promise<void> {
+  await client.query(
+    `INSERT INTO idempotency_keys
+       (tenant_id, scope, key, request_hash, response_status, response_body, expires_at)
+     VALUES ($1, $2, $3, $4, $5, $6, now() + interval '24 hours')
+     ON CONFLICT (tenant_id, scope, key) DO UPDATE SET
+       request_hash = EXCLUDED.request_hash, response_status = EXCLUDED.response_status,
+       response_body = EXCLUDED.response_body, expires_at = EXCLUDED.expires_at`,
+    [tenantId, scope, key, requestHash, stored.status, JSON.stringify(stored.body)],
+  );
+}
+
+async function findOrigin(
+  client: PoolClient,
+  tenantId: string,
+  subjectId: string,
+  brainId: string,
+  originRef: string,
+) {
+  const result = await client.query(
+    `SELECT ${columns} FROM ingest_sources
+     WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND origin_ref = $4
+     AND deleted_at IS NULL`,
+    [tenantId, subjectId, brainId, originRef],
+  );
+  return result.rows[0] as Row | undefined;
+}
+
+export async function createCapture(
+  client: PoolClient,
+  auth: Auth,
+  subjectId: string,
+  brainId: string,
+  body: Static<typeof captureCreate>,
+  idempotencyKey: string | null,
+): Promise<StoredResponse> {
+  const { content, fetchUrl } = normalize(body);
+  const tenantId = auth.tenantId;
+  await requireBrain(client, tenantId, subjectId, brainId);
+
+  const scope = `POST /v1/brains/${brainId}/captures`;
+  const requestHash = hash(canonical(body));
+  if (idempotencyKey !== null) {
+    const stored = await replay(client, tenantId, scope, idempotencyKey, requestHash);
+    if (stored) return stored;
+  }
+
+  const originRef = body.originRef ?? null;
+  let status = 201;
+  let row: Row | undefined;
+  if (originRef !== null) {
+    row = await findOrigin(client, tenantId, subjectId, brainId, originRef);
+    if (row) status = 200;
+  }
+
+  if (!row) {
+    const id = newId("source");
+    const raw = content ?? fetchUrl ?? "";
+    const inserted = await client.query(
+      `INSERT INTO ingest_sources
+         (id, tenant_id, subject_id, brain_id, kind, content, content_hash, origin_ref,
+          label, bucket, metadata, original_bytes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       ON CONFLICT (brain_id, origin_ref)
+         WHERE origin_ref IS NOT NULL AND deleted_at IS NULL DO NOTHING
+       RETURNING ${columns}`,
+      [
+        id,
+        tenantId,
+        subjectId,
+        brainId,
+        body.kind,
+        raw,
+        hash(raw),
+        originRef,
+        body.label ?? null,
+        body.bucket ?? "inbox",
+        JSON.stringify(body.metadata ?? {}),
+        content === null ? 0 : Buffer.byteLength(content, "utf8"),
+      ],
+    );
+    row = inserted.rows[0] as Row | undefined;
+    if (row) {
+      await client.query(
+        `INSERT INTO jobs (tenant_id, brain_id, type, payload, idempotency_key, max_attempts)
+         VALUES ($1, $2, 'capture.ingest', $3, $4, 5)`,
+        [tenantId, brainId, JSON.stringify({ sourceId: id, brainId }), `capture:${id}`],
+      );
+    } else if (originRef !== null) {
+      row = await findOrigin(client, tenantId, subjectId, brainId, originRef);
+      status = 200;
+    }
+  }
+
+  if (!row) throw new DomainError("InternalServerError", 500, "Internal server error");
+
+  const stored: StoredResponse = { status, body: sourceBody(row) };
+  if (idempotencyKey !== null) {
+    await remember(client, tenantId, scope, idempotencyKey, requestHash, stored);
+  }
+  return stored;
+}
+
+export async function listSources(
+  client: PoolClient,
+  tenantId: string,
+  subjectId: string,
+  brainId: string,
+  limit: number,
+  offset: number,
+) {
+  await requireBrain(client, tenantId, subjectId, brainId);
+  const total = await client.query<{ total: number }>(
+    `SELECT count(*)::int AS total FROM ingest_sources
+     WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND deleted_at IS NULL`,
+    [tenantId, subjectId, brainId],
+  );
+  const items = await client.query(
+    `SELECT ${columns} FROM ingest_sources
+     WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND deleted_at IS NULL
+     ORDER BY created_at DESC NULLS LAST, id LIMIT $4 OFFSET $5`,
+    [tenantId, subjectId, brainId, limit, offset],
+  );
+  return {
+    items: (items.rows as Row[]).map(sourceBody),
+    total: total.rows[0]?.total ?? 0,
+    limit,
+    offset,
+  };
+}
+
+export async function getSource(
+  client: PoolClient,
+  tenantId: string,
+  subjectId: string,
+  brainId: string,
+  sourceId: string,
+) {
+  await requireBrain(client, tenantId, subjectId, brainId);
+  const result = await client.query(
+    `SELECT ${columns} FROM ingest_sources
+     WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND id = $4
+     AND deleted_at IS NULL`,
+    [tenantId, subjectId, brainId, sourceId],
+  );
+  const row = result.rows[0] as Row | undefined;
+  if (!row) throw new DomainError("NotFoundError", 404, "Not found");
+  return sourceBody(row);
+}
+
+export async function deleteSource(
+  client: PoolClient,
+  tenantId: string,
+  subjectId: string,
+  brainId: string,
+  sourceId: string,
+) {
+  await requireBrain(client, tenantId, subjectId, brainId);
+  const found = await client.query(
+    `SELECT id FROM ingest_sources
+     WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND id = $4`,
+    [tenantId, subjectId, brainId, sourceId],
+  );
+  if (!found.rowCount) throw new DomainError("NotFoundError", 404, "Not found");
+  await client.query(
+    `UPDATE ingest_sources SET deleted_at = COALESCE(deleted_at, now())
+     WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND id = $4`,
+    [tenantId, subjectId, brainId, sourceId],
+  );
+  return { id: sourceId, targetType: "source", state: "deleted" };
+}

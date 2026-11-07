@@ -13,6 +13,25 @@ export const brainCreate = t.Object({
   briefSettings: t.Optional(t.Record(t.String(), t.Unknown())),
 });
 
+export const captureCreate = t.Object({
+  kind: t.Union([
+    t.Literal("note"),
+    t.Literal("url"),
+    t.Literal("file"),
+    t.Literal("transcript"),
+    t.Literal("chat_turn"),
+    t.Literal("integration"),
+  ]),
+  content: t.Optional(t.Union([t.String(), t.Null()])),
+  fetchUrl: t.Optional(t.Union([t.String(), t.Null()])),
+  originRef: t.Optional(t.Union([t.String(), t.Null()])),
+  label: t.Optional(t.Union([t.String(), t.Null()])),
+  bucket: t.Optional(
+    t.Union([t.Literal("inbox"), t.Literal("notes"), t.Literal("ideas"), t.Literal("projects")]),
+  ),
+  metadata: t.Optional(t.Record(t.String(), t.Unknown())),
+});
+
 export const apiKeyCreate = t.Object({
   name: t.String({ minLength: 1, maxLength: 200 }),
   role: t.Optional(

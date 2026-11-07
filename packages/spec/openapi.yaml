@@ -244,6 +244,15 @@ paths:
             schema:
               $ref: "#/components/schemas/Capture"
       responses:
+        "200":
+          description: A source with the same `originRef` already exists and is returned.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestSource"
         "201":
           description: The capture was accepted and queued.
           headers:
@@ -1860,6 +1869,7 @@ components:
           type:
             - string
             - "null"
+          maxLength: 50000
         fetchUrl:
           type:
             - string
@@ -1897,6 +1907,7 @@ components:
         - lastError
         - affectedPageIds
         - originalBytes
+        - createdAt
         - compiledAt
         - deletedAt
       properties:
@@ -1942,6 +1953,9 @@ components:
         originalBytes:
           type: integer
           minimum: 0
+        createdAt:
+          type: string
+          format: date-time
         compiledAt:
           type:
             - string

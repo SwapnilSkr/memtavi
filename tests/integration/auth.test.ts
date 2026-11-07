@@ -179,7 +179,7 @@ describe.skipIf(!ownerUrl || !appUrl)("API authentication and tenant scope", () 
         [...new Set(actors.rows.map((row) => row.created_by))],
       ]);
     }
-    await Promise.all([owner.end(), application.end(), db?.pool.end()]);
+    await Promise.all([owner.end(), application.end()]);
     if (previousAppUrl === undefined) delete process.env.APP_DATABASE_URL;
     else process.env.APP_DATABASE_URL = previousAppUrl;
   });

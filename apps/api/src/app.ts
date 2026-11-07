@@ -4,6 +4,7 @@ import { errors } from "./middleware/errors";
 import { requestId } from "./middleware/request-id";
 import { apiKeyRoutes } from "./routes/api-keys";
 import { brainRoutes } from "./routes/brains";
+import { captureRoutes } from "./routes/captures";
 import { tenantRoutes } from "./routes/tenant";
 
 export function createApp(config: AppConfig) {
@@ -13,6 +14,7 @@ export function createApp(config: AppConfig) {
     .use(requestId)
     .use(errors(config.now ?? (() => new Date()), securityDenials))
     .use(brainRoutes(config))
+    .use(captureRoutes(config))
     .use(apiKeyRoutes(config))
     .use(tenantRoutes(config));
 }
