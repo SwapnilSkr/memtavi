@@ -27,6 +27,7 @@ describe.skipIf(!ownerUrl || !appUrl)("tenant isolation", () => {
     "score_snapshots",
     "briefs",
     "webhook_deliveries",
+    "memory_settings",
   ] as const;
   const embedding = JSON.stringify(Array.from({ length: 1536 }, () => 0));
   const owner = new Pool({ connectionString: ownerUrl });
@@ -95,6 +96,10 @@ describe.skipIf(!ownerUrl || !appUrl)("tenant isolation", () => {
           webhook: webhookB,
         },
       ]) {
+        await client.query("INSERT INTO memory_settings (tenant_id, subject_id) VALUES ($1, $2)", [
+          fixture.tenant,
+          fixture.subject,
+        ]);
         await client.query(
           "INSERT INTO pages (id, tenant_id, subject_id, brain_id, slug, title, summary, body, content_hash) VALUES ($1, $2, $3, $4, 'isolation-page', 'Alpha', 'Beta', 'Gamma', 'fixture-hash')",
           [fixture.page, fixture.tenant, fixture.subject, fixture.brain],
@@ -250,6 +255,112 @@ describe.skipIf(!ownerUrl || !appUrl)("tenant isolation", () => {
       });
     });
   }
+
+  test("memory settings reject inserts for another tenant", async () => {
+    await expect(
+      db.withTenant(tenantB, async (client) => {
+        expect(
+          (
+            await client.query("SELECT subject_id FROM memory_settings WHERE tenant_id = $1", [
+              tenantA,
+            ])
+          ).rows,
+        ).toEqual([]);
+        await client.query(
+          "INSERT INTO memory_settings (tenant_id, subject_id, mode) VALUES ($1, $2, 'off')",
+          [tenantA, subjectB],
+        );
+      }),
+    ).rejects.toMatchObject({ code: "42501" });
+  });
+
+  test("memory settings reject moving an own row into another tenant", async () => {
+    await expect(
+      db.withTenant(tenantB, async (client) => {
+        expect(
+          (
+            await client.query("SELECT subject_id FROM memory_settings WHERE tenant_id = $1", [
+              tenantA,
+            ])
+          ).rows,
+        ).toEqual([]);
+        await client.query(
+          "UPDATE memory_settings SET tenant_id = $1 WHERE tenant_id = $2 AND subject_id = $3",
+          [tenantA, tenantB, subjectB],
+        );
+      }),
+    ).rejects.toMatchObject({ code: "42501" });
+  });
+
+  test("memory settings reject cross-tenant deletes", async () => {
+    await db.withTenant(tenantB, async (client) => {
+      expect(
+        (
+          await client.query("SELECT subject_id FROM memory_settings WHERE tenant_id = $1", [
+            tenantA,
+          ])
+        ).rows,
+      ).toEqual([]);
+      expect(
+        (await client.query("DELETE FROM memory_settings WHERE tenant_id = $1", [tenantA]))
+          .rowCount,
+      ).toBe(0);
+    });
+    expect(
+      (
+        await owner.query(
+          "SELECT mode FROM memory_settings WHERE tenant_id = $1 AND subject_id = $2",
+          [tenantA, subjectA],
+        )
+      ).rows,
+    ).toEqual([{ mode: "auto" }]);
+  });
+
+  test("memory settings allow own-tenant CRUD with an auto default", async () => {
+    const rollback = new Error("Discard memory settings fixture");
+    await expect(
+      db.withTenant(tenantA, async (client) => {
+        expect(
+          (
+            await client.query("SELECT subject_id FROM memory_settings WHERE tenant_id = $1", [
+              tenantB,
+            ])
+          ).rows,
+        ).toEqual([]);
+        await client.query("INSERT INTO memory_settings (tenant_id, subject_id) VALUES ($1, $2)", [
+          tenantA,
+          subjectB,
+        ]);
+        expect(
+          (
+            await client.query(
+              "SELECT mode, updated_by, updated_at IS NOT NULL AS has_timestamp FROM memory_settings WHERE tenant_id = $1 AND subject_id = $2",
+              [tenantA, subjectB],
+            )
+          ).rows,
+        ).toEqual([{ mode: "auto", updated_by: null, has_timestamp: true }]);
+        for (const mode of ["ask", "off"]) {
+          expect(
+            (
+              await client.query(
+                "UPDATE memory_settings SET mode = $1 WHERE tenant_id = $2 AND subject_id = $3 RETURNING mode",
+                [mode, tenantA, subjectB],
+              )
+            ).rows,
+          ).toEqual([{ mode }]);
+        }
+        expect(
+          (
+            await client.query(
+              "DELETE FROM memory_settings WHERE tenant_id = $1 AND subject_id = $2",
+              [tenantA, subjectB],
+            )
+          ).rowCount,
+        ).toBe(1);
+        throw rollback;
+      }),
+    ).rejects.toBe(rollback);
+  });
 
   const childInserts = [
     {

@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  bigint,
   boolean,
   check,
   customType,
@@ -83,6 +84,7 @@ export const apiKeyRole = pgEnum("api_key_role", ["owner", "admin", "developer",
 export const targetType = pgEnum("target_type", ["brain", "source", "page"]);
 export const usageKind = pgEnum("usage_kind", ["chat", "embedding"]);
 export const deletionState = pgEnum("deletion_state", ["active", "deleting", "deleted"]);
+export const memoryMode = pgEnum("memory_mode", ["auto", "ask", "off"]);
 
 export const tenants = pgTable("tenants", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -183,6 +185,20 @@ export const subjectLinks = pgTable(
   ],
 );
 
+export const memorySettings = pgTable(
+  "memory_settings",
+  {
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    subjectId: uuid("subject_id").notNull(),
+    mode: memoryMode("mode").notNull().default("auto"),
+    updatedBy: uuid("updated_by"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.tenantId, table.subjectId] })],
+);
+
 export const projects = pgTable(
   "projects",
   {
@@ -248,6 +264,8 @@ export const ingestSources = pgTable(
     brainId: text("brain_id").notNull(),
     kind: captureKind("kind").notNull(),
     content: text("content").notNull(),
+    bodyRef: text("body_ref"),
+    bodyBytes: integer("body_bytes").notNull().default(0),
     contentHash: text("content_hash").notNull(),
     originRef: text("origin_ref"),
     label: text("label"),
@@ -293,7 +311,8 @@ export const sourceChunks = pgTable(
     brainId: text("brain_id").notNull(),
     sourceId: text("source_id").notNull(),
     ordinal: integer("ordinal").notNull(),
-    text: text("text").notNull(),
+    text: text("text"),
+    bodyRef: text("body_ref"),
     charStart: integer("char_start").notNull(),
     charEnd: integer("char_end").notNull(),
     tokenCount: integer("token_count").notNull(),
@@ -739,6 +758,9 @@ export const budgetCaps = pgTable("budget_caps", {
   currentPeriodSpend: numeric("current_period_spend", { precision: 18, scale: 8 })
     .notNull()
     .default("0"),
+  maxStorageBytes: bigint("max_storage_bytes", { mode: "number" }).notNull().default(5368709120),
+  maxPages: integer("max_pages").notNull().default(1000),
+  maxSources: integer("max_sources").notNull().default(5000),
 });
 
 export const auditEvents = pgTable(
@@ -764,6 +786,7 @@ export type Membership = typeof memberships.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type ApiKey = typeof apiKeys.$inferSelect;
 export type SubjectLink = typeof subjectLinks.$inferSelect;
+export type MemorySetting = typeof memorySettings.$inferSelect;
 export type Project = typeof projects.$inferSelect;
 export type Brain = typeof brains.$inferSelect;
 export type IngestSource = typeof ingestSources.$inferSelect;
