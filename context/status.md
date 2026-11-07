@@ -21,4 +21,11 @@ Last updated 2026-11-06. One line per open item; detail lives in the linked node
 - **`p1-compiler-core` approved** (2026-11-06): Zod fact/patch contracts matching the plan, extraction with evidence-span enforcement, MWS banding, PFS place/review/new, patch contested/append/rewrite rules, versioned prompts, and a deterministic golden corpus. 239 unit tests. Review: `.agents/reviews/p1-compiler-core-r2.md`.
 - **Storage infrastructure live** (2026-11-06): `memtavi-storage-dev` CloudFormation stack in `ap-south-1` — private bucket `memtavi-media-dev-209479287671`, CloudFront `E22V6MKMFVBZ8C` with OAC and signed URLs, SSM-held signing key, IAM policies, lifecycle. Unsigned requests return 403; signed return 200.
 - **`p1-storage` approved**: `@memtavi/storage` with `s3`, `local` and `fake` drivers, content-addressed key builders and signed URLs. 307 unit tests. Review: `.agents/reviews/p1-storage-r1.md`.
+- **Open AWS follow-ups** (2026-11-06, none blocking Phase 1):
+  - **TLS 1.2**: the default `*.cloudfront.net` certificate forces a TLSv1 minimum. Set `CertificateArn` (ACM, us-east-1) and `AliasDomain` on the stack to switch to `sni-only` + `TLSv1.2_2021`. Needs a domain.
+  - **Retention**: `sources/` and `chunks/` have no lifecycle expiration by design; ship the citation-aware `storage-retention` job before launch. Do not add a blind lifecycle rule — it would delete evidence pages cite.
+  - **Budget guard**: create an AWS Budget at $5/month with an email alert. Not created yet.
+  - **Dev CORS**: add `http://localhost:5173` to `AllowedOrigin` before inspector work, or signed media fetches from the browser will fail.
+  - **Cache header**: set `Cache-Control: public, max-age=31536000, immutable` on put in `packages/storage`; keys never change.
+  - **Task roles**: attach `memtavi-storage-worker-dev` and `memtavi-storage-api-dev` to ECS/EC2 roles. The local CLI is authenticated as root and must never back an app process.
 - **Next: `p1-storage-wire`** — migration `0008` (`body_ref`, preview content, `memory_settings`, budget limits), capture/worker/compiler reading and writing through the store, spec change for `contentPreview`/`contentUrl`.

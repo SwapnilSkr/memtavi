@@ -89,6 +89,18 @@ aws s3 rb s3://memtavi-logs-dev-209479287671 --force
 
 One bucket pair, one distribution at `PriceClass_200` (US, Canada, Europe, Asia, Middle East, Africa — the right class for a Mumbai origin and Indian users), no KMS, no WAF, no Shield Advanced. At dev volume this is cents per month; the only real variable is CloudFront egress.
 
+## Known gaps
+
+| Gap | Why it matters | Fix |
+|---|---|---|
+| TLS minimum is `TLSv1` | Default CloudFront certificate ignores a higher minimum | Set `CertificateArn` + `AliasDomain`; needs a domain and an ACM cert in `us-east-1` |
+| No CloudFront request logs | Only S3 access logs and CloudWatch metrics today | CloudFront standard logging v2 to CloudWatch Logs; do not re-enable ACLs |
+| `sources/` and `chunks/` never expire | Storage grows with every capture | Citation-aware `storage-retention` job; never a blind lifecycle rule |
+| No budget alarm | A runaway would only appear on the invoice | AWS Budget at $5/month with email |
+| Dev CORS allows only `https://app.memtavi.com` | Browser fetches of signed URLs from `localhost:5173` will be blocked | Add the dev origin to `AllowedOrigin` |
+| Uploads set no `Cache-Control` | CloudFront caches by default, but a shorter TTL than necessary | Set `public, max-age=31536000, immutable` in `packages/storage` |
+| Local CLI is the root account | Root must never back an application process | Attach the two managed policies to ECS/EC2 task roles |
+
 ## App integration
 
 `packages/storage` owns the SDK. Other packages call the `ObjectStore` interface only. Local development uses the filesystem driver; the S3 driver is used when `STORAGE_DRIVER=s3`.
