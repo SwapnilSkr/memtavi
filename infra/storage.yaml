@@ -15,6 +15,17 @@ Parameters:
   AllowedOrigin:
     Type: String
     Default: https://app.memtavi.com
+  CertificateArn:
+    Type: String
+    Default: ""
+    Description: ACM certificate ARN in us-east-1; enables a custom domain and TLS 1.2 minimum
+  AliasDomain:
+    Type: String
+    Default: ""
+    Description: Custom domain for the distribution, required with CertificateArn
+
+Conditions:
+  HasCertificate: !Not [!Equals [!Ref CertificateArn, ""]]
 
 Resources:
   LogsBucket:
@@ -182,7 +193,7 @@ Resources:
       DistributionConfig:
         Enabled: true
         Comment: !Sub "memtavi media ${Env}"
-        PriceClass: PriceClass_100
+        PriceClass: PriceClass_200
         HttpVersion: http2and3
         IPV6Enabled: true
         Origins:
@@ -199,9 +210,13 @@ Resources:
           ResponseHeadersPolicyId: !Ref SecurityHeaders
           TrustedKeyGroups:
             - !Ref SigningKeyGroup
-        ViewerCertificate:
-          CloudFrontDefaultCertificate: true
-          MinimumProtocolVersion: TLSv1.2_2021
+        Aliases: !If [HasCertificate, [!Ref AliasDomain], !Ref "AWS::NoValue"]
+        ViewerCertificate: !If
+          - HasCertificate
+          - AcmCertificateArn: !Ref CertificateArn
+            SslSupportMethod: sni-only
+            MinimumProtocolVersion: TLSv1.2_2021
+          - CloudFrontDefaultCertificate: true
 
   MediaBucketPolicy:
     Type: AWS::S3::BucketPolicy

@@ -692,6 +692,8 @@ Postgres keeps knowledge and evidence pointers. S3 keeps bulk text.
 - Private bucket, all four Block Public Access settings, Object Ownership enforced, no ACLs.
 - SSE-S3, TLS-only bucket policy, CloudFront OAC scoped to one distribution.
 - Viewer access only through CloudFront signed URLs; the private key is in SSM SecureString and `infra/.keys/<env>/` (gitignored).
+- `PriceClass_200` (US/EU/Asia/ME/Africa). The default `*.cloudfront.net` certificate forces a TLSv1 minimum; pass `CertificateArn` (us-east-1) and `AliasDomain` to switch to `sni-only` with `TLSv1.2_2021`.
+- CloudFront standard logging is off: the v1 path requires ACLs on the log bucket, which is deliberately ACL-free. S3 server access logs are on; use CloudFront standard logging v2 to CloudWatch Logs if request-level logs become necessary.
 - Lifecycle: exports 7 days, originals 90 to Glacier IR then 365, noncurrent 30, abort multipart 7.
 - IAM managed policies `memtavi-storage-worker-<env>` and `memtavi-storage-api-<env>`; no wildcard actions, no bucket-wide list.
 

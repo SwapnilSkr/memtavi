@@ -44,7 +44,24 @@ Keys are content-addressed and immutable, so a changed body is a new object and 
 - Noncurrent versions expire after 30 days.
 - Incomplete multipart uploads abort after 7 days.
 
-S3 server access logs go to the logs bucket and expire after 30 days. CloudFront standard logging is not enabled yet; CloudWatch metrics cover 4xx/5xx in the meantime.
+S3 server access logs go to the logs bucket and expire after 30 days. CloudFront standard logging is **not** enabled: the v1 delivery path requires ACLs on the log bucket, and this bucket intentionally disables ACLs. CloudWatch metrics cover 4xx/5xx meanwhile. If request-level logs become necessary, use CloudFront standard logging v2 to CloudWatch Logs rather than re-enabling ACLs.
+
+## TLS and a custom domain
+
+With the default `*.cloudfront.net` certificate CloudFront forces a **TLSv1 minimum**; it ignores a higher `MinimumProtocolVersion`. To get TLS 1.2+ and a branded hostname, pass both extra parameters (the certificate must be in `us-east-1`):
+
+```bash
+aws cloudformation deploy \
+  --stack-name memtavi-storage-dev \
+  --template-file infra/storage.yaml \
+  --parameter-overrides Env=dev AccountId=209479287671 \
+    PublicKeyPem="$(cat infra/.keys/dev/public.pem)" \
+    CertificateArn=arn:aws:acm:us-east-1:209479287671:certificate/... \
+    AliasDomain=media.memtavi.com \
+  --capabilities CAPABILITY_NAMED_IAM
+```
+
+When `CertificateArn` is set, the distribution switches to `sni-only` with `TLSv1.2_2021` and adds the alias.
 
 ## Operations
 
@@ -70,7 +87,7 @@ aws s3 rb s3://memtavi-logs-dev-209479287671 --force
 
 ## Cost
 
-One bucket pair, one distribution at `PriceClass_100`, no KMS, no WAF, no Shield Advanced. At dev volume this is cents per month; the only real variable is CloudFront egress.
+One bucket pair, one distribution at `PriceClass_200` (US, Canada, Europe, Asia, Middle East, Africa — the right class for a Mumbai origin and Indian users), no KMS, no WAF, no Shield Advanced. At dev volume this is cents per month; the only real variable is CloudFront egress.
 
 ## App integration
 
