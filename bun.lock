@@ -23,6 +23,18 @@
         "@types/pg": "^8.15.5",
       },
     },
+    "apps/worker": {
+      "name": "@memtavi/worker",
+      "version": "0.0.0",
+      "dependencies": {
+        "@memtavi/db": "workspace:*",
+        "@memtavi/fetch": "workspace:*",
+        "pg": "^8.16.3",
+      },
+      "devDependencies": {
+        "@types/pg": "^8.15.5",
+      },
+    },
     "packages/db": {
       "name": "@memtavi/db",
       "version": "0.0.0",
@@ -34,6 +46,10 @@
         "@types/pg": "^8.15.5",
         "drizzle-kit": "^0.31.7",
       },
+    },
+    "packages/fetch": {
+      "name": "@memtavi/fetch",
+      "version": "0.0.0",
     },
     "packages/shared": {
       "name": "@memtavi/shared",
@@ -51,7 +67,9 @@
       "dependencies": {
         "@memtavi/api": "workspace:*",
         "@memtavi/db": "workspace:*",
+        "@memtavi/fetch": "workspace:*",
         "@memtavi/shared": "workspace:*",
+        "@memtavi/worker": "workspace:*",
         "ajv": "^8.17.1",
         "ajv-formats": "^3.0.1",
         "pg": "^8.16.3",
@@ -161,6 +179,8 @@
 
     "@memtavi/db": ["@memtavi/db@workspace:packages/db"],
 
+    "@memtavi/fetch": ["@memtavi/fetch@workspace:packages/fetch"],
+
     "@memtavi/integration-tests": ["@memtavi/integration-tests@workspace:tests/integration"],
 
     "@memtavi/isolation-tests": ["@memtavi/isolation-tests@workspace:tests/isolation"],
@@ -168,6 +188,8 @@
     "@memtavi/shared": ["@memtavi/shared@workspace:packages/shared"],
 
     "@memtavi/spec": ["@memtavi/spec@workspace:packages/spec"],
+
+    "@memtavi/worker": ["@memtavi/worker@workspace:apps/worker"],
 
     "@sinclair/typebox": ["@sinclair/typebox@0.34.52", "", {}, "sha512-XiMQh7qqVlxZzcVD+kkGMNGMzcTrDMLWI7S4x7z1MkCkbDPrekpZXEUK0eZqZFMuHQg2a2DZOcDIh9o5v3Gonw=="],
 

@@ -14,6 +14,7 @@
   "scripts": {
     "dev:api": "bun run --cwd apps/api dev",
     "start:api": "bun run --cwd apps/api start",
+    "start:worker": "bun run --cwd apps/worker start",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "spec:lint": "bun packages/spec/lint.mjs",
     "lint": "biome check .",

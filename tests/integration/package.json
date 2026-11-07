@@ -5,7 +5,9 @@
   "dependencies": {
     "@memtavi/api": "workspace:*",
     "@memtavi/db": "workspace:*",
+    "@memtavi/fetch": "workspace:*",
     "@memtavi/shared": "workspace:*",
+    "@memtavi/worker": "workspace:*",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
     "pg": "^8.16.3",
