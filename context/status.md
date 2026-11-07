@@ -46,6 +46,7 @@ Last updated 2026-11-06. One line per open item; detail lives in the linked node
 - **Phase 2 changes shipped**: `GET /changes` (newest first), idempotent `PATCH /changes/{id}` ack/clear, and `PATCH /pages/{slug}` with version-conflict 409, a `user` page version, an `updated` change event, `userEditedAt`, and contested resolution via `status: active`. 139 integration tests.
 - **Known reliability gap**: page update calls the embedder before writing, so a provider outage blocks edits. Make the embed best-effort when the file is next touched.
 - **Phase 2 graph shipped**: `GET /graph` returns live nodes and only edges whose both endpoints are live; `GET /connections` is similarity-ordered and paginated; `PATCH /connections/{id}` acks idempotently. 144 integration tests.
-- **Next: `p2-score-profile`** — score, health history and profile endpoints, then the inspector.
+- **Phase 2 score/profile shipped**: `GET /score` returns the newest snapshot or 404; `GET /profile` returns an empty profile for a new brain; `PATCH /profile` upserts only supplied fields with a tenant guard. 152 integration tests.
+- **Next: the inspector** — `apps/web` capture → read → correct against the live API. Still no provider spend.
 - **Evidence anchor fix shipped**: the first live run exposed that models return exact quotes with wrong character offsets, so every fact was dropped. `extractFacts` now re-anchors a verbatim quote and drops only text that is absent. Without it, zero pages compiled.
 - **Phase 1 complete**: capture, storage, worker, LLM, compiler core, compiler wire, eval harness and the first live measurement are recorded.
