@@ -9,6 +9,7 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-06** — Storage live: private S3 + CloudFront with OAC, signed URLs, SSE-S3, lifecycle and least-privilege policies, deployed as `memtavi-storage-dev`. `@memtavi/storage` added with s3/local/fake drivers; 307 unit tests.
 - **2026-11-06** — `p1-compiler-core` approved: plan-exact fact and patch contracts, evidence-span enforcement, MWS, PFS review band, patch decisions, versioned prompts, deterministic golden corpus; 239 unit tests.
 - **2026-11-06** — `p1-llm` approved: provider interfaces, OpenRouter and OpenAI adapters, deterministic fake, typed error classification, and cost functions; 156 unit tests.
 - **2026-11-06** — `p1-worker` approved: leased job claim with `SKIP LOCKED`, backoff and dead-lettering, and a document fetcher that resolves once and pins the connection to the validated address. 103 unit, 64 integration tests.
