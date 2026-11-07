@@ -259,11 +259,19 @@ export const ingestSources = pgTable(
     affectedPageIds: text("affected_page_ids").array().notNull().default(sql`'{}'::text[]`),
     chunkUuids: uuid("chunk_uuids").array().notNull().default(sql`'{}'::uuid[]`),
     originalBytes: integer("original_bytes").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     compiledAt: timestamp("compiled_at", { withTimezone: true }),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (table) => [
     unique("ingest_sources_tenant_id_unique").on(table.tenantId, table.id),
+    index("ingest_sources_brain_created_idx").on(
+      table.tenantId,
+      table.subjectId,
+      table.brainId,
+      table.createdAt.desc(),
+      table.id,
+    ),
     unique("ingest_sources_tenant_brain_id_unique").on(table.tenantId, table.brainId, table.id),
     uniqueIndex("ingest_sources_brain_origin_active_unique")
       .on(table.brainId, table.originRef)

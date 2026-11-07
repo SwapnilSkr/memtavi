@@ -1,0 +1,2 @@
+ALTER TABLE "ingest_sources" ADD COLUMN "created_at" timestamp with time zone DEFAULT now() NOT NULL;--> statement-breakpoint
+CREATE INDEX "ingest_sources_brain_created_idx" ON "ingest_sources" USING btree ("tenant_id","subject_id","brain_id","created_at" DESC NULLS LAST,"id");
