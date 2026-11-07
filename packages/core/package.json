@@ -1,0 +1,18 @@
+{
+  "name": "@memtavi/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./compile/schemas": "./src/compile/schemas.ts",
+    "./compile/extract": "./src/compile/extract.ts",
+    "./compile/policies/mws": "./src/compile/policies/mws.ts",
+    "./compile/policies/pfs": "./src/compile/policies/pfs.ts",
+    "./compile/patch": "./src/compile/patch.ts",
+    "./compile/prompts": "./src/compile/prompts.ts"
+  },
+  "dependencies": {
+    "@memtavi/llm": "workspace:*",
+    "zod": "^4.1.12"
+  }
+}
