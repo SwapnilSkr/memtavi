@@ -37,6 +37,11 @@ describe("capture.compile", () => {
   let failPageEmbedding = false;
   let factEntities: string[] = [];
   let routing: RoutingEvent[] = [];
+  let entitiesByClaim: Record<string, string[]> = {};
+  const batchClaims = ["Alpha ships. ", "Beta builds. ", "Gamma tests. "].map((claim) =>
+    claim.repeat(180).trim(),
+  );
+  const batchText = batchClaims.join("\n\n");
 
   async function withTenant<T>(
     tenant: string,
@@ -74,7 +79,7 @@ describe("capture.compile", () => {
               (chunk): ExtractedFact => ({
                 claim: chunk.text.trim(),
                 kind: "project_fact",
-                entities: factEntities,
+                entities: entitiesByClaim[chunk.text.trim()] ?? factEntities,
                 confidence: score,
                 durability: score,
                 impact: score,
@@ -242,6 +247,7 @@ describe("capture.compile", () => {
     failPageEmbedding = false;
     factEntities = [];
     routing = [];
+    entitiesByClaim = {};
     await owner.query(
       "INSERT INTO brains (id, tenant_id, subject_id, name, slug) VALUES ($1, $2, $3, 'Compiler', $1)",
       [brainId, tenantId, subjectId],
@@ -678,6 +684,286 @@ describe("capture.compile", () => {
     expect(page?.title).toBe("Updated");
     expect(page?.body).toContain("Updated body\n\n## Sources");
     expect(page?.version).toBe(2);
+  });
+
+  test("three facts for one page use one patch, version, event and complete evidence", async () => {
+    const pageId = await seedCandidate("batch", note, "other-model", ["acme"]);
+    factEntities = ["Acme", "Compiler"];
+    patchResponse = JSON.stringify({
+      title: "Batch",
+      summary: "Three facts",
+      body: "All three facts",
+      changed: true,
+      contradictions: [],
+    });
+    await capture(batchText);
+    await worker().runOnce();
+    expect(routing).toHaveLength(3);
+    expect(routing.every((event) => event.chosenPageId === pageId)).toBe(true);
+    const chats = provider.calls.filter((call) => call.kind === "chat");
+    expect(chats).toHaveLength(2);
+    const input = JSON.parse(chats[1]?.request.messages[1]?.content ?? "{}");
+    expect(input.facts.map((fact: ExtractedFact) => fact.claim).sort()).toEqual(
+      [...batchClaims].sort(),
+    );
+    expect(input.existing.version).toBe(1);
+    expect(await counts()).toEqual({
+      pages: 1,
+      versions: 2,
+      sources: 1,
+      events: 1,
+      embeddings: 2,
+      ledger: 4,
+      reviews: 0,
+    });
+    const chunks = await owner.query<{ id: string }>(
+      "SELECT id FROM source_chunks WHERE source_id = $1 ORDER BY id",
+      [sourceId],
+    );
+    expect(chunks.rows).toHaveLength(3);
+    const links = await owner.query<{ chunk_uuids: string[] }>(
+      "SELECT chunk_uuids FROM page_sources WHERE page_id = $1 AND ingest_source_id = $2",
+      [pageId, sourceId],
+    );
+    expect(links.rows).toEqual([{ chunk_uuids: chunks.rows.map((chunk) => chunk.id) }]);
+    const page = (
+      await owner.query("SELECT body, version, entities FROM pages WHERE id = $1", [pageId])
+    ).rows[0];
+    expect(page?.version).toBe(2);
+    expect(page?.entities).toEqual(["acme", "compiler"]);
+    for (const chunk of chunks.rows) expect(page?.body).toContain(chunk.id);
+    const event = (
+      await owner.query(
+        "SELECT change_summary, from_version, to_version FROM change_events WHERE page_id = $1",
+        [pageId],
+      )
+    ).rows[0];
+    expect(event).toEqual({
+      change_summary: `${routing[0]?.factClaim} (3 facts)`,
+      from_version: 1,
+      to_version: 2,
+    });
+    expect(provider.calls.filter((call) => call.kind === "embed")).toHaveLength(2);
+    const calls = provider.calls.length;
+    await owner.query("UPDATE jobs SET status = 'pending' WHERE id = $1", [jobId]);
+    await worker().runOnce();
+    expect(provider.calls).toHaveLength(calls);
+    expect((await counts())?.versions).toBe(2);
+    expect((await counts())?.events).toBe(1);
+  });
+
+  test("facts routed to two pages use exactly two patches after all routing", async () => {
+    const alpha = await seedCandidate("alpha", note, "other-model", ["alpha"]);
+    const beta = await seedCandidate("beta", note, "other-model", ["beta"]);
+    entitiesByClaim = Object.fromEntries(
+      batchClaims.map((claim, index) => [claim, [index === 1 ? "beta" : "alpha"]]),
+    );
+    patchResponse = JSON.stringify({
+      title: "Batch",
+      summary: "Batch update",
+      body: "Batch body",
+      changed: true,
+      contradictions: [],
+    });
+    const base = compiler();
+    const instance = createWorker({
+      withTenant,
+      tenantIds: [tenantId],
+      store,
+      compiler: {
+        ...base,
+        chatProvider: {
+          chat: async (request) => {
+            const input = JSON.parse(request.messages[1]?.content ?? "{}");
+            if (input.facts) expect(routing).toHaveLength(3);
+            return base.chatProvider.chat(request);
+          },
+        },
+      },
+      handlers: {
+        "capture.compile": (context) =>
+          compileCapture({ ...context, onRouting: (event) => routing.push(event) }),
+      },
+    });
+    await capture(batchText);
+    await instance.runOnce();
+    const chats = provider.calls.filter((call) => call.kind === "chat");
+    expect(chats).toHaveLength(3);
+    const patches = chats
+      .slice(1)
+      .map((call) => JSON.parse(call.request.messages[1]?.content ?? "{}"));
+    expect(patches.map((input) => input.existing.id)).toEqual([alpha, beta].sort());
+    expect(patches.map((input) => input.facts.length).sort()).toEqual([1, 2]);
+    expect((await counts())?.versions).toBe(4);
+    expect((await counts())?.events).toBe(2);
+    expect((await counts())?.sources).toBe(2);
+    expect(provider.calls.filter((call) => call.kind === "embed")).toHaveLength(3);
+  });
+
+  test("a batch records all contradictions in one contest event", async () => {
+    const pageId = await seedCandidate("batch-contested", note, "other-model", ["acme"]);
+    factEntities = ["Acme"];
+    const base = compiler();
+    let contradictions: {
+      existingClaim: string;
+      newClaim: string;
+      evidence: ExtractedFact["evidence"];
+    }[] = [];
+    const instance = createWorker({
+      withTenant,
+      tenantIds: [tenantId],
+      store,
+      compiler: {
+        ...base,
+        chatProvider: {
+          chat: async (request) => {
+            const input = JSON.parse(request.messages[1]?.content ?? "{}") as {
+              facts?: ExtractedFact[];
+            };
+            if (input.facts) {
+              contradictions = input.facts.slice(1).map((fact) => ({
+                existingClaim: "Old claim",
+                newClaim: fact.claim,
+                evidence: fact.evidence,
+              }));
+              patchResponse = JSON.stringify({
+                title: "Ignored",
+                summary: "Ignored",
+                body: "Ignored",
+                changed: false,
+                contradictions,
+              });
+            }
+            return base.chatProvider.chat(request);
+          },
+        },
+      },
+    });
+    await capture(batchText);
+    await instance.runOnce();
+    expect(contradictions).toHaveLength(2);
+    expect((await counts())?.versions).toBe(2);
+    expect((await counts())?.events).toBe(1);
+    expect((await counts())?.sources).toBe(1);
+    expect(provider.calls.filter((call) => call.kind === "chat")).toHaveLength(2);
+    const page = (
+      await owner.query("SELECT status, body, version FROM pages WHERE id = $1", [pageId])
+    ).rows[0];
+    expect(page).toEqual({ status: "contested", body: "Human body", version: 2 });
+    const event = (
+      await owner.query("SELECT contradictions FROM change_events WHERE page_id = $1", [pageId])
+    ).rows[0];
+    expect(event?.contradictions).toEqual(contradictions);
+    const link = (
+      await owner.query("SELECT chunk_uuids FROM page_sources WHERE page_id = $1", [pageId])
+    ).rows[0];
+    expect(link?.chunk_uuids).toHaveLength(3);
+  });
+
+  test("an unchanged batch attaches every chunk without a version, event or page embedding", async () => {
+    const pageId = await seedCandidate("batch-unchanged", note, "other-model", ["acme"]);
+    factEntities = ["Acme"];
+    await owner.query(
+      `INSERT INTO page_embeddings (tenant_id, page_id, model, dimensions, embedding, content_hash)
+       SELECT tenant_id, page_id, $2, dimensions, embedding, content_hash FROM page_embeddings
+       WHERE page_id = $1`,
+      [pageId, embeddingModel],
+    );
+    patchResponse = JSON.stringify({
+      title: "Original",
+      summary: "Old summary",
+      body: "Human body",
+      changed: false,
+      contradictions: [],
+    });
+    await capture(batchText);
+    await worker().runOnce();
+    expect(await counts()).toEqual({
+      pages: 1,
+      versions: 1,
+      sources: 1,
+      events: 0,
+      embeddings: 2,
+      ledger: 3,
+      reviews: 0,
+    });
+    expect(provider.calls.filter((call) => call.kind === "chat")).toHaveLength(2);
+    expect(provider.calls.filter((call) => call.kind === "embed")).toHaveLength(1);
+    const link = (
+      await owner.query("SELECT chunk_uuids FROM page_sources WHERE page_id = $1", [pageId])
+    ).rows[0];
+    expect(link?.chunk_uuids).toHaveLength(3);
+  });
+
+  test("three review facts create three reviews and no page, patch or version", async () => {
+    const candidates = [
+      await seedCandidate("batch-review-a", note, embeddingModel, ["acme"]),
+      await seedCandidate("batch-review-b", note, embeddingModel, ["acme"]),
+    ];
+    factEntities = ["Acme"];
+    const base = compiler();
+    const instance = createWorker({
+      withTenant,
+      tenantIds: [tenantId],
+      store,
+      compiler: {
+        ...base,
+        embeddingProvider: {
+          embed: async (texts) => {
+            const result = await base.embeddingProvider.embed(texts);
+            const vector = (await createFakeProvider().embed([note])).vectors[0];
+            if (!vector) throw new Error("Missing fixture vector");
+            return { ...result, vectors: texts.map(() => vector) };
+          },
+        },
+      },
+    });
+    await capture(batchText);
+    await instance.runOnce();
+    expect(await counts()).toEqual({
+      pages: 2,
+      versions: 2,
+      sources: 0,
+      events: 0,
+      embeddings: 2,
+      ledger: 2,
+      reviews: 3,
+    });
+    expect(provider.calls.filter((call) => call.kind === "chat")).toHaveLength(1);
+    const reviews = await owner.query<{ candidate_page_ids: string[]; fact: ExtractedFact }>(
+      "SELECT candidate_page_ids, fact FROM routing_reviews WHERE brain_id = $1",
+      [brainId],
+    );
+    expect(reviews.rows.map((row) => row.fact.claim).sort()).toEqual([...batchClaims].sort());
+    for (const review of reviews.rows) expect(review.candidate_page_ids).toEqual(candidates);
+  });
+
+  test("new pages remain visible to later facts before a single grouped patch", async () => {
+    factEntities = ["Acme"];
+    patchResponse = JSON.stringify({
+      title: "Acme",
+      summary: "Three facts",
+      body: "Consolidated facts",
+      changed: true,
+      contradictions: [],
+    });
+    await capture(batchText);
+    await worker().runOnce();
+    expect(routing.map((event) => event.action)).toEqual(["new", "place", "place"]);
+    expect(routing.slice(1).every((event) => event.reason === "entity")).toBe(true);
+    const chats = provider.calls.filter((call) => call.kind === "chat");
+    expect(chats).toHaveLength(2);
+    const input = JSON.parse(chats[1]?.request.messages[1]?.content ?? "{}");
+    expect(input.facts).toHaveLength(2);
+    expect((await counts())?.pages).toBe(1);
+    expect((await counts())?.versions).toBe(2);
+    expect((await counts())?.events).toBe(2);
+    expect((await counts())?.sources).toBe(1);
+    const links = await owner.query<{ chunk_uuids: string[] }>(
+      "SELECT chunk_uuids FROM page_sources WHERE ingest_source_id = $1",
+      [sourceId],
+    );
+    expect(links.rows[0]?.chunk_uuids).toHaveLength(3);
   });
 
   test("manual edits keep their body and append updates on subsequent compiles", async () => {

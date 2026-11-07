@@ -209,6 +209,85 @@ async function compileSource({
   }
   const vectors = facts.length ? (await embed(facts.map((fact) => fact.claim))).vectors : [];
   const affected = new Set<string>();
+
+  async function recordPage(
+    page: PageRow,
+    pageFacts: readonly ExtractedFact[],
+    previousVersion: number | null,
+    contradictions: PatchResult["contradictions"],
+    changed: boolean,
+  ): Promise<void> {
+    affected.add(page.id);
+    if (changed) {
+      await client.query(
+        `INSERT INTO page_versions
+         (tenant_id, page_id, version, title, summary, body, ingest_source_id, actor)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'compiler')`,
+        [job.tenantId, page.id, page.version, page.title, page.summary, page.body, sourceId],
+      );
+      await client.query(
+        `INSERT INTO change_events
+         (id, tenant_id, brain_id, page_id, action, change_summary, from_version, to_version, ingest_source_id, contradictions)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [
+          newId("change"),
+          job.tenantId,
+          job.brainId,
+          page.id,
+          previousVersion === null ? "created" : "updated",
+          previousVersion === null
+            ? pageFacts[0]?.claim
+            : `${pageFacts[0]?.claim} (${pageFacts.length} facts)`,
+          previousVersion,
+          page.version,
+          sourceId,
+          JSON.stringify(contradictions),
+        ],
+      );
+    }
+    await client.query(
+      `INSERT INTO page_sources (tenant_id, page_id, ingest_source_id, chunk_uuids)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (page_id, ingest_source_id) DO UPDATE SET chunk_uuids = ARRAY(
+         SELECT DISTINCT chunk FROM unnest(page_sources.chunk_uuids || EXCLUDED.chunk_uuids) AS chunk ORDER BY chunk)
+       WHERE page_sources.tenant_id = $1`,
+      [
+        job.tenantId,
+        page.id,
+        sourceId,
+        [...new Set(pageFacts.map((fact) => fact.evidence.chunkUuid))].sort(),
+      ],
+    );
+    const embedded = await client.query(
+      `SELECT page_id FROM page_embeddings
+       WHERE tenant_id = $1 AND page_id = $2 AND model = $3 AND content_hash = $4 LIMIT 1`,
+      [job.tenantId, page.id, embeddingModel, page.content_hash],
+    );
+    if (embedded.rowCount === 0) {
+      const result = await embed([`${page.title}\n${page.summary}\n${page.body}`]);
+      await client.query(
+        `INSERT INTO page_embeddings (tenant_id, page_id, model, dimensions, embedding, content_hash)
+         VALUES ($1, $2, $3, $4, $5::vector, $6)
+         ON CONFLICT (page_id, model) DO UPDATE SET embedding = EXCLUDED.embedding,
+         dimensions = EXCLUDED.dimensions, content_hash = EXCLUDED.content_hash
+         WHERE page_embeddings.tenant_id = $1`,
+        [
+          job.tenantId,
+          page.id,
+          embeddingModel,
+          result.dimensions,
+          JSON.stringify(result.vectors[0]),
+          page.content_hash,
+        ],
+      );
+      await client.query("UPDATE pages SET embedding_model = $3 WHERE tenant_id = $1 AND id = $2", [
+        job.tenantId,
+        page.id,
+        embeddingModel,
+      ]);
+    }
+  }
+  const placed = new Map<string, ExtractedFact[]>();
   for (const [index, fact] of facts.entries()) {
     const entities = normalizeEntities(fact.entities);
     const vector = vectors[index];
@@ -274,196 +353,146 @@ async function compileSource({
       );
       continue;
     }
-    let page: PageRow;
-    let previousVersion: number | null = null;
-    let contradictions: PatchResult["contradictions"] = [];
-    let changed = true;
     if (decision.action === "place") {
-      const found = await client.query<PageRow>(
-        `SELECT id, title, summary, body, version, content_hash, user_edited_at, last_compiled_at, entities
-         FROM pages WHERE tenant_id = $1 AND brain_id = $2 AND id = $3
-         AND deletion_state = 'active' AND status IN ('active', 'contested') FOR UPDATE`,
-        [job.tenantId, job.brainId, decision.pageId],
+      const pageFacts = placed.get(decision.pageId) ?? [];
+      pageFacts.push(fact);
+      placed.set(decision.pageId, pageFacts);
+      continue;
+    }
+    const title =
+      fact.entities.find((entity) => entity.trim())?.trim() ?? fact.claim.trim().slice(0, 120);
+    const pageBody = `${fact.claim}\n\n## Sources\n- ${fact.evidence.chunkUuid}:${fact.evidence.charStart}-${fact.evidence.charEnd} ${JSON.stringify(fact.evidence.quote)}`;
+    const page: PageRow = {
+      id: newId("page"),
+      title,
+      summary: fact.claim,
+      body: pageBody,
+      version: 1,
+      content_hash: contentHash(`${title}\n${fact.claim}\n${pageBody}`),
+      user_edited_at: null,
+      last_compiled_at: null,
+      entities,
+    };
+    const baseSlug =
+      title
+        .toLowerCase()
+        .normalize("NFKD")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "") || "topic";
+    const suffix = contentHash(`${sourceId}\n${index}\n${fact.claim}`).slice(0, 12);
+    let attempt = 0;
+    while (true) {
+      const slug =
+        attempt === 0 ? baseSlug : `${baseSlug}-${suffix}${attempt > 1 ? `-${attempt}` : ""}`;
+      const inserted = await client.query(
+        `INSERT INTO pages
+         (id, tenant_id, subject_id, brain_id, slug, title, summary, body, page_type, content_hash, last_compiled_at, entities)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $10, $9, now(), $11)
+         ON CONFLICT (brain_id, slug) WHERE deletion_state = 'active' DO NOTHING`,
+        [
+          page.id,
+          job.tenantId,
+          source.subject_id,
+          job.brainId,
+          slug,
+          title,
+          fact.claim,
+          page.body,
+          page.content_hash,
+          entities.length > 0 ? "entity" : "topic",
+          entities,
+        ],
       );
-      const existing = found.rows[0];
-      if (!existing) throw new JobError("transient", "Routing page changed");
-      const userEdited =
-        existing.user_edited_at !== null &&
-        (existing.last_compiled_at === null || existing.user_edited_at > existing.last_compiled_at);
-      const response = await chatProvider.chat({
-        model: chatModel,
-        temperature: 0,
-        responseFormat: "json",
-        messages: buildPatchMessages(existing, [fact], {
-          userEdited,
-          promptVersion: promptVersion("patch"),
-        }),
-      });
-      await ledger(response);
-      const parsed = parsePatchResult(response.text);
-      for (const { evidence } of parsed.contradictions) {
-        const text = chunks.find((chunk) => chunk.chunkUuid === evidence.chunkUuid)?.text;
-        if (
-          text === undefined ||
-          evidence.charEnd <= evidence.charStart ||
-          evidence.charEnd > text.length ||
-          text.slice(evidence.charStart, evidence.charEnd) !== evidence.quote
-        ) {
-          throw new CompileError();
-        }
-      }
-      const patch = applyPatch(existing, parsed, {
+      if (inserted.rowCount) break;
+      attempt += 1;
+    }
+    await recordPage(page, [fact], null, [], true);
+  }
+  for (const [pageId, pageFacts] of [...placed].sort(([left], [right]) =>
+    left < right ? -1 : left > right ? 1 : 0,
+  )) {
+    const found = await client.query<PageRow>(
+      `SELECT id, title, summary, body, version, content_hash, user_edited_at, last_compiled_at, entities
+       FROM pages WHERE tenant_id = $1 AND brain_id = $2 AND id = $3
+       AND deletion_state = 'active' AND status IN ('active', 'contested') FOR UPDATE`,
+      [job.tenantId, job.brainId, pageId],
+    );
+    const existing = found.rows[0];
+    if (!existing) throw new JobError("transient", "Routing page changed");
+    const userEdited =
+      existing.user_edited_at !== null &&
+      (existing.last_compiled_at === null || existing.user_edited_at > existing.last_compiled_at);
+    const response = await chatProvider.chat({
+      model: chatModel,
+      temperature: 0,
+      responseFormat: "json",
+      messages: buildPatchMessages(existing, pageFacts, {
         userEdited,
-        facts: [fact],
-      });
-      contradictions = patch.contradictions;
-      changed = patch.changed || contradictions.length > 0;
-      previousVersion = existing.version;
-      page = {
-        ...existing,
-        title: patch.title,
-        summary: patch.summary,
-        body: patch.body,
-        version: existing.version + (changed ? 1 : 0),
-        entities: normalizeEntities([...existing.entities, ...entities]),
-      };
-      page.content_hash = contentHash(`${page.title}\n${page.summary}\n${page.body}`);
-      if (changed) {
-        await client.query(
-          `UPDATE pages SET title = $4, summary = $5, body = $6, version = $7, content_hash = $8,
-           status = CASE WHEN $9 THEN 'contested'::page_status ELSE status END,
-           last_compiled_at = CASE WHEN $10 THEN last_compiled_at ELSE now() END
-           WHERE tenant_id = $1 AND brain_id = $2 AND id = $3`,
-          [
-            job.tenantId,
-            job.brainId,
-            page.id,
-            page.title,
-            page.summary,
-            page.body,
-            page.version,
-            page.content_hash,
-            contradictions.length > 0,
-            userEdited,
-          ],
-        );
+        promptVersion: promptVersion("patch"),
+      }),
+    });
+    await ledger(response);
+    const parsed = parsePatchResult(response.text);
+    for (const { evidence } of parsed.contradictions) {
+      const text = chunks.find((chunk) => chunk.chunkUuid === evidence.chunkUuid)?.text;
+      if (
+        text === undefined ||
+        evidence.charEnd <= evidence.charStart ||
+        evidence.charEnd > text.length ||
+        text.slice(evidence.charStart, evidence.charEnd) !== evidence.quote
+      ) {
+        throw new CompileError();
       }
+    }
+    const patch = applyPatch(existing, parsed, {
+      userEdited,
+      facts: pageFacts,
+    });
+    const contradictions = patch.contradictions;
+    const changed = patch.changed || contradictions.length > 0;
+    const previousVersion = existing.version;
+    const page = {
+      ...existing,
+      title: patch.title,
+      summary: patch.summary,
+      body: patch.body,
+      version: existing.version + (changed ? 1 : 0),
+      entities: normalizeEntities([
+        ...existing.entities,
+        ...pageFacts.flatMap((fact) => normalizeEntities(fact.entities)),
+      ]),
+    };
+    page.content_hash = contentHash(`${page.title}\n${page.summary}\n${page.body}`);
+    if (changed) {
+      await client.query(
+        `UPDATE pages SET title = $4, summary = $5, body = $6, version = $7, content_hash = $8,
+         status = CASE WHEN $9 THEN 'contested'::page_status ELSE status END,
+         last_compiled_at = CASE WHEN $10 THEN last_compiled_at ELSE now() END,
+         entities = $11
+         WHERE tenant_id = $1 AND brain_id = $2 AND id = $3`,
+        [
+          job.tenantId,
+          job.brainId,
+          page.id,
+          page.title,
+          page.summary,
+          page.body,
+          page.version,
+          page.content_hash,
+          contradictions.length > 0,
+          userEdited,
+          page.entities,
+        ],
+      );
+    } else {
       await client.query(
         `UPDATE pages SET entities = $4 WHERE tenant_id = $1 AND brain_id = $2 AND id = $3`,
         [job.tenantId, job.brainId, page.id, page.entities],
       );
-    } else {
-      const title =
-        fact.entities.find((entity) => entity.trim())?.trim() ?? fact.claim.trim().slice(0, 120);
-      const pageBody = `${fact.claim}\n\n## Sources\n- ${fact.evidence.chunkUuid}:${fact.evidence.charStart}-${fact.evidence.charEnd} ${JSON.stringify(fact.evidence.quote)}`;
-      page = {
-        id: newId("page"),
-        title,
-        summary: fact.claim,
-        body: pageBody,
-        version: 1,
-        content_hash: contentHash(`${title}\n${fact.claim}\n${pageBody}`),
-        user_edited_at: null,
-        last_compiled_at: null,
-        entities,
-      };
-      const baseSlug =
-        title
-          .toLowerCase()
-          .normalize("NFKD")
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/^-|-$/g, "") || "topic";
-      const suffix = contentHash(`${sourceId}\n${index}\n${fact.claim}`).slice(0, 12);
-      let attempt = 0;
-      while (true) {
-        const slug =
-          attempt === 0 ? baseSlug : `${baseSlug}-${suffix}${attempt > 1 ? `-${attempt}` : ""}`;
-        const inserted = await client.query(
-          `INSERT INTO pages
-           (id, tenant_id, subject_id, brain_id, slug, title, summary, body, page_type, content_hash, last_compiled_at, entities)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $10, $9, now(), $11)
-           ON CONFLICT (brain_id, slug) WHERE deletion_state = 'active' DO NOTHING`,
-          [
-            page.id,
-            job.tenantId,
-            source.subject_id,
-            job.brainId,
-            slug,
-            title,
-            fact.claim,
-            page.body,
-            page.content_hash,
-            entities.length > 0 ? "entity" : "topic",
-            entities,
-          ],
-        );
-        if (inserted.rowCount) break;
-        attempt += 1;
-      }
     }
-    affected.add(page.id);
-    if (changed) {
-      await client.query(
-        `INSERT INTO page_versions
-         (tenant_id, page_id, version, title, summary, body, ingest_source_id, actor)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'compiler')`,
-        [job.tenantId, page.id, page.version, page.title, page.summary, page.body, sourceId],
-      );
-      await client.query(
-        `INSERT INTO change_events
-         (id, tenant_id, brain_id, page_id, action, change_summary, from_version, to_version, ingest_source_id, contradictions)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-        [
-          newId("change"),
-          job.tenantId,
-          job.brainId,
-          page.id,
-          previousVersion === null ? "created" : "updated",
-          fact.claim,
-          previousVersion,
-          page.version,
-          sourceId,
-          JSON.stringify(contradictions),
-        ],
-      );
-    }
-    await client.query(
-      `INSERT INTO page_sources (tenant_id, page_id, ingest_source_id, chunk_uuids)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (page_id, ingest_source_id) DO UPDATE SET chunk_uuids = ARRAY(
-         SELECT DISTINCT chunk FROM unnest(page_sources.chunk_uuids || EXCLUDED.chunk_uuids) AS chunk ORDER BY chunk)
-       WHERE page_sources.tenant_id = $1`,
-      [job.tenantId, page.id, sourceId, [fact.evidence.chunkUuid]],
-    );
-    const embedded = await client.query(
-      `SELECT page_id FROM page_embeddings
-       WHERE tenant_id = $1 AND page_id = $2 AND model = $3 AND content_hash = $4 LIMIT 1`,
-      [job.tenantId, page.id, embeddingModel, page.content_hash],
-    );
-    if (embedded.rowCount === 0) {
-      const result = await embed([`${page.title}\n${page.summary}\n${page.body}`]);
-      await client.query(
-        `INSERT INTO page_embeddings (tenant_id, page_id, model, dimensions, embedding, content_hash)
-         VALUES ($1, $2, $3, $4, $5::vector, $6)
-         ON CONFLICT (page_id, model) DO UPDATE SET embedding = EXCLUDED.embedding,
-         dimensions = EXCLUDED.dimensions, content_hash = EXCLUDED.content_hash
-         WHERE page_embeddings.tenant_id = $1`,
-        [
-          job.tenantId,
-          page.id,
-          embeddingModel,
-          result.dimensions,
-          JSON.stringify(result.vectors[0]),
-          page.content_hash,
-        ],
-      );
-      await client.query("UPDATE pages SET embedding_model = $3 WHERE tenant_id = $1 AND id = $2", [
-        job.tenantId,
-        page.id,
-        embeddingModel,
-      ]);
-    }
+    await recordPage(page, pageFacts, previousVersion, contradictions, changed);
   }
+
   await client.query(
     `UPDATE ingest_sources SET status = 'completed', compiled_at = now(), affected_page_ids = $4,
        metadata = metadata || $5::jsonb, last_error = NULL

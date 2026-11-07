@@ -30,6 +30,15 @@ function positiveUsd(value: string | undefined): number {
   return parsed;
 }
 
+function positiveRate(value: string | undefined, fallback: number, name: string): number {
+  if (value === undefined || value.trim() === "") return fallback;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`${name} must be a positive number`);
+  }
+  return parsed;
+}
+
 function required(value: string | undefined, name: string): string {
   if (value === undefined || value.trim() === "") throw new Error(`${name} is required`);
   return value.trim();
@@ -60,6 +69,18 @@ export function buildConfig(
     "EVAL_INDEX_TOKENS",
   );
   const readTokens = positiveInteger(env.EVAL_READ_TOKENS, DEFAULT_READ_TOKENS, "EVAL_READ_TOKENS");
+  const chatPrices = {
+    inputPerMillionUsd: positiveRate(
+      env.EVAL_CHAT_INPUT_USD_PER_M,
+      DEFAULT_CHAT_PRICES.inputPerMillionUsd,
+      "EVAL_CHAT_INPUT_USD_PER_M",
+    ),
+    outputPerMillionUsd: positiveRate(
+      env.EVAL_CHAT_OUTPUT_USD_PER_M,
+      DEFAULT_CHAT_PRICES.outputPerMillionUsd,
+      "EVAL_CHAT_OUTPUT_USD_PER_M",
+    ),
+  };
 
   if (mode === "fake") {
     const chatModel = "fake-chat";
@@ -89,7 +110,7 @@ export function buildConfig(
   const embeddingKey = required(env.OPENAI_API_KEY, "OPENAI_API_KEY");
   const chatModel = pinnedModel(env.OPENROUTER_CHAT_MODEL, "OPENROUTER_CHAT_MODEL");
   const embeddingModel = pinnedModel(env.EMBEDDING_MODEL, "EMBEDDING_MODEL");
-  const budget = new EvalBudget(positiveUsd(env.EVAL_BUDGET_USD));
+  const budget = new EvalBudget(positiveUsd(env.EVAL_BUDGET_USD), chatPrices);
   const chatProvider = guardChat(createOpenRouterChat({ apiKey }), budget);
   const embeddingProvider = guardEmbeddings(
     createOpenAIImbeddings({ apiKey: embeddingKey, model: embeddingModel, dimensions: 1536 }),
@@ -109,12 +130,12 @@ export function buildConfig(
       embeddingProvider,
       chatModel,
       embeddingModel,
-      chatPrices: DEFAULT_CHAT_PRICES,
+      chatPrices,
       embeddingPrices: DEFAULT_EMBEDDING_PRICES,
     },
     answerProvider: chatProvider,
     chatModel,
-    chatPrices: DEFAULT_CHAT_PRICES,
+    chatPrices,
     budget,
   };
 }

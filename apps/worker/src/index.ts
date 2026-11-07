@@ -1,8 +1,16 @@
+import { DEFAULT_CHAT_PRICES } from "@memtavi/llm/cost";
 import { createOpenAIImbeddings } from "@memtavi/llm/openai-embeddings";
 import { createOpenRouterChat } from "@memtavi/llm/openrouter";
 import { createWorker } from "./worker";
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function rate(value: string | undefined, fallback: number, name: string): number {
+  if (value === undefined || value.trim() === "") return fallback;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) throw new Error(`${name} must be a positive number`);
+  return parsed;
+}
 
 if (!process.env.APP_DATABASE_URL) throw new Error("APP_DATABASE_URL is required");
 const chatKey = process.env.OPENROUTER_API_KEY;
@@ -54,6 +62,18 @@ const worker = createWorker({
     }),
     chatModel,
     embeddingModel,
+    chatPrices: {
+      inputPerMillionUsd: rate(
+        process.env.OPENROUTER_INPUT_USD_PER_M,
+        DEFAULT_CHAT_PRICES.inputPerMillionUsd,
+        "OPENROUTER_INPUT_USD_PER_M",
+      ),
+      outputPerMillionUsd: rate(
+        process.env.OPENROUTER_OUTPUT_USD_PER_M,
+        DEFAULT_CHAT_PRICES.outputPerMillionUsd,
+        "OPENROUTER_OUTPUT_USD_PER_M",
+      ),
+    },
   },
   log: (event) => {
     process.stdout.write(`${JSON.stringify(event)}\n`);
