@@ -9,6 +9,8 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-06** — First live eval recorded on a LoCoMo slice (conv-26, 20 questions, `openai/gpt-4.1-mini`): 5% exact, 11.5% F1, 554.5 injected tokens per question, $0.54. Temporal questions fail because session dates are not ingested.
+- **2026-11-06** — Evidence spans re-anchored: a verbatim quote with wrong offsets is corrected instead of dropped; absent quotes still fail. This unblocked page compilation on real models.
 - **2026-11-06** — Eval harness shipped: `tests/eval` compiles a labelled set through the real compiler, answers from a budgeted summaries index plus FTS pages, and reports exact match, F1, injected tokens, accuracy per 1k tokens, latency and cost. Fake mode is CI-safe; live mode is budget-gated.
 - **2026-11-06** — `capture.compile` shipped: paragraph chunking to the store, extraction with evidence enforcement, MWS, PFS over pgvector candidates, patch/create paths, immutable versions, change events, embeddings, usage ledger, and source failure handling. 315 unit, 84 integration.
 - **2026-11-06** — Two-tier storage shipped: migration `0008` (`body_ref`, `body_bytes`, nullable chunk text, `memory_settings` with RLS, budget caps), capture and worker write bodies through `@memtavi/storage`, and the wire exposes `contentPreview`, `contentUrl` and a signed content endpoint.
