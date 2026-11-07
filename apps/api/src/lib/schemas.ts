@@ -5,6 +5,16 @@ export const pagination = t.Object({
   offset: t.Optional(t.Numeric({ minimum: 0, multipleOf: 1, default: 0 })),
 });
 
+export const indexLimit = t.Object({
+  limit: t.Optional(t.Numeric({ minimum: 1, maximum: 200, multipleOf: 1, default: 40 })),
+});
+
+export const searchQuery = t.Object({
+  q: t.String({ minLength: 1 }),
+  limit: t.Optional(t.Numeric({ minimum: 1, maximum: 200, multipleOf: 1, default: 50 })),
+  minSimilarity: t.Optional(t.Numeric({ minimum: 0, maximum: 1 })),
+});
+
 export const brainCreate = t.Object({
   name: t.String({ minLength: 1, maxLength: 200 }),
   slug: t.Optional(t.String({ minLength: 1 })),

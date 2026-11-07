@@ -1,3 +1,4 @@
+import { createOpenAIImbeddings } from "@memtavi/llm/openai-embeddings";
 import { Pool } from "pg";
 import { createApp } from "./app";
 
@@ -11,7 +12,18 @@ const { buildStoreFromEnv } = await import("@memtavi/storage/config");
 const { pool, withTenant } = await import("@memtavi/db/client");
 const ownerPool = new Pool({ connectionString: databaseUrl });
 const store = await buildStoreFromEnv(process.env);
-const app = createApp({ ownerPool, withTenant, store }).listen(port);
+const embeddingKey = process.env.OPENAI_API_KEY;
+const embeddingModel = process.env.EMBEDDING_MODEL;
+const embeddings =
+  embeddingKey?.trim() && embeddingModel?.trim()
+    ? createOpenAIImbeddings({ apiKey: embeddingKey, model: embeddingModel, dimensions: 1536 })
+    : undefined;
+const app = createApp({
+  ownerPool,
+  withTenant,
+  store,
+  ...(embeddings === undefined ? {} : { embeddings }),
+}).listen(port);
 
 async function shutdown() {
   await app.stop();

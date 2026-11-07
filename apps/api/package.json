@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@memtavi/db": "workspace:*",
+    "@memtavi/llm": "workspace:*",
     "@memtavi/shared": "workspace:*",
     "@memtavi/storage": "workspace:*",
     "elysia": "^1.4.0",

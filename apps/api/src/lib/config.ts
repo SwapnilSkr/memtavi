@@ -1,4 +1,5 @@
 import type { withTenant } from "@memtavi/db/client";
+import type { EmbeddingProvider } from "@memtavi/llm/provider";
 import type { ObjectStore } from "@memtavi/storage/types";
 import type { Pool } from "pg";
 
@@ -7,4 +8,5 @@ export interface AppConfig {
   withTenant: typeof withTenant;
   store: ObjectStore;
   now?: () => Date;
+  embeddings?: EmbeddingProvider;
 }
