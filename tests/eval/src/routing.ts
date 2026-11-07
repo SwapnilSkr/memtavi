@@ -55,7 +55,7 @@ function median(values: readonly number[]): number {
 
 export function aggregateRouting(events: readonly RoutingEvent[]): RoutingAggregate {
   const actions = { place: 0, review: 0, new: 0 };
-  const reasons = { score: 0, entity: 0, new: 0 };
+  const reasons = { score: 0, entity: 0, new: 0, split: 0 };
   for (const event of events) {
     actions[event.action] += 1;
     reasons[event.reason] += 1;

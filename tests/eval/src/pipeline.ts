@@ -1,11 +1,12 @@
 import { SQL } from "bun";
 import { compileCapture } from "../../../apps/worker/src/compile";
-import type {
-  ClaimedJob,
-  CompilerConfig,
-  CompilerUsage,
-  JobContext,
-  RoutingEvent,
+import {
+  type ClaimedJob,
+  type CompilerConfig,
+  type CompilerUsage,
+  type JobContext,
+  JobError,
+  type RoutingEvent,
 } from "../../../apps/worker/src/types";
 import { newId } from "../../../packages/shared/src/ids";
 import { contentHash } from "../../../packages/storage/src/keys";
@@ -203,22 +204,34 @@ export class EvalPipeline {
       attempts: 1,
       maxAttempts: 5,
     };
-    await withTenant(this.app, this.tenantId, this.subjectId, async (client) => {
-      const context: JobContext = {
-        job,
-        client: client as unknown as JobContext["client"],
-        store: this.store,
-        fetchDocument: async () => {
-          throw new Error("Network is forbidden during eval");
-        },
-        compiler: this.compiler,
-        recordUsage: async (usage) => {
-          await this.onUsage(usage);
-        },
-        onRouting,
-      };
-      await compileCapture(context);
-    });
+    for (let attempt = 0; ; attempt += 1) {
+      const routing: RoutingEvent[] = [];
+      job.attempts = attempt + 1;
+      try {
+        await withTenant(this.app, this.tenantId, this.subjectId, async (client) => {
+          const context: JobContext = {
+            job,
+            client: client as unknown as JobContext["client"],
+            store: this.store,
+            fetchDocument: async () => {
+              throw new Error("Network is forbidden during eval");
+            },
+            compiler: this.compiler,
+            recordUsage: async (usage) => {
+              await this.onUsage(usage);
+            },
+            onRouting: (event) => routing.push(event),
+          };
+          await compileCapture(context);
+        });
+        for (const event of routing) onRouting(event);
+        return;
+      } catch (error) {
+        if (!(error instanceof JobError) || error.kind !== "transient" || attempt >= 2) {
+          throw error;
+        }
+      }
+    }
   }
 
   async close(): Promise<void> {

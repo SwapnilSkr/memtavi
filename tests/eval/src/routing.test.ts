@@ -41,6 +41,16 @@ describe("aggregateRouting", () => {
     expect(aggregate.actions).toEqual({ place: 1, review: 2, new: 1 });
   });
 
+  test("counts split placements separately from score, entity and new reasons", () => {
+    const aggregate = aggregateRouting([
+      event({ action: "place", best: 0.9, reason: "split" }),
+      event({ action: "place", best: 0.9, reason: "entity" }),
+      event({ action: "new", best: 0.1, reason: "new" }),
+    ]);
+    expect(aggregate.actions).toEqual({ place: 2, review: 0, new: 1 });
+    expect(aggregate.reasons).toEqual({ score: 0, entity: 1, new: 1, split: 1 });
+  });
+
   test("places boundary scores in the higher bucket", () => {
     const aggregate = aggregateRouting([
       event({ action: "new", best: 0 }),

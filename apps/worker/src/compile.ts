@@ -12,6 +12,8 @@ import { chunkKey, contentHash } from "@memtavi/storage/keys";
 import { StorageError } from "@memtavi/storage/types";
 import { type JobContext, JobError, type RoutingEvent } from "./types";
 
+export const PAGE_BODY_MAX_CHARS = 6000;
+
 interface SourceRow {
   content: string;
   body_ref: string | null;
@@ -103,6 +105,7 @@ async function compileSource({
   if (!source || source.deleted_at || source.status === "completed") return;
   if (!compiler) throw new JobError("permanent", "Compiler configuration is required");
   const { chatProvider, embeddingProvider, chatModel, embeddingModel } = compiler;
+  const subjectId = source.subject_id;
   const body = source.body_ref
     ? await new Response(await store.get(source.body_ref)).text()
     : source.content;
@@ -216,6 +219,7 @@ async function compileSource({
     previousVersion: number | null,
     contradictions: PatchResult["contradictions"],
     changed: boolean,
+    splitFrom?: PageRow,
   ): Promise<void> {
     affected.add(page.id);
     if (changed) {
@@ -234,10 +238,12 @@ async function compileSource({
           job.tenantId,
           job.brainId,
           page.id,
-          previousVersion === null ? "created" : "updated",
-          previousVersion === null
-            ? pageFacts[0]?.claim
-            : `${pageFacts[0]?.claim} (${pageFacts.length} facts)`,
+          splitFrom ? "split" : previousVersion === null ? "created" : "updated",
+          splitFrom
+            ? `Split from ${splitFrom.title} (${splitFrom.id})`
+            : previousVersion === null
+              ? pageFacts[0]?.claim
+              : `${pageFacts[0]?.claim} (${pageFacts.length} facts)`,
           previousVersion,
           page.version,
           sourceId,
@@ -287,6 +293,75 @@ async function compileSource({
       ]);
     }
   }
+  async function createPage(
+    pageFacts: readonly ExtractedFact[],
+    title: string,
+    pageType: "entity" | "topic",
+    entities: string[],
+    suffixKey: string | number,
+    splitFrom?: PageRow,
+  ): Promise<PageRow> {
+    const first = pageFacts[0];
+    if (!first) throw new JobError("permanent", "Missing page facts");
+    const sources = [
+      ...new Set(
+        pageFacts.map(
+          ({ evidence }) =>
+            `- ${evidence.chunkUuid}:${evidence.charStart}-${evidence.charEnd} ${JSON.stringify(evidence.quote)}`,
+        ),
+      ),
+    ]
+      .sort()
+      .join("\n");
+    const pageBody = `${pageFacts.map((fact) => fact.claim).join("\n\n")}\n\n## Sources\n${sources}`;
+    const page: PageRow = {
+      id: newId("page"),
+      title,
+      summary: first.claim,
+      body: pageBody,
+      version: 1,
+      content_hash: contentHash(`${title}\n${first.claim}\n${pageBody}`),
+      user_edited_at: null,
+      last_compiled_at: null,
+      entities,
+    };
+    const baseSlug =
+      title
+        .toLowerCase()
+        .normalize("NFKD")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "") || "topic";
+    const suffix = contentHash(`${sourceId}\n${suffixKey}\n${first.claim}`).slice(0, 12);
+    let attempt = 0;
+    while (true) {
+      const slug =
+        attempt === 0 ? baseSlug : `${baseSlug}-${suffix}${attempt > 1 ? `-${attempt}` : ""}`;
+      const inserted = await client.query(
+        `INSERT INTO pages
+         (id, tenant_id, subject_id, brain_id, slug, title, summary, body, page_type, content_hash, last_compiled_at, entities)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $10, $9, now(), $11)
+         ON CONFLICT (brain_id, slug) WHERE deletion_state = 'active' DO NOTHING`,
+        [
+          page.id,
+          job.tenantId,
+          subjectId,
+          job.brainId,
+          slug,
+          title,
+          first.claim,
+          page.body,
+          page.content_hash,
+          pageType,
+          entities,
+        ],
+      );
+      if (inserted.rowCount) break;
+      attempt += 1;
+    }
+    await recordPage(page, pageFacts, null, [], true, splitFrom);
+    return page;
+  }
+  const routing: RoutingEvent[] = [];
   const placed = new Map<string, ExtractedFact[]>();
   for (const [index, fact] of facts.entries()) {
     const entities = normalizeEntities(fact.entities);
@@ -331,7 +406,7 @@ async function compileSource({
         entities.includes(entity),
       ).length;
     }
-    onRouting?.({
+    routing.push({
       sourceId,
       factClaim: fact.claim,
       action: decision.action,
@@ -361,52 +436,7 @@ async function compileSource({
     }
     const title =
       fact.entities.find((entity) => entity.trim())?.trim() ?? fact.claim.trim().slice(0, 120);
-    const pageBody = `${fact.claim}\n\n## Sources\n- ${fact.evidence.chunkUuid}:${fact.evidence.charStart}-${fact.evidence.charEnd} ${JSON.stringify(fact.evidence.quote)}`;
-    const page: PageRow = {
-      id: newId("page"),
-      title,
-      summary: fact.claim,
-      body: pageBody,
-      version: 1,
-      content_hash: contentHash(`${title}\n${fact.claim}\n${pageBody}`),
-      user_edited_at: null,
-      last_compiled_at: null,
-      entities,
-    };
-    const baseSlug =
-      title
-        .toLowerCase()
-        .normalize("NFKD")
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-|-$/g, "") || "topic";
-    const suffix = contentHash(`${sourceId}\n${index}\n${fact.claim}`).slice(0, 12);
-    let attempt = 0;
-    while (true) {
-      const slug =
-        attempt === 0 ? baseSlug : `${baseSlug}-${suffix}${attempt > 1 ? `-${attempt}` : ""}`;
-      const inserted = await client.query(
-        `INSERT INTO pages
-         (id, tenant_id, subject_id, brain_id, slug, title, summary, body, page_type, content_hash, last_compiled_at, entities)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $10, $9, now(), $11)
-         ON CONFLICT (brain_id, slug) WHERE deletion_state = 'active' DO NOTHING`,
-        [
-          page.id,
-          job.tenantId,
-          source.subject_id,
-          job.brainId,
-          slug,
-          title,
-          fact.claim,
-          page.body,
-          page.content_hash,
-          entities.length > 0 ? "entity" : "topic",
-          entities,
-        ],
-      );
-      if (inserted.rowCount) break;
-      attempt += 1;
-    }
-    await recordPage(page, [fact], null, [], true);
+    await createPage([fact], title, entities.length > 0 ? "entity" : "topic", entities, index);
   }
   for (const [pageId, pageFacts] of [...placed].sort(([left], [right]) =>
     left < right ? -1 : left > right ? 1 : 0,
@@ -419,9 +449,41 @@ async function compileSource({
     );
     const existing = found.rows[0];
     if (!existing) throw new JobError("transient", "Routing page changed");
-    const userEdited =
-      existing.user_edited_at !== null &&
-      (existing.last_compiled_at === null || existing.user_edited_at > existing.last_compiled_at);
+    const userEdited = existing.user_edited_at !== null;
+    const estimatedSize =
+      existing.body.length + pageFacts.reduce((total, fact) => total + fact.claim.length + 200, 0);
+    if (!userEdited && estimatedSize > PAGE_BODY_MAX_CHARS) {
+      const frequencies = new Map<string, number>();
+      for (const fact of pageFacts) {
+        const entities = new Set(
+          fact.entities.map((entity) => entity.trim().toLowerCase()).filter(Boolean),
+        );
+        for (const entity of entities) {
+          if (entity !== existing.title.trim().toLowerCase()) {
+            frequencies.set(entity, (frequencies.get(entity) ?? 0) + 1);
+          }
+        }
+      }
+      const secondary = [...frequencies].sort(
+        ([left, a], [right, b]) => b - a || (left < right ? -1 : left > right ? 1 : 0),
+      )[0]?.[0];
+      const title = secondary ?? `${existing.title} — ${pageFacts[0]?.claim.slice(0, 60)}`;
+      const sibling = await createPage(
+        pageFacts,
+        title,
+        secondary ? "entity" : "topic",
+        normalizeEntities(pageFacts.flatMap((fact) => fact.entities)),
+        pageId,
+        existing,
+      );
+      for (const event of routing) {
+        if (event.action === "place" && event.chosenPageId === pageId) {
+          event.reason = "split";
+          event.chosenPageId = sibling.id;
+        }
+      }
+      continue;
+    }
     const response = await chatProvider.chat({
       model: chatModel,
       temperature: 0,
@@ -508,4 +570,5 @@ async function compileSource({
       }),
     ],
   );
+  for (const event of routing) onRouting?.(event);
 }

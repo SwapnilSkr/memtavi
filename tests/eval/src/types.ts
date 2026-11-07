@@ -83,7 +83,7 @@ export interface RoutingReviewExample {
 export interface RoutingAggregate {
   total: number;
   actions: { place: number; review: number; new: number };
-  reasons: { score: number; entity: number; new: number };
+  reasons: { score: number; entity: number; new: number; split: number };
   bestBuckets: RoutingBucket[];
   gapBuckets: RoutingBucket[];
   best: { mean: number; median: number };

@@ -7,7 +7,12 @@ import { newId } from "@memtavi/shared/ids";
 import { createFakeStore } from "@memtavi/storage/fake";
 import { contentHash, sourceKey } from "@memtavi/storage/keys";
 import { createWorker } from "@memtavi/worker";
-import { CANDIDATES_SQL, compileCapture, ENTITY_PAGES_SQL } from "@memtavi/worker/compile";
+import {
+  CANDIDATES_SQL,
+  compileCapture,
+  ENTITY_PAGES_SQL,
+  PAGE_BODY_MAX_CHARS,
+} from "@memtavi/worker/compile";
 import type { CompilerConfig, RoutingEvent } from "@memtavi/worker/types";
 import { Pool, type PoolClient } from "pg";
 
@@ -39,7 +44,7 @@ describe("capture.compile", () => {
   let routing: RoutingEvent[] = [];
   let entitiesByClaim: Record<string, string[]> = {};
   const batchClaims = ["Alpha ships. ", "Beta builds. ", "Gamma tests. "].map((claim) =>
-    claim.repeat(180).trim(),
+    claim.repeat(130).trim(),
   );
   const batchText = batchClaims.join("\n\n");
 
@@ -686,6 +691,218 @@ describe("capture.compile", () => {
     expect(page?.version).toBe(2);
   });
 
+  test.each(["frequency", "tie", "fallback", "beyond entity cap"] as const)(
+    "an oversized batch creates one sibling with evidence, embedding and a split event (%s)",
+    async (titleCase) => {
+      const pageId = await seedCandidate("oversized", note, "other-model", ["original"]);
+      const body = "Existing body. ".repeat(450);
+      await owner.query("UPDATE pages SET body = $2 WHERE id = $1", [pageId, body]);
+      const originalSourceId = newId("source");
+      await owner.query(
+        `INSERT INTO ingest_sources (id, tenant_id, subject_id, brain_id, kind, content, content_hash)
+       VALUES ($1, $2, $3, $4, 'note', 'Old evidence', 'old')`,
+        [originalSourceId, tenantId, subjectId, brainId],
+      );
+      await owner.query(
+        "INSERT INTO page_sources (tenant_id, page_id, ingest_source_id) VALUES ($1, $2, $3)",
+        [tenantId, pageId, originalSourceId],
+      );
+      const original = (await owner.query("SELECT * FROM pages WHERE id = $1", [pageId])).rows[0];
+      const versions = (
+        await owner.query("SELECT * FROM page_versions WHERE page_id = $1", [pageId])
+      ).rows;
+      const sources = (await owner.query("SELECT * FROM page_sources WHERE page_id = $1", [pageId]))
+        .rows;
+      const embeddings = (
+        await owner.query("SELECT * FROM page_embeddings WHERE page_id = $1", [pageId])
+      ).rows;
+      entitiesByClaim = Object.fromEntries(
+        batchClaims.map((claim, index) => [
+          claim,
+          titleCase === "beyond entity cap"
+            ? [
+                " ORIGINAL ",
+                ...Array.from({ length: 20 }, (_, ordinal) => `noise-${index}-${ordinal}`),
+                " repeated ",
+              ]
+            : titleCase === "fallback"
+              ? [" ORIGINAL "]
+              : titleCase === "tie" || index === 0
+                ? [" ORIGINAL ", "Acme", "Compiler"]
+                : ["Original", " compiler "],
+        ]),
+      );
+      await capture(batchText);
+      await worker().runOnce();
+      expect((await owner.query("SELECT * FROM pages WHERE id = $1", [pageId])).rows[0]).toEqual(
+        original,
+      );
+      expect(
+        (await owner.query("SELECT * FROM page_versions WHERE page_id = $1", [pageId])).rows,
+      ).toEqual(versions);
+      expect(
+        (await owner.query("SELECT * FROM page_sources WHERE page_id = $1", [pageId])).rows,
+      ).toEqual(sources);
+      expect(
+        (await owner.query("SELECT * FROM page_embeddings WHERE page_id = $1", [pageId])).rows,
+      ).toEqual(embeddings);
+      const siblings = await owner.query(
+        "SELECT id, title, summary, body, version, page_type, entities, content_hash FROM pages WHERE brain_id = $1 AND id <> $2",
+        [brainId, pageId],
+      );
+      expect(siblings.rows).toHaveLength(1);
+      const sibling = siblings.rows[0];
+      expect(sibling).toMatchObject({
+        title:
+          titleCase === "fallback"
+            ? `Original — ${routing[0]?.factClaim.slice(0, 60)}`
+            : titleCase === "tie"
+              ? "acme"
+              : titleCase === "beyond entity cap"
+                ? "repeated"
+                : "compiler",
+        summary: routing[0]?.factClaim,
+        page_type: titleCase === "fallback" ? "topic" : "entity",
+        version: 1,
+      });
+      expect(sibling?.body.split("\n\n## Sources\n")[0].split("\n\n").sort()).toEqual(
+        [...batchClaims].sort(),
+      );
+      const chunks = (
+        await owner.query<{ id: string }>(
+          "SELECT id FROM source_chunks WHERE source_id = $1 ORDER BY id",
+          [sourceId],
+        )
+      ).rows;
+      expect(chunks).toHaveLength(3);
+      for (const chunk of chunks) expect(sibling?.body).toContain(chunk.id);
+      expect(
+        (
+          await owner.query(
+            "SELECT chunk_uuids FROM page_sources WHERE page_id = $1 AND ingest_source_id = $2",
+            [sibling?.id, sourceId],
+          )
+        ).rows,
+      ).toEqual([{ chunk_uuids: chunks.map((chunk) => chunk.id) }]);
+      expect(
+        (
+          await owner.query("SELECT version, body FROM page_versions WHERE page_id = $1", [
+            sibling?.id,
+          ])
+        ).rows,
+      ).toEqual([{ version: 1, body: sibling?.body }]);
+      expect(
+        (
+          await owner.query(
+            "SELECT model, dimensions, content_hash FROM page_embeddings WHERE page_id = $1",
+            [sibling?.id],
+          )
+        ).rows,
+      ).toEqual([{ model: embeddingModel, dimensions: 1536, content_hash: sibling?.content_hash }]);
+      const events = (
+        await owner.query(
+          "SELECT page_id, action, from_version, to_version, change_summary FROM change_events WHERE brain_id = $1",
+          [brainId],
+        )
+      ).rows;
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        page_id: sibling?.id,
+        action: "split",
+        from_version: null,
+        to_version: 1,
+      });
+      expect(events[0]?.change_summary).toContain(`Original (${pageId})`);
+      expect(routing).toHaveLength(3);
+      for (const event of routing)
+        expect(event).toMatchObject({
+          action: "place",
+          reason: "split",
+          chosenPageId: sibling?.id,
+        });
+      const source = (
+        await owner.query("SELECT status, affected_page_ids FROM ingest_sources WHERE id = $1", [
+          sourceId,
+        ])
+      ).rows[0];
+      expect(source).toEqual({ status: "completed", affected_page_ids: [sibling?.id] });
+      expect(provider.calls.filter((call) => call.kind === "chat")).toHaveLength(1);
+      const calls = provider.calls.length;
+      await owner.query("UPDATE jobs SET status = 'pending' WHERE id = $1", [jobId]);
+      await worker().runOnce();
+      expect(provider.calls).toHaveLength(calls);
+      expect((await counts())?.pages).toBe(2);
+    },
+  );
+
+  test.each([-1, 0, 1])(
+    "the estimated size splits only above the cap (offset %j)",
+    async (offset) => {
+      const pageId = await seedCandidate("boundary");
+      const body = "x".repeat(PAGE_BODY_MAX_CHARS - note.length - 200 + offset);
+      await owner.query("UPDATE pages SET body = $2 WHERE id = $1", [pageId, body]);
+      patchResponse = JSON.stringify({
+        title: "Patched",
+        summary: note,
+        body: "Patched",
+        changed: true,
+        contradictions: [],
+      });
+      await capture();
+      await worker().runOnce();
+      expect((await counts())?.pages).toBe(offset > 0 ? 2 : 1);
+      const original = (
+        await owner.query("SELECT body, version FROM pages WHERE id = $1", [pageId])
+      ).rows[0];
+      expect(original?.version).toBe(offset > 0 ? 1 : 2);
+      if (offset > 0) {
+        expect(original?.body).toBe(body);
+        const sibling = (
+          await owner.query("SELECT title, page_type FROM pages WHERE brain_id = $1 AND id <> $2", [
+            brainId,
+            pageId,
+          ])
+        ).rows[0];
+        expect(sibling).toEqual({ title: `Original — ${note.slice(0, 60)}`, page_type: "topic" });
+      } else {
+        expect(original?.body).toContain("Patched");
+        expect(routing[0]?.reason).toBe("score");
+      }
+    },
+  );
+
+  test.each([null, "2026-11-06T00:00:00Z", "2026-11-08T00:00:00Z"])(
+    "an oversized user-edited page appends instead of splitting (last compiled %j)",
+    async (lastCompiled) => {
+      const pageId = await seedCandidate("oversized-edited");
+      const body = "Human body. ".repeat(600);
+      await owner.query(
+        "UPDATE pages SET body = $2, user_edited_at = '2026-11-07T00:00:00Z', last_compiled_at = $3 WHERE id = $1",
+        [pageId, body, lastCompiled],
+      );
+      patchResponse = JSON.stringify({
+        title: "Rewritten",
+        summary: "Rewritten",
+        body: "Update",
+        changed: true,
+        contradictions: [],
+      });
+      await capture();
+      await worker().runOnce();
+      expect((await counts())?.pages).toBe(1);
+      const page = (
+        await owner.query("SELECT title, body, version FROM pages WHERE id = $1", [pageId])
+      ).rows[0];
+      expect(page?.title).toBe("Original");
+      expect(page?.body).toStartWith(`${body}\n\n## Updates`);
+      expect(page?.version).toBe(2);
+      expect(routing[0]).toMatchObject({ action: "place", reason: "score", chosenPageId: pageId });
+      expect(
+        (await owner.query("SELECT action FROM change_events WHERE page_id = $1", [pageId])).rows,
+      ).toEqual([{ action: "updated" }]);
+    },
+  );
+
   test("three facts for one page use one patch, version, event and complete evidence", async () => {
     const pageId = await seedCandidate("batch", note, "other-model", ["acme"]);
     factEntities = ["Acme", "Compiler"];
@@ -775,7 +992,7 @@ describe("capture.compile", () => {
         chatProvider: {
           chat: async (request) => {
             const input = JSON.parse(request.messages[1]?.content ?? "{}");
-            if (input.facts) expect(routing).toHaveLength(3);
+            if (input.facts) expect(routing).toHaveLength(0);
             return base.chatProvider.chat(request);
           },
         },
@@ -789,6 +1006,7 @@ describe("capture.compile", () => {
     await instance.runOnce();
     const chats = provider.calls.filter((call) => call.kind === "chat");
     expect(chats).toHaveLength(3);
+    expect(routing).toHaveLength(3);
     const patches = chats
       .slice(1)
       .map((call) => JSON.parse(call.request.messages[1]?.content ?? "{}"));
@@ -938,7 +1156,7 @@ describe("capture.compile", () => {
     for (const review of reviews.rows) expect(review.candidate_page_ids).toEqual(candidates);
   });
 
-  test("new pages remain visible to later facts before a single grouped patch", async () => {
+  test("new pages remain visible to later facts before an oversized batch splits", async () => {
     factEntities = ["Acme"];
     patchResponse = JSON.stringify({
       title: "Acme",
@@ -950,20 +1168,19 @@ describe("capture.compile", () => {
     await capture(batchText);
     await worker().runOnce();
     expect(routing.map((event) => event.action)).toEqual(["new", "place", "place"]);
-    expect(routing.slice(1).every((event) => event.reason === "entity")).toBe(true);
+    expect(routing.slice(1).every((event) => event.reason === "split")).toBe(true);
+    expect(new Set(routing.slice(1).map((event) => event.chosenPageId)).size).toBe(1);
     const chats = provider.calls.filter((call) => call.kind === "chat");
-    expect(chats).toHaveLength(2);
-    const input = JSON.parse(chats[1]?.request.messages[1]?.content ?? "{}");
-    expect(input.facts).toHaveLength(2);
-    expect((await counts())?.pages).toBe(1);
+    expect(chats).toHaveLength(1);
+    expect((await counts())?.pages).toBe(2);
     expect((await counts())?.versions).toBe(2);
     expect((await counts())?.events).toBe(2);
-    expect((await counts())?.sources).toBe(1);
+    expect((await counts())?.sources).toBe(2);
     const links = await owner.query<{ chunk_uuids: string[] }>(
       "SELECT chunk_uuids FROM page_sources WHERE ingest_source_id = $1",
       [sourceId],
     );
-    expect(links.rows[0]?.chunk_uuids).toHaveLength(3);
+    expect(links.rows.map((row) => row.chunk_uuids.length).sort()).toEqual([1, 2]);
   });
 
   test("manual edits keep their body and append updates on subsequent compiles", async () => {
