@@ -9,8 +9,9 @@ import type {
 import { newId } from "../../../packages/shared/src/ids";
 import { contentHash } from "../../../packages/storage/src/keys";
 import type { ObjectStore } from "../../../packages/storage/src/types";
+import { BudgetExceededError } from "./budget";
 import { assertTestDatabase, type Queryable, withTenant } from "./db";
-import type { Conversation } from "./types";
+import type { CompileCounts, Conversation, Session } from "./types";
 
 export interface PipelineOptions {
   ownerUrl: string;
@@ -20,10 +21,26 @@ export interface PipelineOptions {
   onUsage?: (usage: CompilerUsage) => Promise<void> | void;
 }
 
+interface CountRow {
+  sources_completed: number;
+  sources_failed: number;
+  pages: number;
+  page_versions: number;
+  routing_reviews: number;
+}
+
 export interface CompiledConversation {
   conversationId: string;
   brainId: string;
   sourceIds: string[];
+  counts: CompileCounts;
+  failures: { sourceId: string; message: string }[];
+}
+
+export function sessionSourceText(session: Session): string {
+  const turns = session.turns.map((turn) => `${turn.speaker}: ${turn.text}`);
+  if (session.date === undefined) return turns.join("\n");
+  return [`Session date: ${session.date}`, ...turns].join("\n");
 }
 
 function slugFor(conversationId: string, ordinal: number): string {
@@ -102,7 +119,7 @@ export class EvalPipeline {
     const sourceIds: string[] = [];
     for (const session of conversation.sessions) {
       const sourceId = newId("source");
-      const text = session.turns.map((turn) => `${turn.speaker}: ${turn.text}`).join("\n");
+      const text = sessionSourceText(session);
       await this.owner.unsafe(
         `INSERT INTO ingest_sources
          (id, tenant_id, subject_id, brain_id, kind, content, content_hash)
@@ -112,10 +129,57 @@ export class EvalPipeline {
       sourceIds.push(sourceId);
     }
 
+    const failures: { sourceId: string; message: string }[] = [];
     for (const sourceId of sourceIds) {
-      await this.compileSource(brainId, sourceId);
+      try {
+        await this.compileSource(brainId, sourceId);
+      } catch (error) {
+        if (error instanceof BudgetExceededError) throw error;
+        const message = error instanceof Error ? error.message : String(error);
+        failures.push({ sourceId, message });
+        await this.failSource(brainId, sourceId, message);
+      }
     }
-    return { conversationId: conversation.id, brainId, sourceIds };
+    const counts = await this.collectCounts(brainId);
+    return { conversationId: conversation.id, brainId, sourceIds, counts, failures };
+  }
+
+  private async failSource(brainId: string, sourceId: string, message: string): Promise<void> {
+    await this.withScope(async (client) => {
+      await client.query(
+        `UPDATE ingest_sources SET status = 'failed', last_error = $4
+         WHERE tenant_id = $1 AND brain_id = $2 AND id = $3`,
+        [this.tenantId, brainId, sourceId, message],
+      );
+    });
+  }
+
+  private async collectCounts(brainId: string): Promise<CompileCounts> {
+    return this.withScope(async (client) => {
+      const result = await client.query<CountRow>(
+        `SELECT
+           (SELECT count(*)::int FROM ingest_sources
+             WHERE tenant_id = $1 AND brain_id = $2 AND status = 'completed') AS sources_completed,
+           (SELECT count(*)::int FROM ingest_sources
+             WHERE tenant_id = $1 AND brain_id = $2 AND status = 'failed') AS sources_failed,
+           (SELECT count(*)::int FROM pages
+             WHERE tenant_id = $1 AND brain_id = $2 AND deletion_state = 'active') AS pages,
+           (SELECT count(*)::int FROM page_versions v
+             JOIN pages p ON p.tenant_id = v.tenant_id AND p.id = v.page_id
+             WHERE v.tenant_id = $1 AND p.brain_id = $2) AS page_versions,
+           (SELECT count(*)::int FROM routing_reviews
+             WHERE tenant_id = $1 AND brain_id = $2) AS routing_reviews`,
+        [this.tenantId, brainId],
+      );
+      const row = result.rows[0];
+      return {
+        sourcesCompleted: row?.sources_completed ?? 0,
+        sourcesFailed: row?.sources_failed ?? 0,
+        pages: row?.pages ?? 0,
+        pageVersions: row?.page_versions ?? 0,
+        routingReviews: row?.routing_reviews ?? 0,
+      };
+    });
   }
 
   async withScope<T>(fn: (client: Queryable) => Promise<T>): Promise<T> {

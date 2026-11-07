@@ -4,6 +4,7 @@ export interface Turn {
 }
 
 export interface Session {
+  date?: string | undefined;
   turns: Turn[];
 }
 
@@ -52,6 +53,20 @@ export interface Aggregates {
   totalCostUsd: number;
 }
 
+export interface CompileCounts {
+  sourcesCompleted: number;
+  sourcesFailed: number;
+  pages: number;
+  pageVersions: number;
+  routingReviews: number;
+}
+
+export interface ConversationSummary {
+  conversationId: string;
+  brainId: string;
+  counts: CompileCounts;
+}
+
 export interface EvalResults {
   mode: "fake" | "live";
   label: "plumbing check, not accuracy" | "measured";
@@ -63,6 +78,7 @@ export interface EvalResults {
   spentUsd: number;
   stoppedReason: string | null;
   aggregates: Aggregates;
+  conversations: ConversationSummary[];
   results: QuestionResult[];
   errors: string[];
 }

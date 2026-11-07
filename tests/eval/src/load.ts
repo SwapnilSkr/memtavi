@@ -8,6 +8,7 @@ const turnSchema = z.object({
 });
 
 const sessionSchema = z.object({
+  date: z.string().min(1).optional(),
   turns: z.array(turnSchema).min(1),
 });
 
@@ -149,7 +150,13 @@ export function adaptLocomo(raw: unknown): Dataset {
         if (speaker.length > 0 && text.length > 0) turns.push({ speaker, text });
       }
       if (turns.length > 0) {
-        sessions.push({ ordinal: Number(match[1]), session: { turns } });
+        const rawDate = source[`${match[0]}_date_time`];
+        const date =
+          typeof rawDate === "string" && rawDate.trim().length > 0 ? rawDate.trim() : undefined;
+        sessions.push({
+          ordinal: Number(match[1]),
+          session: date === undefined ? { turns } : { date, turns },
+        });
       }
     }
     if (sessions.length === 0) continue;

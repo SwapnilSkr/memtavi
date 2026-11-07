@@ -17,6 +17,19 @@ describe("eval dataset loader", () => {
     expect(parseDataset(valid)).toEqual(valid);
   });
 
+  test("keeps an optional date on an internal session", () => {
+    const dated = {
+      ...valid,
+      conversations: [
+        {
+          id: "c1",
+          sessions: [{ date: "2026-01-01", turns: [{ speaker: "A", text: "hello" }] }],
+        },
+      ],
+    };
+    expect(parseDataset(dated)).toEqual(dated);
+  });
+
   test("loads the shipped smoke fixture", async () => {
     const dataset = await loadDatasetFile(DEFAULT_DATASET_PATH);
     expect(dataset.name).toBe("smoke");
@@ -99,6 +112,12 @@ describe("locomo adapter", () => {
     });
     expect(dataset.questions[1]?.answer).toBe("42");
     expect(dataset.questions[1]?.category).toBe("temporal");
+  });
+
+  test("attaches session_N_date_time and invents no date", () => {
+    const dataset = adaptLocomo([sample]);
+    expect(dataset.conversations[0]?.sessions[0]?.date).toBe("2026-01-01");
+    expect(dataset.conversations[0]?.sessions[1]?.date).toBeUndefined();
   });
 
   test("accepts a dictionary keyed by sample id and skips unusable samples", () => {

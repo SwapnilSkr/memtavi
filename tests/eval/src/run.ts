@@ -16,7 +16,14 @@ import {
 import { BudgetExceededError, type EvalBudget } from "./budget";
 import { judge } from "./judge";
 import { type CompiledConversation, EvalPipeline } from "./pipeline";
-import type { Aggregates, Dataset, EvalResults, Question, QuestionResult } from "./types";
+import type {
+  Aggregates,
+  ConversationSummary,
+  Dataset,
+  EvalResults,
+  Question,
+  QuestionResult,
+} from "./types";
 
 export interface RunConfig {
   mode: "fake" | "live";
@@ -136,6 +143,7 @@ export async function runEval(config: RunConfig): Promise<RunOutput> {
   const usage: CompilerUsage[] = [];
   const errors: string[] = [];
   const collected: QuestionResult[] = [];
+  const conversations: ConversationSummary[] = [];
   let stoppedReason: string | null = null;
   const startedAt = new Date();
 
@@ -163,6 +171,15 @@ export async function runEval(config: RunConfig): Promise<RunOutput> {
         }
         errors.push(`conversation ${conversation.id}: ${messageOf(error)}`);
         continue;
+      }
+
+      conversations.push({
+        conversationId: compiled.conversationId,
+        brainId: compiled.brainId,
+        counts: compiled.counts,
+      });
+      for (const failure of compiled.failures) {
+        errors.push(`source ${failure.sourceId}: ${failure.message}`);
       }
 
       let index: IndexBudget;
@@ -210,6 +227,7 @@ export async function runEval(config: RunConfig): Promise<RunOutput> {
       spentUsd: round(spentUsd, 8),
       stoppedReason,
       aggregates: summarise(collected, config.dataset.questions.length, spentUsd),
+      conversations,
       results: collected,
       errors,
     };
@@ -245,6 +263,19 @@ export function printResults(output: RunOutput): void {
         result.exactMatch ? "yes" : "no",
         8,
       )}${pad(result.f1.toFixed(3), 8)}${pad(String(result.injectedTokens), 8)}${result.latencyMs.toFixed(1)}ms`,
+    );
+  }
+  console.log("");
+  console.log(
+    `${pad("conversation", 26)}${pad("completed", 12)}${pad("failed", 8)}${pad("pages", 8)}${pad("versions", 10)}reviews`,
+  );
+  for (const entry of results.conversations) {
+    const { counts } = entry;
+    console.log(
+      `${pad(entry.conversationId, 26)}${pad(String(counts.sourcesCompleted), 12)}${pad(
+        String(counts.sourcesFailed),
+        8,
+      )}${pad(String(counts.pages), 8)}${pad(String(counts.pageVersions), 10)}${counts.routingReviews}`,
     );
   }
   console.log("");
