@@ -46,6 +46,10 @@ export const changeAck = t.Object({
   acked: t.Boolean(),
 });
 
+export const connectionAck = t.Object({
+  acked: t.Boolean(),
+});
+
 export const pageUpdate = t.Object({
   title: t.Optional(t.String()),
   summary: t.Optional(t.String()),
