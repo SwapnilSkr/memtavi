@@ -1,0 +1,295 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Memtavi media storage - private S3 bucket, CloudFront OAC and signed URLs
+
+Parameters:
+  Env:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, prod]
+  AccountId:
+    Type: String
+    AllowedPattern: "^[0-9]{12}$"
+  PublicKeyPem:
+    Type: String
+    Description: CloudFront signing public key (PEM)
+  AllowedOrigin:
+    Type: String
+    Default: https://app.memtavi.com
+
+Resources:
+  LogsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub "memtavi-logs-${Env}-${AccountId}"
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-logs
+            Status: Enabled
+            Prefix: ""
+            ExpirationInDays: 30
+          - Id: abort-multipart
+            Status: Enabled
+            Prefix: ""
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+
+  MediaBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub "memtavi-media-${Env}-${AccountId}"
+      VersioningConfiguration:
+        Status: Enabled
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LoggingConfiguration:
+        DestinationBucketName: !Ref LogsBucket
+        LogFilePrefix: media-access/
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-exports
+            Status: Enabled
+            Prefix: "exports/"
+            ExpirationInDays: 7
+          - Id: originals-tiering
+            Status: Enabled
+            Prefix: "originals/"
+            Transitions:
+              - StorageClass: GLACIER_IR
+                TransitionInDays: 90
+            ExpirationInDays: 365
+          - Id: noncurrent-versions
+            Status: Enabled
+            Prefix: ""
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
+          - Id: abort-multipart
+            Status: Enabled
+            Prefix: ""
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+
+  LogsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref LogsBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !GetAtt LogsBucket.Arn
+              - !Sub "${LogsBucket.Arn}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: "false"
+          - Sid: S3ServerAccessLogs
+            Effect: Allow
+            Principal:
+              Service: logging.s3.amazonaws.com
+            Action: s3:PutObject
+            Resource: !Sub "${LogsBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AccountId
+
+  OriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "memtavi-${Env}-media-oac"
+        Description: Access control for the private media bucket
+        SigningBehavior: always
+        SigningProtocol: sigv4
+        OriginAccessControlOriginType: s3
+
+  SigningPublicKey:
+    Type: AWS::CloudFront::PublicKey
+    Properties:
+      PublicKeyConfig:
+        CallerReference: !Sub "memtavi-${Env}-${AccountId}"
+        Name: !Sub "memtavi-${Env}-signing"
+        EncodedKey: !Ref PublicKeyPem
+
+  SigningKeyGroup:
+    Type: AWS::CloudFront::KeyGroup
+    Properties:
+      KeyGroupConfig:
+        Name: !Sub "memtavi-${Env}-signed-urls"
+        Items:
+          - !Ref SigningPublicKey
+
+  SecurityHeaders:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub "memtavi-${Env}-security-headers"
+        Comment: HSTS, nosniff, frame deny, no-referrer
+        SecurityHeadersConfig:
+          StrictTransportSecurity:
+            AccessControlMaxAgeSec: 31536000
+            IncludeSubdomains: true
+            Override: true
+          ContentTypeOptions:
+            Override: true
+          FrameOptions:
+            FrameOption: DENY
+            Override: true
+          ReferrerPolicy:
+            ReferrerPolicy: no-referrer
+            Override: true
+        CorsConfig:
+          AccessControlAllowCredentials: false
+          AccessControlAllowHeaders:
+            Items: ["authorization", "content-type", "range"]
+          AccessControlAllowMethods:
+            Items: [GET, HEAD]
+          AccessControlAllowOrigins:
+            Items: [!Ref AllowedOrigin]
+          OriginOverride: true
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub "memtavi media ${Env}"
+        PriceClass: PriceClass_100
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        Origins:
+          - Id: media
+            DomainName: !GetAtt MediaBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt OriginAccessControl.Id
+            S3OriginConfig: {}
+        DefaultCacheBehavior:
+          TargetOriginId: media
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD]
+          CachedMethods: [GET, HEAD]
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          ResponseHeadersPolicyId: !Ref SecurityHeaders
+          TrustedKeyGroups:
+            - !Ref SigningKeyGroup
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+          MinimumProtocolVersion: TLSv1.2_2021
+
+  MediaBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref MediaBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !GetAtt MediaBucket.Arn
+              - !Sub "${MediaBucket.Arn}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: "false"
+          - Sid: CloudFrontReadViaOac
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${MediaBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AccountId}:distribution/${Distribution}"
+
+  WorkerStoragePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "memtavi-storage-worker-${Env}"
+      Description: Read and write source bodies and chunks
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:GetObject
+              - s3:DeleteObject
+            Resource:
+              - !Sub "${MediaBucket.Arn}/sources/*"
+              - !Sub "${MediaBucket.Arn}/chunks/*"
+              - !Sub "${MediaBucket.Arn}/originals/*"
+
+  ApiStoragePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "memtavi-storage-api-${Env}"
+      Description: Read source bodies, write exports
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: s3:GetObject
+            Resource:
+              - !Sub "${MediaBucket.Arn}/sources/*"
+              - !Sub "${MediaBucket.Arn}/chunks/*"
+              - !Sub "${MediaBucket.Arn}/originals/*"
+          - Effect: Allow
+            Action: s3:PutObject
+            Resource: !Sub "${MediaBucket.Arn}/exports/*"
+
+Outputs:
+  MediaBucketName:
+    Value: !Ref MediaBucket
+    Export:
+      Name: !Sub "memtavi-${Env}-media-bucket"
+  LogsBucketName:
+    Value: !Ref LogsBucket
+    Export:
+      Name: !Sub "memtavi-${Env}-logs-bucket"
+  DistributionId:
+    Value: !Ref Distribution
+    Export:
+      Name: !Sub "memtavi-${Env}-distribution-id"
+  DistributionDomain:
+    Value: !GetAtt Distribution.DomainName
+    Export:
+      Name: !Sub "memtavi-${Env}-distribution-domain"
+  SigningKeyPairId:
+    Value: !Ref SigningPublicKey
+    Export:
+      Name: !Sub "memtavi-${Env}-signing-key-pair-id"
+  PrivateKeyParameter:
+    Value: !Sub "/memtavi/${Env}/cloudfront-private-key"
+  WorkerPolicyArn:
+    Value: !Ref WorkerStoragePolicy
+  ApiPolicyArn:
+    Value: !Ref ApiStoragePolicy

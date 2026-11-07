@@ -6,6 +6,8 @@ node_modules/
 bun.lockb
 .agents/
 .commandcode/
+infra/.keys/
+.storage/
 dist/
 coverage/
 .turbo/
