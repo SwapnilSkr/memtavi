@@ -9,10 +9,11 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
-- **2026-11-06** — Entity pages shipped: facts consolidate by entity, reviews resolve when one candidate shares an entity, and `pages.entities` is populated. Three runs: reviews 64→4, pages 22→3, exact 5%, cost $1.58/run — over-consolidated, so a split is next.
+- **2026-11-06** — Patches batched per page: compile cost fell from $1.26–$1.75 (inflated estimate) to $0.097 at real prices. Pricing defaults corrected in the eval and the worker ledger; rates are env-configurable.
+- **2026-11-06** — Entity pages shipped: facts consolidate by entity, reviews resolve when one candidate shares an entity, and `pages.entities` is populated. Three runs: reviews 64→4, pages 22→3, exact 5%; $1.58/run at the old inflated default.
 - **2026-11-06** — Routing instrumented: every PFS decision now carries best/second/gap/candidates, and the eval reports the distribution. Live: 34 place, 64 review, 19 new; the reviews are driven by near-duplicate pages, not the gap threshold.
 - **2026-11-06** — Session dates ingested into the compiled text; live slice moved from 5% to 15% exact and 11.5% to 20.4% F1. Counts exposed 59 routing reviews against 22 pages — the next bottleneck.
-- **2026-11-06** — First live eval recorded on a LoCoMo slice (conv-26, 20 questions, `openai/gpt-4.1-mini`): 5% exact, 11.5% F1, 554.5 injected tokens per question, $0.54. Temporal questions fail because session dates are not ingested.
+- **2026-11-06** — First live eval recorded on a LoCoMo slice (conv-26, 20 questions, `openai/gpt-4.1-mini`): 5% exact, 11.5% F1, 554.5 injected tokens per question, $0.54 at the old inflated default. Temporal questions fail because session dates are not ingested.
 - **2026-11-06** — Evidence spans re-anchored: a verbatim quote with wrong offsets is corrected instead of dropped; absent quotes still fail. This unblocked page compilation on real models.
 - **2026-11-06** — Eval harness shipped: `tests/eval` compiles a labelled set through the real compiler, answers from a budgeted summaries index plus FTS pages, and reports exact match, F1, injected tokens, accuracy per 1k tokens, latency and cost. Fake mode is CI-safe; live mode is budget-gated.
 - **2026-11-06** — `capture.compile` shipped: paragraph chunking to the store, extraction with evidence enforcement, MWS, PFS over pgvector candidates, patch/create paths, immutable versions, change events, embeddings, usage ledger, and source failure handling. 315 unit, 84 integration.
