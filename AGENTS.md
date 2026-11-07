@@ -75,7 +75,7 @@ bun run eval:smoke       bun run bench:search
 | [conv-security](./context/conv-security.md) | 3.4 | auth, tenancy, API keys, cookies, URL or file fetch, logging | Threats that apply here and the rule that answers each |
 | [conv-tests](./context/conv-tests.md) | 2.6 | writing a test, choosing a Done when, re-running verification | What each suite must prove, the commands, and what is forbidden |
 | [conv-web](./context/conv-web.md) | 3.0 | touching apps/web | Inspector stack, state boundaries, evidence UI, accessibility |
-| [gl-changelog](./context/gl-changelog.md) | 2.0 | recording or checking what shipped | Shipped changes, newest first, dated |
+| [gl-changelog](./context/gl-changelog.md) | 2.2 | recording or checking what shipped | Shipped changes, newest first, dated |
 | [gl-decisions](./context/gl-decisions.md) | 4.0 | checking or recording a decision | Accepted decisions, newest last, dated |
-| [status](./context/status.md) | 1.9 | resuming work, deciding what to do next | The short list of work in flight, each pointing at its node |
+| [status](./context/status.md) | 2.2 | resuming work, deciding what to do next | The short list of work in flight, each pointing at its node |
 <!-- nodes:end -->
