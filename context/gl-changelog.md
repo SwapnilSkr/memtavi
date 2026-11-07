@@ -9,6 +9,7 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-06** — Entity pages shipped: facts consolidate by entity, reviews resolve when one candidate shares an entity, and `pages.entities` is populated. Three runs: reviews 64→4, pages 22→3, exact 5%, cost $1.58/run — over-consolidated, so a split is next.
 - **2026-11-06** — Routing instrumented: every PFS decision now carries best/second/gap/candidates, and the eval reports the distribution. Live: 34 place, 64 review, 19 new; the reviews are driven by near-duplicate pages, not the gap threshold.
 - **2026-11-06** — Session dates ingested into the compiled text; live slice moved from 5% to 15% exact and 11.5% to 20.4% F1. Counts exposed 59 routing reviews against 22 pages — the next bottleneck.
 - **2026-11-06** — First live eval recorded on a LoCoMo slice (conv-26, 20 questions, `openai/gpt-4.1-mini`): 5% exact, 11.5% F1, 554.5 injected tokens per question, $0.54. Temporal questions fail because session dates are not ingested.
