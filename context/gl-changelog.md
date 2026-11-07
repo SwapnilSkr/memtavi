@@ -9,6 +9,7 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-06** — Phase 2 read path shipped: pages list/get with `lastReferencedAt` bump, compact index, and hybrid FTS + pgvector search fused with RRF.
 - **2026-11-06** — Page split shipped: batches over 6,000 characters become sibling pages with a `split` event; user-edited pages never split. Eval retries transient source failures. One run: 15% exact, F1 0.205, $0.083, 19/19 sources.
 - **2026-11-06** — Patches batched per page: compile cost fell to $0.097 at real prices. Pricing defaults corrected in the eval and the worker ledger; rates are env-configurable.
 - **2026-11-06** — Entity pages shipped: facts consolidate by entity, reviews resolve when one candidate shares an entity, and `pages.entities` is populated. Three runs: reviews 64→4, pages 22→3, exact 5%; $1.58/run at the old inflated default.
