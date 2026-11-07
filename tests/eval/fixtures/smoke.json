@@ -1,0 +1,83 @@
+{
+  "name": "smoke",
+  "conversations": [
+    {
+      "id": "conv-orbit",
+      "sessions": [
+        {
+          "turns": [
+            { "speaker": "Alice", "text": "My name is Alice and I drive a red Volvo." },
+            { "speaker": "Alice", "text": "My dog is named Biscuit." }
+          ]
+        },
+        {
+          "turns": [
+            { "speaker": "Alice", "text": "I moved to Lisbon in March." },
+            { "speaker": "Bob", "text": "Alice cooks grilled sardines on Sundays." }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "conv-atlas",
+      "sessions": [
+        {
+          "turns": [
+            { "speaker": "Carol", "text": "Carol leads the Atlas project at Northwind." },
+            { "speaker": "Dan", "text": "The Atlas project ships in June." }
+          ]
+        },
+        {
+          "turns": [
+            { "speaker": "Carol", "text": "The Atlas budget is forty thousand dollars." },
+            { "speaker": "Dan", "text": "Dan owns the billing service." }
+          ]
+        }
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "id": "q1",
+      "conversationId": "conv-orbit",
+      "question": "What is Alice's dog's name?",
+      "answer": "Biscuit",
+      "category": "single-hop"
+    },
+    {
+      "id": "q2",
+      "conversationId": "conv-orbit",
+      "question": "Which car does Alice drive?",
+      "answer": "red Volvo",
+      "category": "single-hop"
+    },
+    {
+      "id": "q3",
+      "conversationId": "conv-orbit",
+      "question": "Where did Alice move in March?",
+      "answer": "Lisbon",
+      "category": "single-hop"
+    },
+    {
+      "id": "q4",
+      "conversationId": "conv-atlas",
+      "question": "Who leads the Atlas project?",
+      "answer": "Carol",
+      "category": "single-hop"
+    },
+    {
+      "id": "q5",
+      "conversationId": "conv-atlas",
+      "question": "When does the Atlas project ship?",
+      "answer": "June",
+      "category": "temporal"
+    },
+    {
+      "id": "q6",
+      "conversationId": "conv-atlas",
+      "question": "What is the Atlas budget?",
+      "answer": "forty thousand dollars",
+      "category": "single-hop"
+    }
+  ]
+}

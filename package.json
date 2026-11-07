@@ -19,7 +19,8 @@
     "spec:lint": "bun packages/spec/lint.mjs",
     "lint": "biome check .",
     "format": "biome format --write .",
-    "test:unit": "bun test packages",
+    "test:unit": "bun test packages tests/eval",
+    "eval:smoke": "bun tests/eval/src/smoke.ts",
     "test:integration": "bun test tests/integration --pass-with-no-tests",
     "test:isolation": "bun test tests/isolation --pass-with-no-tests",
     "test:contract": "bun test tests/contract --pass-with-no-tests"
