@@ -7,8 +7,9 @@ import {
 } from "@memtavi/fetch";
 import type { ObjectStore } from "@memtavi/storage/types";
 import type { PoolClient } from "pg";
+import { compileCapture } from "./compile";
 import { ingestCapture } from "./ingest";
-import { type ClaimedJob, JobError, type JobHandler } from "./types";
+import { type ClaimedJob, type CompilerConfig, JobError, type JobHandler } from "./types";
 
 const CLAIM_SQL = `
   UPDATE jobs
@@ -67,6 +68,7 @@ export interface WorkerConfig {
   withTenant: typeof withTenant;
   tenantIds: string[];
   store: ObjectStore;
+  compiler?: CompilerConfig;
   handlers?: Record<string, JobHandler>;
   fetchDocument?: (url: string) => Promise<FetchedDocument>;
   concurrency?: number;
@@ -115,7 +117,10 @@ export function createWorker(config: WorkerConfig): Worker {
   const tenantIds = [...new Set(config.tenantIds.filter((id) => id.trim()))];
   if (tenantIds.length === 0) throw new Error("At least one tenant id is required");
 
-  const handlers = config.handlers ?? { "capture.ingest": ingestCapture };
+  const handlers = config.handlers ?? {
+    "capture.ingest": ingestCapture,
+    "capture.compile": compileCapture,
+  };
   const types = Object.keys(handlers);
   if (types.length === 0) throw new Error("At least one job handler is required");
 
@@ -150,7 +155,35 @@ export function createWorker(config: WorkerConfig): Worker {
     const handler = handlers[job.type];
     try {
       if (!handler) throw new JobError("permanent", "Unknown job type");
-      await withTenant(job.tenantId, (client) => handler({ job, client, store, fetchDocument }));
+      await withTenant(job.tenantId, (client) =>
+        handler({
+          job,
+          client,
+          store,
+          fetchDocument,
+          compiler: config.compiler,
+          recordUsage: async (usage) => {
+            await withTenant(job.tenantId, (usageClient) =>
+              usageClient.query(
+                `INSERT INTO usage_ledger
+               (tenant_id, brain_id, job_id, provider, model, kind, input_tokens, output_tokens, cost_usd)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+                [
+                  job.tenantId,
+                  job.brainId,
+                  job.id,
+                  usage.provider,
+                  usage.model,
+                  usage.kind,
+                  usage.inputTokens,
+                  usage.outputTokens,
+                  usage.costUsd,
+                ],
+              ),
+            );
+          },
+        }),
+      );
       await withTenant(job.tenantId, (client) =>
         client.query(COMPLETE_SQL, [job.tenantId, job.id]),
       );
@@ -167,6 +200,16 @@ export function createWorker(config: WorkerConfig): Worker {
       const failure = classify(error);
       const dead = failure.kind === "permanent" || job.attempts >= job.maxAttempts;
       try {
+        if (job.type === "capture.compile" && typeof job.payload.sourceId === "string") {
+          await withTenant(job.tenantId, (client) =>
+            client.query(
+              `UPDATE ingest_sources SET status = 'failed', last_error = $4
+             WHERE tenant_id = $1 AND brain_id = $2 AND id = $3
+               AND deleted_at IS NULL AND status <> 'completed'`,
+              [job.tenantId, job.brainId, job.payload.sourceId, failure.message],
+            ),
+          );
+        }
         if (dead) {
           await withTenant(job.tenantId, (client) =>
             client.query(DEAD_SQL, [job.tenantId, job.id, failure.message]),

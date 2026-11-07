@@ -1,8 +1,22 @@
+import { createOpenAIImbeddings } from "@memtavi/llm/openai-embeddings";
+import { createOpenRouterChat } from "@memtavi/llm/openrouter";
 import { createWorker } from "./worker";
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 if (!process.env.APP_DATABASE_URL) throw new Error("APP_DATABASE_URL is required");
+const chatKey = process.env.OPENROUTER_API_KEY;
+const embeddingKey = process.env.OPENAI_API_KEY;
+const chatModel = process.env.OPENROUTER_CHAT_MODEL;
+const embeddingModel = process.env.EMBEDDING_MODEL;
+if (!chatKey?.trim()) throw new Error("OPENROUTER_API_KEY is required");
+if (!embeddingKey?.trim()) throw new Error("OPENAI_API_KEY is required");
+if (!chatModel?.trim() || /latest/i.test(chatModel)) {
+  throw new Error("A pinned OPENROUTER_CHAT_MODEL is required");
+}
+if (!embeddingModel?.trim() || /latest/i.test(embeddingModel)) {
+  throw new Error("A pinned EMBEDDING_MODEL is required");
+}
 
 const concurrency = Number(process.env.WORKER_CONCURRENCY ?? 2);
 if (!Number.isInteger(concurrency) || concurrency < 1) {
@@ -31,6 +45,16 @@ const worker = createWorker({
   concurrency,
   pollIntervalMs,
   store,
+  compiler: {
+    chatProvider: createOpenRouterChat({ apiKey: chatKey }),
+    embeddingProvider: createOpenAIImbeddings({
+      apiKey: embeddingKey,
+      model: embeddingModel,
+      dimensions: 1536,
+    }),
+    chatModel,
+    embeddingModel,
+  },
   log: (event) => {
     process.stdout.write(`${JSON.stringify(event)}\n`);
   },

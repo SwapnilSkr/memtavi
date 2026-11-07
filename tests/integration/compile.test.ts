@@ -1,0 +1,641 @@
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import type { ExtractedFact } from "@memtavi/core/compile/schemas";
+import { chatCostUsd, embeddingCostUsd } from "@memtavi/llm/cost";
+import { createFakeProvider } from "@memtavi/llm/fake";
+import { type ChatRequest, ProviderError } from "@memtavi/llm/provider";
+import { newId } from "@memtavi/shared/ids";
+import { createFakeStore } from "@memtavi/storage/fake";
+import { contentHash, sourceKey } from "@memtavi/storage/keys";
+import { createWorker } from "@memtavi/worker";
+import { CANDIDATES_SQL } from "@memtavi/worker/compile";
+import type { CompilerConfig } from "@memtavi/worker/types";
+import { Pool, type PoolClient } from "pg";
+
+const ownerUrl = process.env.TEST_DATABASE_URL;
+const appUrl = process.env.TEST_APP_DATABASE_URL;
+
+describe("capture.compile", () => {
+  const owner = new Pool({ connectionString: ownerUrl });
+  const application = new Pool({ connectionString: appUrl });
+  const store = createFakeStore();
+  const tenantId = crypto.randomUUID();
+  const foreignTenantId = crypto.randomUUID();
+  const subjectId = crypto.randomUUID();
+  const chatModel = "fake-chat";
+  const embeddingModel = "fake-embedding";
+  let brainId = "";
+  let foreignBrainId = "";
+  let foreignSourceId = "";
+  let authorized = false;
+  let sourceId = "";
+  let jobId = "";
+  let note = "The compiler preserves evidence.";
+  let score = 0.9;
+  let provider = createFakeProvider();
+  let patchResponse: string | undefined;
+  let failChat: ProviderError | undefined;
+  let failPageEmbedding = false;
+
+  async function withTenant<T>(
+    tenant: string,
+    callback: (client: PoolClient) => Promise<T>,
+    subject?: string,
+  ): Promise<T> {
+    const client = await application.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT set_config('app.tenant_id', $1, true)", [tenant]);
+      if (subject) await client.query("SELECT set_config('app.subject_id', $1, true)", [subject]);
+      const result = await callback(client);
+      await client.query("COMMIT");
+      return result;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  function compiler(): CompilerConfig {
+    return {
+      chatModel,
+      embeddingModel,
+      chatProvider: {
+        chat: async (request: ChatRequest) => {
+          if (failChat) throw failChat;
+          const input = JSON.parse(request.messages[1]?.content ?? "{}") as {
+            chunks?: { chunkUuid: string; text: string }[];
+          };
+          if (input.chunks) {
+            const facts = input.chunks.map(
+              (chunk): ExtractedFact => ({
+                claim: chunk.text.trim(),
+                kind: "project_fact",
+                entities: [],
+                confidence: score,
+                durability: score,
+                impact: score,
+                recurrence: score,
+                novelty: score,
+                futureUse: score,
+                sensitivity: "none",
+                evidence: {
+                  chunkUuid: chunk.chunkUuid,
+                  charStart: 0,
+                  charEnd: chunk.text.length,
+                  quote: chunk.text,
+                },
+              }),
+            );
+            provider.queueChat(JSON.stringify({ facts }));
+          } else if (patchResponse !== undefined) provider.queueChat(patchResponse);
+          return provider.chat(request);
+        },
+      },
+      embeddingProvider: {
+        embed: async (texts) => {
+          if (failPageEmbedding && texts.some((text) => text.includes("## Sources"))) {
+            throw new ProviderError("server_error", true, "private upstream error");
+          }
+          return provider.embed(texts);
+        },
+      },
+    };
+  }
+
+  function worker() {
+    return createWorker({
+      withTenant,
+      tenantIds: [tenantId],
+      store,
+      compiler: compiler(),
+      random: () => 0,
+      fetchDocument: async () => {
+        throw new Error("Network is forbidden");
+      },
+    });
+  }
+
+  async function capture(text = note, bodyInStore = false) {
+    sourceId = newId("source");
+    const bodyRef = bodyInStore ? sourceKey({ tenantId, sourceId, body: text }) : null;
+    if (bodyRef) await store.put(bodyRef, text, "text/plain");
+    await owner.query(
+      `INSERT INTO ingest_sources
+       (id, tenant_id, subject_id, brain_id, kind, content, content_hash, body_ref)
+       VALUES ($1, $2, $3, $4, 'note', $5, $6, $7)`,
+      [
+        sourceId,
+        tenantId,
+        subjectId,
+        brainId,
+        bodyRef ? "preview" : text,
+        contentHash(text),
+        bodyRef,
+      ],
+    );
+    const job = await owner.query<{ id: string }>(
+      `INSERT INTO jobs (tenant_id, brain_id, type, payload, idempotency_key)
+       VALUES ($1, $2, 'capture.compile', $3, $4) RETURNING id`,
+      [tenantId, brainId, JSON.stringify({ sourceId, brainId }), `compile:${sourceId}`],
+    );
+    jobId = job.rows[0]?.id ?? "";
+  }
+
+  async function seedCandidate(slug: string, text = note, model = embeddingModel) {
+    const pageId = newId("page");
+    const vector = (await createFakeProvider().embed([text])).vectors[0];
+    await owner.query(
+      `INSERT INTO pages (id, tenant_id, subject_id, brain_id, slug, title, summary, body, content_hash)
+       VALUES ($1, $2, $3, $4, $5, 'Original', 'Old summary', 'Human body', $6)`,
+      [
+        pageId,
+        tenantId,
+        subjectId,
+        brainId,
+        slug,
+        contentHash("Original\nOld summary\nHuman body"),
+      ],
+    );
+    await owner.query(
+      `INSERT INTO page_embeddings (tenant_id, page_id, model, dimensions, embedding, content_hash)
+       SELECT tenant_id, id, $3, 1536, $4::vector, content_hash FROM pages
+       WHERE tenant_id = $1 AND id = $2`,
+      [tenantId, pageId, model, JSON.stringify(vector)],
+    );
+    await owner.query(
+      `INSERT INTO page_versions (tenant_id, page_id, version, title, summary, body, actor)
+       VALUES ($1, $2, 1, 'Original', 'Old summary', 'Human body', 'user')`,
+      [tenantId, pageId],
+    );
+    return pageId;
+  }
+
+  async function counts() {
+    const result = await owner.query<Record<string, number>>(
+      `SELECT
+       (SELECT count(*)::int FROM pages WHERE tenant_id = $1 AND brain_id = $2) AS pages,
+       (SELECT count(*)::int FROM page_versions v JOIN pages p ON p.id = v.page_id
+         WHERE v.tenant_id = $1 AND p.brain_id = $2) AS versions,
+       (SELECT count(*)::int FROM page_sources WHERE tenant_id = $1 AND ingest_source_id = $3) AS sources,
+       (SELECT count(*)::int FROM change_events WHERE tenant_id = $1 AND brain_id = $2) AS events,
+       (SELECT count(*)::int FROM page_embeddings e JOIN pages p ON p.id = e.page_id
+         WHERE e.tenant_id = $1 AND p.brain_id = $2) AS embeddings,
+       (SELECT count(*)::int FROM usage_ledger WHERE tenant_id = $1 AND job_id = $4) AS ledger,
+       (SELECT count(*)::int FROM routing_reviews WHERE tenant_id = $1 AND brain_id = $2) AS reviews`,
+      [tenantId, brainId, sourceId, jobId],
+    );
+    return result.rows[0];
+  }
+
+  beforeAll(async () => {
+    if (!ownerUrl || !appUrl) throw new Error("Both test database URLs are required");
+    const db = await owner.query<{ name: string }>("SELECT current_database() AS name");
+    if (!/^memtavi_test(?:_[a-z0-9_]+)?$/.test(db.rows[0]?.name ?? "")) {
+      throw new Error("Compiler fixtures require a disposable memtavi_test database");
+    }
+    const role = await application.query<{ rolsuper: boolean; rolbypassrls: boolean }>(
+      "SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user",
+    );
+    expect(role.rows[0]).toEqual({ rolsuper: false, rolbypassrls: false });
+    authorized = true;
+    await owner.query(
+      "INSERT INTO tenants (id, name, slug) VALUES ($1::uuid, 'Compiler', $1::uuid::text), ($2::uuid, 'Foreign compiler', $2::uuid::text)",
+      [tenantId, foreignTenantId],
+    );
+    await owner.query(
+      "INSERT INTO subject_links (tenant_id, subject_id) VALUES ($1, $3), ($2, $3)",
+      [tenantId, foreignTenantId, subjectId],
+    );
+    foreignBrainId = newId("brain");
+    foreignSourceId = newId("source");
+    await owner.query(
+      "INSERT INTO brains (id, tenant_id, subject_id, name, slug) VALUES ($1, $2, $3, 'Foreign', 'foreign')",
+      [foreignBrainId, foreignTenantId, subjectId],
+    );
+    await owner.query(
+      "INSERT INTO ingest_sources (id, tenant_id, subject_id, brain_id, kind, content, content_hash) VALUES ($1, $2, $3, $4, 'note', 'Foreign body', 'foreign')",
+      [foreignSourceId, foreignTenantId, subjectId, foreignBrainId],
+    );
+  });
+
+  beforeEach(async () => {
+    brainId = newId("brain");
+    note = "The compiler preserves evidence.";
+    score = 0.9;
+    provider = createFakeProvider();
+    patchResponse = undefined;
+    failChat = undefined;
+    failPageEmbedding = false;
+    await owner.query(
+      "INSERT INTO brains (id, tenant_id, subject_id, name, slug) VALUES ($1, $2, $3, 'Compiler', $1)",
+      [brainId, tenantId, subjectId],
+    );
+  });
+
+  afterAll(async () => {
+    if (authorized)
+      await owner.query("DELETE FROM tenants WHERE id = ANY($1::uuid[])", [
+        [tenantId, foreignTenantId],
+      ]);
+    await Promise.all([owner.end(), application.end()]);
+  });
+
+  test("foreign and deleted sources are no-ops before compiling a stored note and replaying it", async () => {
+    await capture(note, true);
+    await owner.query("UPDATE jobs SET payload = $2 WHERE id = $1", [
+      jobId,
+      JSON.stringify({ sourceId: foreignSourceId, brainId }),
+    ]);
+    expect(await worker().runOnce()).toBe(true);
+    expect(provider.calls).toHaveLength(0);
+    expect(
+      (await owner.query("SELECT status FROM ingest_sources WHERE id = $1", [foreignSourceId]))
+        .rows[0]?.status,
+    ).toBe("pending");
+    await owner.query("UPDATE ingest_sources SET deleted_at = now() WHERE id = $1", [sourceId]);
+    await owner.query("UPDATE jobs SET status = 'pending', payload = $2 WHERE id = $1", [
+      jobId,
+      JSON.stringify({ sourceId, brainId }),
+    ]);
+    await worker().runOnce();
+    expect(provider.calls).toHaveLength(0);
+    await owner.query("UPDATE ingest_sources SET deleted_at = NULL WHERE id = $1", [sourceId]);
+    await owner.query("UPDATE jobs SET status = 'pending' WHERE id = $1", [jobId]);
+    await worker().runOnce();
+    expect(await counts()).toEqual({
+      pages: 1,
+      versions: 1,
+      sources: 1,
+      events: 1,
+      embeddings: 1,
+      ledger: 3,
+      reviews: 0,
+    });
+    const source = (
+      await owner.query(
+        "SELECT status, affected_page_ids, chunk_uuids, compiled_at FROM ingest_sources WHERE id = $1",
+        [sourceId],
+      )
+    ).rows[0];
+    expect(source?.status).toBe("completed");
+    expect(source?.compiled_at).toBeInstanceOf(Date);
+    expect(source?.affected_page_ids).toHaveLength(1);
+    const chunk = (
+      await owner.query(
+        "SELECT id, text, body_ref, char_start, char_end FROM source_chunks WHERE source_id = $1",
+        [sourceId],
+      )
+    ).rows[0];
+    expect(chunk?.text).toBeNull();
+    expect(chunk?.char_start).toBe(0);
+    expect(chunk?.char_end).toBe(note.length);
+    expect(await new Response(await store.get(chunk?.body_ref as string)).text()).toBe(note);
+    const page = (
+      await owner.query("SELECT id, title, summary, body, version FROM pages WHERE brain_id = $1", [
+        brainId,
+      ])
+    ).rows[0];
+    expect(page?.title).toBe(note);
+    expect(page?.summary).toBe(note);
+    expect(page?.version).toBe(1);
+    expect(page?.body).toContain(`## Sources\n- ${chunk?.id}:0-${note.length}`);
+    const usage = await owner.query<{
+      kind: string;
+      input_tokens: number;
+      output_tokens: number;
+      cost_usd: string;
+    }>("SELECT kind, input_tokens, output_tokens, cost_usd FROM usage_ledger WHERE job_id = $1", [
+      jobId,
+    ]);
+    for (const row of usage.rows) {
+      expect(Number(row.cost_usd)).toBeCloseTo(
+        row.kind === "chat"
+          ? chatCostUsd(row.input_tokens, row.output_tokens)
+          : embeddingCostUsd(row.input_tokens),
+        8,
+      );
+      expect(row.input_tokens).toBeGreaterThan(0);
+    }
+    const calls = provider.calls.length;
+    await owner.query("UPDATE jobs SET status = 'pending' WHERE id = $1", [jobId]);
+    await worker().runOnce();
+    expect(await counts()).toEqual({
+      pages: 1,
+      versions: 1,
+      sources: 1,
+      events: 1,
+      embeddings: 1,
+      ledger: 3,
+      reviews: 0,
+    });
+    expect(provider.calls).toHaveLength(calls);
+    expect(
+      (
+        await owner.query("SELECT count(*)::int AS n FROM source_chunks WHERE source_id = $1", [
+          sourceId,
+        ])
+      ).rows[0]?.n,
+    ).toBe(1);
+  });
+
+  test("source-only facts incur extraction usage without creating pages", async () => {
+    score = 0.1;
+    await capture();
+    await worker().runOnce();
+    expect(await counts()).toEqual({
+      pages: 0,
+      versions: 0,
+      sources: 0,
+      events: 0,
+      embeddings: 0,
+      ledger: 1,
+      reviews: 0,
+    });
+  });
+
+  test("provisional facts compile and paragraph offsets still reference the original body", async () => {
+    score = 0.5;
+    note = `${"First paragraph. ".repeat(100)}\r\n\r\n${"Second paragraph. ".repeat(100)}`;
+    await capture(note, true);
+    await worker().runOnce();
+    const chunks = await owner.query<{
+      text: null;
+      body_ref: string;
+      char_start: number;
+      char_end: number;
+    }>(
+      "SELECT text, body_ref, char_start, char_end FROM source_chunks WHERE source_id = $1 ORDER BY ordinal",
+      [sourceId],
+    );
+    expect(chunks.rows.length).toBeGreaterThan(1);
+    let reconstructed = "";
+    for (const chunk of chunks.rows) {
+      const text = await new Response(await store.get(chunk.body_ref)).text();
+      expect(text).toBe(note.slice(chunk.char_start, chunk.char_end));
+      expect(chunk.text).toBeNull();
+      reconstructed += text;
+    }
+    expect(reconstructed).toBe(note);
+    expect((await counts())?.pages).toBe(2);
+    expect(provider.calls.filter((call) => call.kind === "chat")).toHaveLength(1);
+  });
+
+  test("concurrent replays of one source cannot duplicate compiler writes", async () => {
+    await capture();
+    await owner.query(
+      `INSERT INTO jobs (tenant_id, brain_id, type, payload, idempotency_key)
+       SELECT tenant_id, brain_id, type, payload, idempotency_key || ':replay' FROM jobs WHERE id = $1`,
+      [jobId],
+    );
+    const instance = worker();
+    expect(await Promise.all([instance.runOnce(), instance.runOnce()])).toEqual([true, true]);
+    expect(await counts()).toEqual({
+      pages: 1,
+      versions: 1,
+      sources: 1,
+      events: 1,
+      embeddings: 1,
+      ledger: 3,
+      reviews: 0,
+    });
+    expect(provider.calls.filter((call) => call.kind === "chat")).toHaveLength(1);
+  });
+
+  test("near-tied real candidates create a routing review without a new page or version", async () => {
+    const candidates = [await seedCandidate("a"), await seedCandidate("b")];
+    await capture();
+    await worker().runOnce();
+    expect(await counts()).toEqual({
+      pages: 2,
+      versions: 2,
+      sources: 0,
+      events: 0,
+      embeddings: 2,
+      ledger: 2,
+      reviews: 1,
+    });
+    const review = (
+      await owner.query(
+        "SELECT fact, candidate_page_ids, best_gap, status FROM routing_reviews WHERE brain_id = $1",
+        [brainId],
+      )
+    ).rows[0];
+    expect(review?.candidate_page_ids).toEqual(candidates);
+    expect(review?.best_gap).toBe(0);
+    expect(review?.status).toBe("open");
+    expect(review?.fact.evidence.quote).toBe(note);
+  });
+
+  test("placing a fact patches and versions the page and refreshes its embedding", async () => {
+    const pageId = await seedCandidate("target");
+    patchResponse = JSON.stringify({
+      title: "Updated",
+      summary: note,
+      body: "Updated body",
+      changed: true,
+      contradictions: [],
+    });
+    await capture();
+    await worker().runOnce();
+    expect(await counts()).toEqual({
+      pages: 1,
+      versions: 2,
+      sources: 1,
+      events: 1,
+      embeddings: 1,
+      ledger: 4,
+      reviews: 0,
+    });
+    const page = (
+      await owner.query("SELECT title, body, version FROM pages WHERE id = $1", [pageId])
+    ).rows[0];
+    expect(page?.title).toBe("Updated");
+    expect(page?.body).toContain("Updated body\n\n## Sources");
+    expect(page?.version).toBe(2);
+  });
+
+  test("manual edits keep their body and append updates on subsequent compiles", async () => {
+    const pageId = await seedCandidate("edited");
+    await owner.query(
+      "UPDATE pages SET user_edited_at = '2026-11-07T00:00:00Z', last_compiled_at = '2026-11-06T00:00:00Z' WHERE id = $1",
+      [pageId],
+    );
+    patchResponse = JSON.stringify({
+      title: "Rewritten",
+      summary: "Rewritten",
+      body: "Update",
+      changed: true,
+      contradictions: [],
+    });
+    await capture();
+    await worker().runOnce();
+    const page = (
+      await owner.query(
+        "SELECT title, body, user_edited_at > last_compiled_at AS protected FROM pages WHERE id = $1",
+        [pageId],
+      )
+    ).rows[0];
+    expect(page?.title).toBe("Original");
+    expect(page?.body).toStartWith("Human body\n\n## Updates");
+    expect(page?.protected).toBe(true);
+  });
+
+  test("unchanged patches attach evidence without a version or embedding call", async () => {
+    await seedCandidate("unchanged");
+    patchResponse = JSON.stringify({
+      title: "Original",
+      summary: "Old summary",
+      body: "Human body",
+      changed: false,
+      contradictions: [],
+    });
+    await capture();
+    await worker().runOnce();
+    expect(await counts()).toEqual({
+      pages: 1,
+      versions: 1,
+      sources: 1,
+      events: 0,
+      embeddings: 1,
+      ledger: 3,
+      reviews: 0,
+    });
+  });
+
+  test("contradictions contest the page and retain both claims in the event", async () => {
+    const pageId = await seedCandidate("contested");
+    const base = compiler();
+    const instance = createWorker({
+      withTenant,
+      tenantIds: [tenantId],
+      store,
+      compiler: {
+        ...base,
+        chatProvider: {
+          chat: async (request) => {
+            const input = JSON.parse(request.messages[1]?.content ?? "{}") as {
+              facts?: ExtractedFact[];
+            };
+            const evidence = input.facts?.[0]?.evidence;
+            if (evidence)
+              patchResponse = JSON.stringify({
+                title: "Ignored",
+                summary: "",
+                body: "Ignored",
+                changed: true,
+                contradictions: [{ existingClaim: "Old claim", newClaim: note, evidence }],
+              });
+            return base.chatProvider.chat(request);
+          },
+        },
+      },
+    });
+    await capture();
+    await instance.runOnce();
+    const page = (
+      await owner.query("SELECT status, body, version FROM pages WHERE id = $1", [pageId])
+    ).rows[0];
+    expect(page?.status).toBe("contested");
+    expect(page?.body).toBe("Human body");
+    expect(page?.version).toBe(2);
+    const event = (
+      await owner.query("SELECT contradictions FROM change_events WHERE page_id = $1", [pageId])
+    ).rows[0];
+    expect(event?.contradictions[0]?.existingClaim).toBe("Old claim");
+    expect(event?.contradictions[0]?.newClaim).toBe(note);
+    expect((await counts())?.ledger).toBe(3);
+  });
+
+  test.each([true, false])("provider failure is classified as transient=%j", async (transient) => {
+    failChat = new ProviderError(
+      transient ? "server_error" : "bad_request",
+      transient,
+      "private detail",
+    );
+    await capture();
+    await worker().runOnce();
+    const row = (await owner.query("SELECT status, last_error FROM jobs WHERE id = $1", [jobId]))
+      .rows[0];
+    expect(row?.status).toBe(transient ? "pending" : "dead");
+    expect(row?.last_error).toBe("Compiler provider failed");
+    expect(
+      (await owner.query("SELECT status FROM ingest_sources WHERE id = $1", [sourceId])).rows[0]
+        ?.status,
+    ).toBe("failed");
+  });
+
+  test("malformed patch output is permanent and preserves incurred usage after rollback", async () => {
+    await seedCandidate("invalid");
+    patchResponse = "invalid JSON";
+    await capture();
+    await worker().runOnce();
+    expect((await counts())?.ledger).toBe(3);
+    expect((await counts())?.versions).toBe(1);
+    expect(
+      (await owner.query("SELECT status FROM jobs WHERE id = $1", [jobId])).rows[0]?.status,
+    ).toBe("dead");
+  });
+
+  test("embedding failures roll back page writes, preserve cost, and retry without duplicates", async () => {
+    failPageEmbedding = true;
+    await capture();
+    await worker().runOnce();
+    expect(await counts()).toEqual({
+      pages: 0,
+      versions: 0,
+      sources: 0,
+      events: 0,
+      embeddings: 0,
+      ledger: 2,
+      reviews: 0,
+    });
+    failPageEmbedding = false;
+    await owner.query("UPDATE jobs SET available_at = now() WHERE id = $1", [jobId]);
+    await worker().runOnce();
+    expect(await counts()).toEqual({
+      pages: 1,
+      versions: 1,
+      sources: 1,
+      events: 1,
+      embeddings: 1,
+      ledger: 5,
+      reviews: 0,
+    });
+    const extractions = provider.calls.filter((call) => call.kind === "chat");
+    expect(extractions).toHaveLength(2);
+    expect(extractions[0]?.request.messages).toEqual(extractions[1]?.request.messages);
+  });
+
+  test("slug collisions get a deterministic suffix and candidates never mix models", async () => {
+    const existing = await seedCandidate("the-compiler-preserves-evidence", note, "other-model");
+    await capture();
+    await worker().runOnce();
+    expect((await counts())?.pages).toBe(2);
+    const pages = await owner.query<{ slug: string }>(
+      "SELECT slug FROM pages WHERE brain_id = $1 AND id <> $2",
+      [brainId, existing],
+    );
+    expect(pages.rows[0]?.slug).toBe(
+      `the-compiler-preserves-evidence-${contentHash(`${sourceId}\n0\n${note}`).slice(0, 12)}`,
+    );
+  });
+
+  test("the candidate query uses a bounded exact vector scan", async () => {
+    await seedCandidate("plan");
+    const vector = (await provider.embed([note])).vectors[0];
+    await withTenant(tenantId, async (client) => {
+      expect(
+        (await client.query("SELECT id FROM pages WHERE tenant_id = $1", [foreignTenantId])).rows,
+      ).toEqual([]);
+      const plan = await client.query(`EXPLAIN (ANALYZE, BUFFERS) ${CANDIDATES_SQL}`, [
+        JSON.stringify(vector),
+        tenantId,
+        brainId,
+        embeddingModel,
+      ]);
+      expect(plan.rows.map((row) => row["QUERY PLAN"]).join("\n")).toContain("Limit");
+    });
+  });
+});

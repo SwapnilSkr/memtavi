@@ -4,8 +4,10 @@
   "type": "module",
   "dependencies": {
     "@memtavi/api": "workspace:*",
+    "@memtavi/core": "workspace:*",
     "@memtavi/db": "workspace:*",
     "@memtavi/fetch": "workspace:*",
+    "@memtavi/llm": "workspace:*",
     "@memtavi/shared": "workspace:*",
     "@memtavi/storage": "workspace:*",
     "@memtavi/worker": "workspace:*",

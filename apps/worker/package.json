@@ -6,14 +6,18 @@
   "exports": {
     ".": "./src/worker.ts",
     "./ingest": "./src/ingest.ts",
+    "./compile": "./src/compile.ts",
     "./types": "./src/types.ts"
   },
   "scripts": {
     "start": "bun src/index.ts"
   },
   "dependencies": {
+    "@memtavi/core": "workspace:*",
     "@memtavi/db": "workspace:*",
     "@memtavi/fetch": "workspace:*",
+    "@memtavi/llm": "workspace:*",
+    "@memtavi/shared": "workspace:*",
     "@memtavi/storage": "workspace:*",
     "pg": "^8.16.3"
   },

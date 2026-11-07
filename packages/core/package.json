@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./compile/chunk": "./src/compile/chunk.ts",
     "./compile/schemas": "./src/compile/schemas.ts",
     "./compile/extract": "./src/compile/extract.ts",
     "./compile/policies/mws": "./src/compile/policies/mws.ts",
