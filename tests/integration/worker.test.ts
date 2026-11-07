@@ -2,6 +2,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:tes
 import { createHash } from "node:crypto";
 import { createApp } from "@memtavi/api/app";
 import { fetchDocument } from "@memtavi/fetch";
+import { createFakeStore } from "@memtavi/storage/fake";
+import { sourceKey } from "@memtavi/storage/keys";
 import { createWorker, type WorkerConfig } from "@memtavi/worker";
 import { ingestCapture } from "@memtavi/worker/ingest";
 import { JobError } from "@memtavi/worker/types";
@@ -10,7 +12,8 @@ import { bootstrap } from "../../apps/api/src/bin/bootstrap";
 
 interface SourceBody {
   id: string;
-  content: string;
+  contentPreview: string;
+  contentUrl: string | null;
   contentHash: string;
   originalBytes: number;
   metadata: Record<string, unknown>;
@@ -42,6 +45,7 @@ function sha256(value: string): string {
 describe.skipIf(!ownerUrl || !appUrl)("worker job engine and capture.ingest", () => {
   const owner = new Pool({ connectionString: ownerUrl });
   const application = new Pool({ connectionString: appUrl });
+  const store = createFakeStore();
   const slug = `worker-${crypto.randomUUID()}`;
   const subjectId = crypto.randomUUID();
   const previousAppUrl = process.env.APP_DATABASE_URL;
@@ -75,6 +79,7 @@ describe.skipIf(!ownerUrl || !appUrl)("worker job engine and capture.ingest", ()
     return createWorker({
       withTenant: db.withTenant,
       tenantIds: [tenantId],
+      store,
       handlers: { "capture.ingest": async () => undefined },
       random: () => 0,
       log: () => undefined,
@@ -143,12 +148,15 @@ describe.skipIf(!ownerUrl || !appUrl)("worker job engine and capture.ingest", ()
     const result = await owner.query<{
       content: string;
       content_hash: string;
+      body_ref: string | null;
+      body_bytes: number;
       original_bytes: number;
       metadata: Record<string, unknown>;
       status: string;
       last_error: string | null;
     }>(
-      `SELECT content, content_hash, original_bytes, metadata, status, last_error
+      `SELECT content, content_hash, body_ref, body_bytes, original_bytes, metadata, status,
+         last_error
        FROM ingest_sources WHERE tenant_id = $1 AND id = $2`,
       [tenantId, id],
     );
@@ -194,7 +202,7 @@ describe.skipIf(!ownerUrl || !appUrl)("worker job engine and capture.ingest", ()
     fixturesAuthorized = true;
     process.env.APP_DATABASE_URL = appUrl;
     db = await import("@memtavi/db/client");
-    app = createApp({ ownerPool: owner, withTenant: db.withTenant, now: () => fixedNow });
+    app = createApp({ ownerPool: owner, withTenant: db.withTenant, store, now: () => fixedNow });
     apiKey = await bootstrap(owner, "Worker Engine", slug);
     const tenant = await owner.query<{ id: string }>("SELECT id FROM tenants WHERE slug = $1", [
       slug,
@@ -353,6 +361,11 @@ describe.skipIf(!ownerUrl || !appUrl)("worker job engine and capture.ingest", ()
     expect(source.content).toBe("fetched body");
     expect(source.content_hash).toBe(sha256("fetched body"));
     expect(source.original_bytes).toBe(Buffer.byteLength("fetched body", "utf8"));
+    expect(source.body_bytes).toBe(Buffer.byteLength("fetched body", "utf8"));
+    const key = sourceKey({ tenantId, sourceId, body: "fetched body" });
+    expect(source.body_ref).toBe(key);
+    expect(await store.exists(key)).toBe(true);
+    expect(await new Response(await store.get(key)).text()).toBe("fetched body");
     expect(source.metadata).toEqual({
       finalUrl: "https://example.com/article",
       fetchStatus: 200,
@@ -369,6 +382,28 @@ describe.skipIf(!ownerUrl || !appUrl)("worker job engine and capture.ingest", ()
 
     expect(await instance.runOnce()).toBe(false);
     expect(await compileJobs()).toHaveLength(1);
+  });
+
+  test("a fetched body longer than 4000 characters keeps a preview in Postgres", async () => {
+    const created = await capture({
+      kind: "url",
+      fetchUrl: "https://example.com/long",
+      originRef: `long-${crypto.randomUUID()}`,
+    });
+    expect(created.status).toBe(201);
+    const text = "a".repeat(5_000);
+    const instance = worker({
+      handlers: { "capture.ingest": ingestCapture },
+      fetchDocument: () => Promise.resolve({ status: 200, finalUrl: "", contentType: null, text }),
+    });
+
+    expect(await instance.runOnce()).toBe(true);
+
+    const source = await sourceRow(created.body.id);
+    expect(source.content).toBe(text.slice(0, 4_000));
+    expect(source.content_hash).toBe(sha256(text));
+    expect(source.body_bytes).toBe(5_000);
+    expect(source.original_bytes).toBe(5_000);
   });
 
   test("a note source skips fetching and still enqueues compile", async () => {

@@ -1,16 +1,22 @@
 import { createHash } from "node:crypto";
 import { newId } from "@memtavi/shared/ids";
+import { sourceKey } from "@memtavi/storage/keys";
+import type { ObjectStore } from "@memtavi/storage/types";
 import type { Static } from "elysia";
 import type { PoolClient } from "pg";
 import type { Auth } from "../middleware/auth";
 import { DomainError } from "../middleware/errors";
 import type { captureCreate } from "./schemas";
 
+const PREVIEW_LIMIT = 4_000;
+const SIGNED_URL_TTL_SECONDS = 300;
+
 const fields = [
   "id",
   "brainId",
   "kind",
-  "content",
+  "contentPreview",
+  "contentUrl",
   "contentHash",
   "originRef",
   "label",
@@ -26,7 +32,8 @@ const fields = [
   "deletedAt",
 ] as const;
 
-const columns = `id, brain_id AS "brainId", kind, content, content_hash AS "contentHash",
+const columns = `id, brain_id AS "brainId", kind, content AS "contentPreview",
+  content_hash AS "contentHash", body_ref AS "bodyRef",
   origin_ref AS "originRef", label, bucket, metadata, status, attempts,
   last_error AS "lastError", affected_page_ids AS "affectedPageIds",
   original_bytes AS "originalBytes", created_at AS "createdAt", compiled_at AS "compiledAt",
@@ -166,6 +173,7 @@ async function findOrigin(
 
 export async function createCapture(
   client: PoolClient,
+  store: ObjectStore,
   auth: Auth,
   subjectId: string,
   brainId: string,
@@ -194,11 +202,20 @@ export async function createCapture(
   if (!row) {
     const id = newId("source");
     const raw = content ?? fetchUrl ?? "";
+    let bodyRef: string | null = null;
+    let bodyBytes = 0;
+    let preview = raw;
+    if (content !== null) {
+      bodyRef = sourceKey({ tenantId, sourceId: id, body: content });
+      bodyBytes = Buffer.byteLength(content, "utf8");
+      preview = content.slice(0, PREVIEW_LIMIT);
+      await store.put(bodyRef, content, "text/plain; charset=utf-8");
+    }
     const inserted = await client.query(
       `INSERT INTO ingest_sources
          (id, tenant_id, subject_id, brain_id, kind, content, content_hash, origin_ref,
-          label, bucket, metadata, original_bytes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          label, bucket, metadata, original_bytes, body_ref, body_bytes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        ON CONFLICT (brain_id, origin_ref)
          WHERE origin_ref IS NOT NULL AND deleted_at IS NULL DO NOTHING
        RETURNING ${columns}`,
@@ -208,13 +225,15 @@ export async function createCapture(
         subjectId,
         brainId,
         body.kind,
-        raw,
+        preview,
         hash(raw),
         originRef,
         body.label ?? null,
         body.bucket ?? "inbox",
         JSON.stringify(body.metadata ?? {}),
         content === null ? 0 : Buffer.byteLength(content, "utf8"),
+        bodyRef,
+        bodyBytes,
       ],
     );
     row = inserted.rows[0] as Row | undefined;
@@ -269,6 +288,7 @@ export async function listSources(
 
 export async function getSource(
   client: PoolClient,
+  store: ObjectStore,
   tenantId: string,
   subjectId: string,
   brainId: string,
@@ -283,7 +303,39 @@ export async function getSource(
   );
   const row = result.rows[0] as Row | undefined;
   if (!row) throw new DomainError("NotFoundError", 404, "Not found");
-  return sourceBody(row);
+  const body = sourceBody(row);
+  const bodyRef = row.bodyRef;
+  body.contentUrl =
+    typeof bodyRef === "string" && bodyRef !== ""
+      ? await store.signedUrl(bodyRef, SIGNED_URL_TTL_SECONDS)
+      : null;
+  return body;
+}
+
+export async function getSourceContent(
+  client: PoolClient,
+  store: ObjectStore,
+  now: () => Date,
+  tenantId: string,
+  subjectId: string,
+  brainId: string,
+  sourceId: string,
+) {
+  await requireBrain(client, tenantId, subjectId, brainId);
+  const result = await client.query<{ bodyRef: string | null }>(
+    `SELECT body_ref AS "bodyRef" FROM ingest_sources
+     WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND id = $4
+     AND deleted_at IS NULL`,
+    [tenantId, subjectId, brainId, sourceId],
+  );
+  const bodyRef = result.rows[0]?.bodyRef;
+  if (bodyRef === null || bodyRef === undefined || bodyRef === "") {
+    throw new DomainError("NotFoundError", 404, "Not found");
+  }
+  const url = await store.signedUrl(bodyRef, SIGNED_URL_TTL_SECONDS);
+  if (url === null) return { url: null, expiresAt: null };
+  const expiresAt = new Date(now().getTime() + SIGNED_URL_TTL_SECONDS * 1_000).toISOString();
+  return { url, expiresAt };
 }
 
 export async function deleteSource(

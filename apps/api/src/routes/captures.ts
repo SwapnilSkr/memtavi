@@ -1,5 +1,11 @@
 import { Elysia } from "elysia";
-import { createCapture, deleteSource, getSource, listSources } from "../lib/captures";
+import {
+  createCapture,
+  deleteSource,
+  getSource,
+  getSourceContent,
+  listSources,
+} from "../lib/captures";
 import type { AppConfig } from "../lib/config";
 import { captureCreate, pagination } from "../lib/schemas";
 import { auth } from "../middleware/auth";
@@ -24,7 +30,7 @@ export function captureRoutes(config: AppConfig) {
         const subject = subjectId(request);
         const key = idempotencyKey(request);
         const result = await scope(config, auth, subject, (client) =>
-          createCapture(client, auth, subject, params.brainId, body, key),
+          createCapture(client, config.store, auth, subject, params.brainId, body, key),
         );
         set.status = result.status;
         return result.body;
@@ -51,7 +57,21 @@ export function captureRoutes(config: AppConfig) {
     .get("/v1/brains/:brainId/sources/:sourceId", ({ auth, request, params }) => {
       const subject = subjectId(request);
       return scope(config, auth, subject, (client) =>
-        getSource(client, auth.tenantId, subject, params.brainId, params.sourceId),
+        getSource(client, config.store, auth.tenantId, subject, params.brainId, params.sourceId),
+      );
+    })
+    .get("/v1/brains/:brainId/sources/:sourceId/content", ({ auth, request, params }) => {
+      const subject = subjectId(request);
+      return scope(config, auth, subject, (client) =>
+        getSourceContent(
+          client,
+          config.store,
+          config.now ?? (() => new Date()),
+          auth.tenantId,
+          subject,
+          params.brainId,
+          params.sourceId,
+        ),
       );
     })
     .delete("/v1/brains/:brainId/sources/:sourceId", async ({ auth, request, params, set }) => {

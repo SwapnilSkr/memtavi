@@ -21,13 +21,16 @@ const tenantIds = (process.env.WORKER_TENANT_IDS ?? "")
 if (tenantIds.length === 0) throw new Error("WORKER_TENANT_IDS is required");
 if (tenantIds.some((id) => !uuidPattern.test(id))) throw new Error("Invalid WORKER_TENANT_IDS");
 
+const { buildStoreFromEnv } = await import("@memtavi/storage/config");
 const { pool, withTenant } = await import("@memtavi/db/client");
+const store = await buildStoreFromEnv(process.env);
 
 const worker = createWorker({
   withTenant,
   tenantIds,
   concurrency,
   pollIntervalMs,
+  store,
   log: (event) => {
     process.stdout.write(`${JSON.stringify(event)}\n`);
   },

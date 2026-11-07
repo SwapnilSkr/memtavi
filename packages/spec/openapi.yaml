@@ -375,6 +375,38 @@ paths:
         "500":
           $ref: "#/components/responses/Error500"
 
+  /v1/brains/{brainId}/sources/{sourceId}/content:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+      - $ref: "#/components/parameters/SourceId"
+    get:
+      operationId: getSourceContent
+      tags:
+        - Sources
+      summary: Get a short-lived URL for a source body
+      description: |
+        Returns a signed URL that expires after 300 seconds. `url` and `expiresAt` are
+        `null` when the configured object store cannot sign. A source without a stored
+        body returns `404`.
+      responses:
+        "200":
+          description: A short-lived URL for the stored source body.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceContentUrl"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
   /v1/brains/{brainId}/pages:
     parameters:
       - $ref: "#/components/parameters/BrainId"
@@ -1896,7 +1928,8 @@ components:
         - id
         - brainId
         - kind
-        - content
+        - contentPreview
+        - contentUrl
         - contentHash
         - originRef
         - label
@@ -1918,7 +1951,9 @@ components:
           type: string
         kind:
           $ref: "#/components/schemas/CaptureKind"
-        content:
+        contentPreview:
+          type: string
+        contentUrl:
           type:
             - string
             - "null"
@@ -1962,6 +1997,23 @@ components:
             - "null"
           format: date-time
         deletedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+
+    SourceContentUrl:
+      type: object
+      description: A short-lived signed URL for the stored body of an ingest source.
+      required:
+        - url
+        - expiresAt
+      properties:
+        url:
+          type:
+            - string
+            - "null"
+        expiresAt:
           type:
             - string
             - "null"

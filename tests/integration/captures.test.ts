@@ -1,6 +1,9 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { createApp } from "@memtavi/api/app";
+import { createFakeStore } from "@memtavi/storage/fake";
+import { sourceKey } from "@memtavi/storage/keys";
+import type { ObjectBody, ObjectStore } from "@memtavi/storage/types";
 import Ajv from "ajv/dist/2020";
 import addFormats from "ajv-formats";
 import { Pool } from "pg";
@@ -11,7 +14,8 @@ interface SourceBody {
   id: string;
   brainId: string;
   kind: string;
-  content: string | null;
+  contentPreview: string;
+  contentUrl: string | null;
   contentHash: string;
   originRef: string | null;
   label: string | null;
@@ -25,6 +29,30 @@ interface SourceBody {
   createdAt: string;
   compiledAt: string | null;
   deletedAt: string | null;
+}
+
+interface PutRecord {
+  key: string;
+  body: ObjectBody;
+  contentType: string;
+}
+
+function recordingStore() {
+  const inner = createFakeStore();
+  const puts: PutRecord[] = [];
+  const store: ObjectStore = {
+    async put(key, body, contentType) {
+      puts.push({ key, body, contentType });
+      await inner.put(key, body, contentType);
+    },
+    get: (key) => inner.get(key),
+    delete: (key) => inner.delete(key),
+    exists: (key) => inner.exists(key),
+    async signedUrl(key, ttlSeconds) {
+      return `https://signed.example/${key}?ttl=${ttlSeconds}`;
+    },
+  };
+  return { store, puts };
 }
 
 interface ListBody<T> {
@@ -74,6 +102,8 @@ describe.skipIf(!ownerUrl || !appUrl)("captures and ingest sources", () => {
   let tenantB: string;
   let db: typeof import("@memtavi/db/client");
   let app: ReturnType<typeof createApp>;
+  let store: ObjectStore;
+  let puts: PutRecord[];
   let brainId: string;
   let fixturesAuthorized = false;
   const previousAppUrl = process.env.APP_DATABASE_URL;
@@ -142,7 +172,8 @@ describe.skipIf(!ownerUrl || !appUrl)("captures and ingest sources", () => {
     fixturesAuthorized = true;
     process.env.APP_DATABASE_URL = appUrl;
     db = await import("@memtavi/db/client");
-    app = createApp({ ownerPool: owner, withTenant: db.withTenant, now: () => fixedNow });
+    ({ store, puts } = recordingStore());
+    app = createApp({ ownerPool: owner, withTenant: db.withTenant, store, now: () => fixedNow });
     keys.set("owner", await bootstrap(owner, "Capture A", slugA));
     keys.set("foreign", await bootstrap(owner, "Capture B", slugB));
     const tenants = await owner.query<{ id: string; slug: string }>(
@@ -192,7 +223,8 @@ describe.skipIf(!ownerUrl || !appUrl)("captures and ingest sources", () => {
     expect(body.id).toMatch(/^src_[0-9a-f]{32}$/);
     expect(body.brainId).toBe(brainId);
     expect(body.kind).toBe("note");
-    expect(body.content).toBe("hello world");
+    expect(body.contentPreview).toBe("hello world");
+    expect(body.contentUrl).toBeNull();
     expect(body.contentHash).toBe(sha256("hello world"));
     expect(body.originRef).toBe("note-1");
     expect(body.label).toBe("Note");
@@ -229,7 +261,75 @@ describe.skipIf(!ownerUrl || !appUrl)("captures and ingest sources", () => {
     expect(read.status).toBe(200);
     const readBody = (await read.json()) as SourceBody;
     matchesContract(read, readBody, "/v1/brains/{brainId}/sources/{sourceId}", "get");
-    expect(readBody).toEqual(body);
+    const { contentUrl, ...readRest } = readBody;
+    const { contentUrl: capturedUrl, ...captured } = body;
+    expect(capturedUrl).toBeNull();
+    expect(readRest).toEqual(captured);
+    expect(contentUrl).toContain(`?ttl=300`);
+  });
+
+  test("an inline capture writes one object and keeps a 4000-character preview", async () => {
+    const content = "é".repeat(4_500);
+    const before = puts.length;
+    const response = await capture({ kind: "note", content, originRef: "store-1" });
+    expect(response.status).toBe(201);
+    const body = (await response.json()) as SourceBody;
+    matchesContract(response, body, "/v1/brains/{brainId}/captures", "post");
+    expect(body.contentPreview).toBe(content.slice(0, 4_000));
+    expect(body.contentPreview.length).toBe(4_000);
+
+    expect(puts.length - before).toBe(1);
+    const written = puts[before];
+    expect(written?.body).toBe(content);
+    expect(written?.contentType).toBe("text/plain; charset=utf-8");
+
+    const stored = await owner.query<{ bodyRef: string; bodyBytes: number }>(
+      `SELECT body_ref AS "bodyRef", body_bytes AS "bodyBytes"
+       FROM ingest_sources WHERE tenant_id = $1 AND id = $2`,
+      [tenantA, body.id],
+    );
+    const key = sourceKey({ tenantId: tenantA, sourceId: body.id, body: content });
+    expect(stored.rows[0]?.bodyRef).toBe(key);
+    expect(stored.rows[0]?.bodyBytes).toBe(Buffer.byteLength(content, "utf8"));
+    expect(await store.exists(key)).toBe(true);
+    expect(await new Response(await store.get(key)).text()).toBe(content);
+  });
+
+  test("the content endpoint signs the stored body for 300 seconds", async () => {
+    const response = await capture({ kind: "note", content: "signed body", originRef: "sign-1" });
+    expect(response.status).toBe(201);
+    const source = (await response.json()) as SourceBody;
+    const key = sourceKey({ tenantId: tenantA, sourceId: source.id, body: "signed body" });
+
+    const read = await request(`/v1/brains/${brainId}/sources/${source.id}/content`);
+    expect(read.status).toBe(200);
+    const body = (await read.json()) as { url: string | null; expiresAt: string | null };
+    matchesContract(read, body, "/v1/brains/{brainId}/sources/{sourceId}/content", "get");
+    expect(body.url).toBe(`https://signed.example/${key}?ttl=300`);
+    expect(body.expiresAt).toBe(new Date(fixedNow.getTime() + 300_000).toISOString());
+  });
+
+  test("the content endpoint returns 404 for a source without a stored body", async () => {
+    const response = await capture({ kind: "url", fetchUrl: "https://example.com/no-body" });
+    expect(response.status).toBe(201);
+    const source = (await response.json()) as SourceBody;
+    expect(source.contentUrl).toBeNull();
+    const read = await request(`/v1/brains/${brainId}/sources/${source.id}/content`);
+    expect(read.status).toBe(404);
+    matchesContract(
+      read,
+      await read.json(),
+      "/v1/brains/{brainId}/sources/{sourceId}/content",
+      "get",
+    );
+    const missing = await request(`/v1/brains/${brainId}/sources/src_${"0".repeat(32)}/content`);
+    expect(missing.status).toBe(404);
+    matchesContract(
+      missing,
+      await missing.json(),
+      "/v1/brains/{brainId}/sources/{sourceId}/content",
+      "get",
+    );
   });
 
   test.each([
@@ -273,7 +373,7 @@ describe.skipIf(!ownerUrl || !appUrl)("captures and ingest sources", () => {
     expect(response.status).toBe(201);
     const body = (await response.json()) as SourceBody;
     matchesContract(response, body, "/v1/brains/{brainId}/captures", "post");
-    expect(body.content).toBe(fetchUrl);
+    expect(body.contentPreview).toBe(fetchUrl);
     expect(body.contentHash).toBe(sha256(fetchUrl));
     expect(body.originalBytes).toBe(0);
     expect(body.status).toBe("pending");
@@ -289,11 +389,43 @@ describe.skipIf(!ownerUrl || !appUrl)("captures and ingest sources", () => {
     matchesContract(foreign, await foreign.json(), "/v1/brains/{brainId}/captures", "post");
     const listed = await request(`/v1/brains/${brainId}/sources`, { key: keys.get("foreign") });
     expect(listed.status).toBe(404);
+    const owned = await capture({
+      kind: "note",
+      content: "owned body",
+      originRef: "foreign-probe",
+    });
+    expect(owned.status).toBe(201);
+    const ownerSource = (await owned.json()) as SourceBody;
+    const content = await request(`/v1/brains/${brainId}/sources/${ownerSource.id}/content`, {
+      key: keys.get("foreign"),
+    });
+    expect(content.status).toBe(404);
     const stored = await owner.query<{ total: number }>(
       "SELECT count(*)::int AS total FROM ingest_sources WHERE tenant_id = $1",
       [tenantB],
     );
     expect(stored.rows[0]?.total).toBe(0);
+  });
+
+  test("the content endpoint reports nulls when the store cannot sign", async () => {
+    const unsigned = createApp({
+      ownerPool: owner,
+      withTenant: db.withTenant,
+      store: createFakeStore(),
+      now: () => fixedNow,
+    });
+    const created = await capture({ kind: "note", content: "no signing", originRef: "nosign-1" });
+    expect(created.status).toBe(201);
+    const source = (await created.json()) as SourceBody;
+    const response = await unsigned.handle(
+      new Request(`http://localhost/v1/brains/${brainId}/sources/${source.id}/content`, {
+        headers: { "x-api-key": keys.get("owner") ?? "", "x-subject-id": subjectA },
+      }),
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { url: null; expiresAt: null };
+    matchesContract(response, body, "/v1/brains/{brainId}/sources/{sourceId}/content", "get");
+    expect(body).toEqual({ url: null, expiresAt: null });
   });
 
   test("an Idempotency-Key replays byte-for-byte and creates no second job", async () => {
@@ -332,7 +464,7 @@ describe.skipIf(!ownerUrl || !appUrl)("captures and ingest sources", () => {
     const secondBody = (await second.json()) as SourceBody;
     matchesContract(second, secondBody, "/v1/brains/{brainId}/captures", "post");
     expect(secondBody.id).toBe(firstBody.id);
-    expect(secondBody.content).toBe("original");
+    expect(secondBody.contentPreview).toBe("original");
     const jobs = await owner.query<{ total: number }>(
       "SELECT count(*)::int AS total FROM jobs WHERE tenant_id = $1 AND idempotency_key = $2",
       [tenantA, `capture:${firstBody.id}`],

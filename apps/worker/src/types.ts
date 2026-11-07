@@ -1,4 +1,5 @@
 import type { FetchedDocument } from "@memtavi/fetch";
+import type { ObjectStore } from "@memtavi/storage/types";
 import type { PoolClient } from "pg";
 
 export interface ClaimedJob {
@@ -14,6 +15,7 @@ export interface ClaimedJob {
 export interface JobContext {
   job: ClaimedJob;
   client: PoolClient;
+  store: ObjectStore;
   fetchDocument: (url: string) => Promise<FetchedDocument>;
 }
 

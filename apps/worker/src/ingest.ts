@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
+import { sourceKey } from "@memtavi/storage/keys";
+import type { ObjectStore } from "@memtavi/storage/types";
 import type { PoolClient } from "pg";
 import { type JobContext, JobError } from "./types";
+
+const PREVIEW_LIMIT = 4_000;
 
 interface SourceRow {
   id: string;
@@ -21,8 +25,8 @@ const COMPILING_SQL = `
 
 const STORE_SQL = `
   UPDATE ingest_sources
-  SET content = $4, content_hash = $5, original_bytes = $6,
-      metadata = metadata || $7::jsonb, status = 'compiling', last_error = NULL
+  SET content = $4, content_hash = $5, original_bytes = $6, body_ref = $7, body_bytes = $8,
+      metadata = metadata || $9::jsonb, status = 'compiling', last_error = NULL
   WHERE tenant_id = $1 AND brain_id = $2 AND id = $3
 `;
 
@@ -52,6 +56,7 @@ function payloadOf(payload: Record<string, unknown>): { sourceId: string; brainI
 
 async function storeFetched(
   client: PoolClient,
+  store: ObjectStore,
   tenantId: string,
   brainId: string,
   sourceId: string,
@@ -69,18 +74,28 @@ async function storeFetched(
     fetchStatus: fetched.status,
     contentType: fetched.contentType,
   };
+  const bodyRef = sourceKey({ tenantId, sourceId, body: fetched.text });
+  await store.put(bodyRef, fetched.text, "text/plain; charset=utf-8");
+  const bytes = Buffer.byteLength(fetched.text, "utf8");
   await client.query(STORE_SQL, [
     tenantId,
     brainId,
     sourceId,
-    fetched.text,
+    fetched.text.slice(0, PREVIEW_LIMIT),
     sha256(fetched.text),
-    Buffer.byteLength(fetched.text, "utf8"),
+    bytes,
+    bodyRef,
+    bytes,
     JSON.stringify(metadata),
   ]);
 }
 
-export async function ingestCapture({ job, client, fetchDocument }: JobContext): Promise<void> {
+export async function ingestCapture({
+  job,
+  client,
+  store,
+  fetchDocument,
+}: JobContext): Promise<void> {
   const { sourceId, brainId } = payloadOf(job.payload);
   const result = await client.query<SourceRow>(SOURCE_SQL, [job.tenantId, brainId, sourceId]);
   const source = result.rows[0];
@@ -89,6 +104,7 @@ export async function ingestCapture({ job, client, fetchDocument }: JobContext):
   if (source.kind === "url") {
     await storeFetched(
       client,
+      store,
       job.tenantId,
       brainId,
       sourceId,

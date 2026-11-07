@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createApp } from "@memtavi/api/app";
 import { newId } from "@memtavi/shared/ids";
+import { createFakeStore } from "@memtavi/storage/fake";
 import Ajv from "ajv/dist/2020";
 import addFormats from "ajv-formats";
 import { Pool } from "pg";
@@ -123,7 +124,12 @@ describe.skipIf(!ownerUrl || !appUrl)("API authentication and tenant scope", () 
     fixturesAuthorized = true;
     process.env.APP_DATABASE_URL = appUrl;
     db = await import("@memtavi/db/client");
-    app = createApp({ ownerPool: owner, withTenant: db.withTenant, now: () => fixedNow });
+    app = createApp({
+      ownerPool: owner,
+      withTenant: db.withTenant,
+      store: createFakeStore(),
+      now: () => fixedNow,
+    });
     keys.set("owner", await bootstrap(owner, "Auth A", slugA));
     keys.set("foreign", await bootstrap(owner, "Auth B", slugB));
     const tenants = await owner.query<{ id: string; slug: string }>(
@@ -494,6 +500,7 @@ describe.skipIf(!ownerUrl || !appUrl)("API authentication and tenant scope", () 
       withTenant: async () => {
         throw new Error("SELECT secret FROM private_table");
       },
+      store: createFakeStore(),
       now: () => fixedNow,
     });
     const response = await failing.handle(

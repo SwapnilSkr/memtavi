@@ -5,6 +5,7 @@ import {
   type FetchedDocument,
   type FetchFailureCode,
 } from "@memtavi/fetch";
+import type { ObjectStore } from "@memtavi/storage/types";
 import type { PoolClient } from "pg";
 import { ingestCapture } from "./ingest";
 import { type ClaimedJob, JobError, type JobHandler } from "./types";
@@ -65,6 +66,7 @@ const fetchMessages: Record<FetchFailureCode, string> = {
 export interface WorkerConfig {
   withTenant: typeof withTenant;
   tenantIds: string[];
+  store: ObjectStore;
   handlers?: Record<string, JobHandler>;
   fetchDocument?: (url: string) => Promise<FetchedDocument>;
   concurrency?: number;
@@ -118,6 +120,7 @@ export function createWorker(config: WorkerConfig): Worker {
   if (types.length === 0) throw new Error("At least one job handler is required");
 
   const fetchDocument = config.fetchDocument ?? defaultFetchDocument;
+  const store = config.store;
   const concurrency = Math.max(1, Math.trunc(config.concurrency ?? DEFAULT_CONCURRENCY));
   const pollIntervalMs = Math.max(1, config.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS);
   const random = config.random ?? Math.random;
@@ -147,7 +150,7 @@ export function createWorker(config: WorkerConfig): Worker {
     const handler = handlers[job.type];
     try {
       if (!handler) throw new JobError("permanent", "Unknown job type");
-      await withTenant(job.tenantId, (client) => handler({ job, client, fetchDocument }));
+      await withTenant(job.tenantId, (client) => handler({ job, client, store, fetchDocument }));
       await withTenant(job.tenantId, (client) =>
         client.query(COMPLETE_SQL, [job.tenantId, job.id]),
       );
