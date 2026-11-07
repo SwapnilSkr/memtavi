@@ -9,7 +9,8 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
-- **2026-11-06** — `p0-auth` approved: API-key issuance and revocation with the role ladder, tenant/subject scope, error envelope, request id, and brains routes; 34 integration tests. Public repo published at `github.com/SwapnilSkr/memtavi` in seven commits.
+- **2026-11-06** — Phase 0 complete. `p0-ci` approved: GitHub Actions `static` and `test` jobs, Postgres 18 with pgvector, migrations, and all three suites; both runs on `main` green.
+- **2026-11-06** — `p0-auth` approved: API-key issuance and revocation with the role ladder, tenant/subject scope, error envelope, request id, and brains routes; 34 integration tests. Public repo published at `github.com/SwapnilSkr/memtavi`.
 - **2026-11-06** — `p0-spec` approved: OpenAPI 3.1, 23 paths, 32 operations, 40 schemas, error envelope, pagination, idempotency, rate-limit headers, tenant/subject security split, and `spec:lint` with negative checks. Fern config for four generators.
 - **2026-11-06** — `p0-db` approved: 28-table Drizzle schema, 6 migrations, full tenant RLS including the six child tables, partial slug uniqueness, weighted FTS and subject-scoped client; 64 isolation tests.
 - **2026-11-06** — Local database moved to Homebrew `postgresql@18` on 5434 with brew-managed pgvector 0.8.7 (arm64). `memtavi_dev` and `memtavi_test` live there; the EDB 5432 and Homebrew 5433 clusters are untouched.
