@@ -55,7 +55,11 @@ function median(values: readonly number[]): number {
 
 export function aggregateRouting(events: readonly RoutingEvent[]): RoutingAggregate {
   const actions = { place: 0, review: 0, new: 0 };
-  for (const event of events) actions[event.action] += 1;
+  const reasons = { score: 0, entity: 0, new: 0 };
+  for (const event of events) {
+    actions[event.action] += 1;
+    reasons[event.reason] += 1;
+  }
 
   const bestScores = events.map((event) => event.best);
   const gapped = events.filter((event) => event.best >= GAP_MIN_BEST).map((event) => event.gap);
@@ -80,6 +84,7 @@ export function aggregateRouting(events: readonly RoutingEvent[]): RoutingAggreg
   return {
     total: events.length,
     actions,
+    reasons,
     bestBuckets: bucketCounts(bestScores, BEST_BUCKETS),
     gapBuckets: bucketCounts(gapped, GAP_BUCKETS),
     best: { mean: round(mean(bestScores), 6), median: round(median(bestScores), 6) },

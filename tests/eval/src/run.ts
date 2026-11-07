@@ -302,6 +302,9 @@ export function printResults(output: RunOutput): void {
     `  actions:               place ${routing.actions.place}, review ${routing.actions.review}, new ${routing.actions.new}`,
   );
   console.log(
+    `  reasons:               score ${routing.reasons.score}, entity ${routing.reasons.entity}, new ${routing.reasons.new}`,
+  );
+  console.log(
     `  best score:            mean ${routing.best.mean.toFixed(3)}, median ${routing.best.median.toFixed(3)}`,
   );
   console.log(`  mean candidates:       ${routing.meanCandidateCount.toFixed(2)}`);

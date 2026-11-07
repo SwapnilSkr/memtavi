@@ -8,6 +8,8 @@ function event(
   return {
     sourceId: "src_test",
     factClaim: "A claim",
+    reason: "score",
+    entityOverlap: 0,
     second: 0,
     gap: overrides.best,
     candidateCount: 3,

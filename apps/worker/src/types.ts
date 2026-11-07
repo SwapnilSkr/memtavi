@@ -28,6 +28,8 @@ export interface RoutingEvent {
   sourceId: string;
   factClaim: string;
   action: "place" | "review" | "new";
+  reason: "score" | "entity" | "new";
+  entityOverlap: number;
   best: number;
   second: number;
   gap: number;

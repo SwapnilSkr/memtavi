@@ -10,7 +10,7 @@ import { type ChatResult, type EmbeddingResult, ProviderError } from "@memtavi/l
 import { newId } from "@memtavi/shared/ids";
 import { chunkKey, contentHash } from "@memtavi/storage/keys";
 import { StorageError } from "@memtavi/storage/types";
-import { type JobContext, JobError } from "./types";
+import { type JobContext, JobError, type RoutingEvent } from "./types";
 
 interface SourceRow {
   content: string;
@@ -29,10 +29,11 @@ interface PageRow {
   content_hash: string;
   user_edited_at: Date | null;
   last_compiled_at: Date | null;
+  entities: string[];
 }
 
 export const CANDIDATES_SQL = `
-  SELECT p.id, p.slug,
+  SELECT p.id, p.slug, p.entities,
     COALESCE((SELECT v.created_at FROM page_versions v
       WHERE v.tenant_id = p.tenant_id AND v.page_id = p.id AND v.version = 1), 'epoch'::timestamptz) AS "createdAt",
     greatest(0, least(1, 1 - (e.embedding <=> $1::vector))) AS score
@@ -42,6 +43,25 @@ export const CANDIDATES_SQL = `
   ORDER BY e.embedding <=> $1::vector, "createdAt", p.slug, p.id
   LIMIT 5
 `;
+
+export const ENTITY_PAGES_SQL = `
+  SELECT p.id,
+    cardinality(ARRAY(SELECT unnest(p.entities) INTERSECT SELECT unnest($1::text[]))) AS overlap
+  FROM pages p
+  WHERE p.tenant_id = $2 AND p.brain_id = $3
+    AND p.status IN ('active', 'contested') AND p.deletion_state = 'active'
+    AND p.entities && $1::text[]
+    AND ($4::text[] IS NULL OR p.id = ANY($4::text[]))
+  ORDER BY overlap DESC, p.slug, p.id
+  LIMIT 2
+`;
+
+function normalizeEntities(entities: readonly string[]): string[] {
+  return [...new Set(entities.map((entity) => entity.trim().toLowerCase()).filter(Boolean))].slice(
+    0,
+    20,
+  );
+}
 
 export async function compileCapture(context: JobContext): Promise<void> {
   try {
@@ -190,6 +210,7 @@ async function compileSource({
   const vectors = facts.length ? (await embed(facts.map((fact) => fact.claim))).vectors : [];
   const affected = new Set<string>();
   for (const [index, fact] of facts.entries()) {
+    const entities = normalizeEntities(fact.entities);
     const vector = vectors[index];
     if (!vector) throw new JobError("permanent", "Missing fact embedding");
     const candidates = await client.query<{
@@ -197,17 +218,46 @@ async function compileSource({
       slug: string;
       createdAt: Date;
       score: number;
+      entities: string[];
     }>(CANDIDATES_SQL, [JSON.stringify(vector), job.tenantId, job.brainId, embeddingModel]);
-    const decision = decidePfs(
+    let decision = decidePfs(
       candidates.rows.map((row) => ({
         ...row,
         createdAt: row.createdAt.toISOString(),
       })),
     );
+    let reason: RoutingEvent["reason"] = decision.action === "new" ? "new" : "score";
+    let entityOverlap = 0;
+    if (decision.action !== "place" && entities.length > 0) {
+      const matches = await client.query<{ id: string; overlap: number }>(ENTITY_PAGES_SQL, [
+        entities,
+        job.tenantId,
+        job.brainId,
+        decision.action === "review" ? candidates.rows.map((row) => row.id) : null,
+      ]);
+      const first = matches.rows[0];
+      const second = matches.rows[1];
+      entityOverlap = first?.overlap ?? 0;
+      if (
+        first &&
+        (decision.action === "review" ? !second : first.overlap > (second?.overlap ?? 0))
+      ) {
+        decision = { ...decision, action: "place", pageId: first.id };
+        reason = "entity";
+      }
+    } else if (decision.action === "place") {
+      const pageId = decision.pageId;
+      const chosen = candidates.rows.find((row) => row.id === pageId);
+      entityOverlap = normalizeEntities(chosen?.entities ?? []).filter((entity) =>
+        entities.includes(entity),
+      ).length;
+    }
     onRouting?.({
       sourceId,
       factClaim: fact.claim,
       action: decision.action,
+      reason,
+      entityOverlap,
       best: decision.best,
       second: decision.second,
       gap: decision.gap,
@@ -230,7 +280,7 @@ async function compileSource({
     let changed = true;
     if (decision.action === "place") {
       const found = await client.query<PageRow>(
-        `SELECT id, title, summary, body, version, content_hash, user_edited_at, last_compiled_at
+        `SELECT id, title, summary, body, version, content_hash, user_edited_at, last_compiled_at, entities
          FROM pages WHERE tenant_id = $1 AND brain_id = $2 AND id = $3
          AND deletion_state = 'active' AND status IN ('active', 'contested') FOR UPDATE`,
         [job.tenantId, job.brainId, decision.pageId],
@@ -275,6 +325,7 @@ async function compileSource({
         summary: patch.summary,
         body: patch.body,
         version: existing.version + (changed ? 1 : 0),
+        entities: normalizeEntities([...existing.entities, ...entities]),
       };
       page.content_hash = contentHash(`${page.title}\n${page.summary}\n${page.body}`);
       if (changed) {
@@ -297,8 +348,13 @@ async function compileSource({
           ],
         );
       }
+      await client.query(
+        `UPDATE pages SET entities = $4 WHERE tenant_id = $1 AND brain_id = $2 AND id = $3`,
+        [job.tenantId, job.brainId, page.id, page.entities],
+      );
     } else {
-      const title = fact.claim.trim().slice(0, 120);
+      const title =
+        fact.entities.find((entity) => entity.trim())?.trim() ?? fact.claim.trim().slice(0, 120);
       const pageBody = `${fact.claim}\n\n## Sources\n- ${fact.evidence.chunkUuid}:${fact.evidence.charStart}-${fact.evidence.charEnd} ${JSON.stringify(fact.evidence.quote)}`;
       page = {
         id: newId("page"),
@@ -309,6 +365,7 @@ async function compileSource({
         content_hash: contentHash(`${title}\n${fact.claim}\n${pageBody}`),
         user_edited_at: null,
         last_compiled_at: null,
+        entities,
       };
       const baseSlug =
         title
@@ -323,8 +380,8 @@ async function compileSource({
           attempt === 0 ? baseSlug : `${baseSlug}-${suffix}${attempt > 1 ? `-${attempt}` : ""}`;
         const inserted = await client.query(
           `INSERT INTO pages
-           (id, tenant_id, subject_id, brain_id, slug, title, summary, body, page_type, content_hash, last_compiled_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'topic', $9, now())
+           (id, tenant_id, subject_id, brain_id, slug, title, summary, body, page_type, content_hash, last_compiled_at, entities)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $10, $9, now(), $11)
            ON CONFLICT (brain_id, slug) WHERE deletion_state = 'active' DO NOTHING`,
           [
             page.id,
@@ -336,6 +393,8 @@ async function compileSource({
             fact.claim,
             page.body,
             page.content_hash,
+            entities.length > 0 ? "entity" : "topic",
+            entities,
           ],
         );
         if (inserted.rowCount) break;

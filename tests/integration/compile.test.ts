@@ -7,8 +7,8 @@ import { newId } from "@memtavi/shared/ids";
 import { createFakeStore } from "@memtavi/storage/fake";
 import { contentHash, sourceKey } from "@memtavi/storage/keys";
 import { createWorker } from "@memtavi/worker";
-import { CANDIDATES_SQL } from "@memtavi/worker/compile";
-import type { CompilerConfig } from "@memtavi/worker/types";
+import { CANDIDATES_SQL, compileCapture, ENTITY_PAGES_SQL } from "@memtavi/worker/compile";
+import type { CompilerConfig, RoutingEvent } from "@memtavi/worker/types";
 import { Pool, type PoolClient } from "pg";
 
 const ownerUrl = process.env.TEST_DATABASE_URL;
@@ -35,6 +35,8 @@ describe("capture.compile", () => {
   let patchResponse: string | undefined;
   let failChat: ProviderError | undefined;
   let failPageEmbedding = false;
+  let factEntities: string[] = [];
+  let routing: RoutingEvent[] = [];
 
   async function withTenant<T>(
     tenant: string,
@@ -72,7 +74,7 @@ describe("capture.compile", () => {
               (chunk): ExtractedFact => ({
                 claim: chunk.text.trim(),
                 kind: "project_fact",
-                entities: [],
+                entities: factEntities,
                 confidence: score,
                 durability: score,
                 impact: score,
@@ -110,6 +112,10 @@ describe("capture.compile", () => {
       tenantIds: [tenantId],
       store,
       compiler: compiler(),
+      handlers: {
+        "capture.compile": (context) =>
+          compileCapture({ ...context, onRouting: (event) => routing.push(event) }),
+      },
       random: () => 0,
       fetchDocument: async () => {
         throw new Error("Network is forbidden");
@@ -143,12 +149,17 @@ describe("capture.compile", () => {
     jobId = job.rows[0]?.id ?? "";
   }
 
-  async function seedCandidate(slug: string, text = note, model = embeddingModel) {
+  async function seedCandidate(
+    slug: string,
+    text = note,
+    model = embeddingModel,
+    entities: readonly string[] = [],
+  ) {
     const pageId = newId("page");
     const vector = (await createFakeProvider().embed([text])).vectors[0];
     await owner.query(
-      `INSERT INTO pages (id, tenant_id, subject_id, brain_id, slug, title, summary, body, content_hash)
-       VALUES ($1, $2, $3, $4, $5, 'Original', 'Old summary', 'Human body', $6)`,
+      `INSERT INTO pages (id, tenant_id, subject_id, brain_id, slug, title, summary, body, content_hash, entities)
+       VALUES ($1, $2, $3, $4, $5, 'Original', 'Old summary', 'Human body', $6, $7)`,
       [
         pageId,
         tenantId,
@@ -156,6 +167,7 @@ describe("capture.compile", () => {
         brainId,
         slug,
         contentHash("Original\nOld summary\nHuman body"),
+        entities,
       ],
     );
     await owner.query(
@@ -228,6 +240,8 @@ describe("capture.compile", () => {
     patchResponse = undefined;
     failChat = undefined;
     failPageEmbedding = false;
+    factEntities = [];
+    routing = [];
     await owner.query(
       "INSERT INTO brains (id, tenant_id, subject_id, name, slug) VALUES ($1, $2, $3, 'Compiler', $1)",
       [brainId, tenantId, subjectId],
@@ -293,13 +307,16 @@ describe("capture.compile", () => {
     expect(chunk?.char_end).toBe(note.length);
     expect(await new Response(await store.get(chunk?.body_ref as string)).text()).toBe(note);
     const page = (
-      await owner.query("SELECT id, title, summary, body, version FROM pages WHERE brain_id = $1", [
-        brainId,
-      ])
+      await owner.query(
+        "SELECT id, title, summary, body, version, page_type, entities FROM pages WHERE brain_id = $1",
+        [brainId],
+      )
     ).rows[0];
     expect(page?.title).toBe(note);
     expect(page?.summary).toBe(note);
     expect(page?.version).toBe(1);
+    expect(page?.page_type).toBe("topic");
+    expect(page?.entities).toEqual([]);
     expect(page?.body).toContain(`## Sources\n- ${chunk?.id}:0-${note.length}`);
     const usage = await owner.query<{
       kind: string;
@@ -427,6 +444,213 @@ describe("capture.compile", () => {
     expect(review?.status).toBe("open");
     expect(review?.fact.evidence.quote).toBe(note);
   });
+
+  test("facts from different sources consolidate by entity while another entity creates a page", async () => {
+    factEntities = [" AcMe ", "ACME"];
+    await capture("Acme launches its compiler.");
+    await worker().runOnce();
+    const firstSourceId = sourceId;
+    const first = (
+      await owner.query("SELECT id, title, page_type, entities FROM pages WHERE brain_id = $1", [
+        brainId,
+      ])
+    ).rows[0];
+    expect(first?.title).toBe("AcMe");
+    expect(first?.page_type).toBe("entity");
+    expect(first?.entities).toEqual(["acme"]);
+    factEntities = ["acme", " Compiler "];
+    patchResponse = JSON.stringify({
+      title: "AcMe",
+      summary: "Acme launches and maintains its compiler.",
+      body: "Acme launches its compiler. Acme maintains the compiler.",
+      changed: true,
+      contradictions: [],
+    });
+    await capture("Acme maintains the compiler.");
+    await worker().runOnce();
+    expect((await counts())?.pages).toBe(1);
+    expect((await counts())?.versions).toBe(2);
+    expect(routing[1]?.best).toBeLessThan(0.45);
+    expect(routing[1]).toMatchObject({
+      action: "place",
+      reason: "entity",
+      entityOverlap: 1,
+      chosenPageId: first?.id,
+    });
+    const consolidated = (
+      await owner.query("SELECT entities, body, version FROM pages WHERE id = $1", [first?.id])
+    ).rows[0];
+    expect(consolidated?.entities).toEqual(["acme", "compiler"]);
+    expect(consolidated?.body).toContain("Acme maintains the compiler.");
+    expect(consolidated?.version).toBe(2);
+    const sources = await owner.query<{ ingest_source_id: string }>(
+      "SELECT ingest_source_id FROM page_sources WHERE page_id = $1 ORDER BY ingest_source_id",
+      [first?.id],
+    );
+    expect(sources.rows.map((row) => row.ingest_source_id)).toEqual(
+      [firstSourceId, sourceId].sort(),
+    );
+    factEntities = ["Beta"];
+    await capture("Beta builds a calendar.");
+    await worker().runOnce();
+    expect((await counts())?.pages).toBe(2);
+    expect(routing[2]).toMatchObject({ action: "new", reason: "new", entityOverlap: 0 });
+  });
+
+  test("new routing picks the strictly greatest entity overlap without requiring an embedding", async () => {
+    factEntities = [" Acme ", "Beta"];
+    await seedCandidate("a-less-overlap", note, "other-model", ["acme"]);
+    const target = await seedCandidate("z-more-overlap", note, "other-model", ["acme", "beta"]);
+    patchResponse = JSON.stringify({
+      title: "Original",
+      summary: "Old summary",
+      body: "Human body",
+      changed: false,
+      contradictions: [],
+    });
+    await capture();
+    await worker().runOnce();
+    expect((await counts())?.pages).toBe(2);
+    expect(routing[0]).toMatchObject({
+      action: "place",
+      reason: "entity",
+      entityOverlap: 2,
+      candidateCount: 0,
+      chosenPageId: target,
+    });
+  });
+
+  test("equal entity overlaps on new routing create a page with the existing slug fallback", async () => {
+    factEntities = ["Acme"];
+    await seedCandidate("acme", note, "other-model", ["acme"]);
+    await seedCandidate("another-acme", note, "other-model", ["acme"]);
+    await capture();
+    await worker().runOnce();
+    expect((await counts())?.pages).toBe(3);
+    expect(routing[0]).toMatchObject({ action: "new", reason: "new", entityOverlap: 1 });
+    const created = (
+      await owner.query("SELECT slug FROM pages WHERE brain_id = $1 AND title = 'Acme'", [brainId])
+    ).rows[0];
+    expect(created?.slug).toBe(`acme-${contentHash(`${sourceId}\n0\n${note}`).slice(0, 12)}`);
+  });
+
+  test("review places the only entity-sharing candidate and ignores matches outside the candidates", async () => {
+    factEntities = [" AcMe ", "ACME"];
+    await seedCandidate("a-unrelated", note, embeddingModel, ["beta"]);
+    const target = await seedCandidate("b-acme", note, embeddingModel, ["acme"]);
+    await seedCandidate("outside-candidates", note, "other-model", ["acme"]);
+    patchResponse = JSON.stringify({
+      title: "Acme",
+      summary: note,
+      body: "Acme update",
+      changed: true,
+      contradictions: [],
+    });
+    await capture();
+    await worker().runOnce();
+    expect((await counts())?.reviews).toBe(0);
+    expect((await counts())?.pages).toBe(3);
+    expect((await counts())?.versions).toBe(4);
+    expect(routing[0]).toMatchObject({
+      action: "place",
+      reason: "entity",
+      entityOverlap: 1,
+      chosenPageId: target,
+      best: 1,
+      second: 1,
+      gap: 0,
+      candidateCount: 2,
+    });
+  });
+
+  test.each([
+    { entities: ["beta"], overlap: 1 },
+    { entities: ["acme", "beta"], overlap: 2 },
+  ])("review retains two entity-sharing candidates even with overlap $overlap", async (fixture) => {
+    factEntities = ["Acme", "Beta"];
+    const candidates = [
+      await seedCandidate("a", note, embeddingModel, fixture.entities),
+      await seedCandidate("b", note, embeddingModel, ["acme"]),
+    ];
+    await capture();
+    await worker().runOnce();
+    expect((await counts())?.reviews).toBe(1);
+    expect((await counts())?.pages).toBe(2);
+    expect((await counts())?.versions).toBe(2);
+    expect(provider.calls.filter((call) => call.kind === "chat")).toHaveLength(1);
+    expect(routing[0]).toMatchObject({
+      action: "review",
+      reason: "score",
+      entityOverlap: fixture.overlap,
+      candidateIds: candidates,
+    });
+  });
+
+  test.each([{ entities: [] }, { entities: [" ", "\t"] }])(
+    "facts without usable entities retain topic creation: %j",
+    async ({ entities }) => {
+      factEntities = [...entities];
+      note = `  ${"Claim ".repeat(30)}  `;
+      await capture();
+      await worker().runOnce();
+      const page = (
+        await owner.query(
+          "SELECT title, summary, entities, page_type FROM pages WHERE brain_id = $1",
+          [brainId],
+        )
+      ).rows[0];
+      expect(page?.title).toBe(note.trim().slice(0, 120));
+      expect(page?.summary).toBe(note.trim());
+      expect(page?.entities).toEqual([]);
+      expect(page?.page_type).toBe("topic");
+      expect(routing[0]).toMatchObject({ action: "new", reason: "new", entityOverlap: 0 });
+    },
+  );
+
+  test("created entity lists are trimmed, lowercased, deduplicated and capped at twenty", async () => {
+    factEntities = [
+      " AcMe ",
+      "ACME",
+      " ",
+      ...Array.from({ length: 25 }, (_, i) => ` Entity ${i} `),
+    ];
+    await capture();
+    await worker().runOnce();
+    const page = (await owner.query("SELECT entities FROM pages WHERE brain_id = $1", [brainId]))
+      .rows[0];
+    expect(page?.entities).toEqual([
+      "acme",
+      ...Array.from({ length: 19 }, (_, i) => `entity ${i}`),
+    ]);
+  });
+
+  test.each([true, false])(
+    "successful patches normalize and cap the entity union when changed=%j",
+    async (changed) => {
+      const existingEntities = [" Legacy ", "LEGACY", " "];
+      const pageId = await seedCandidate("union", note, embeddingModel, existingEntities);
+      factEntities = [" New ", "NEW", ...Array.from({ length: 25 }, (_, i) => ` Entity ${i} `)];
+      patchResponse = JSON.stringify({
+        title: "Original",
+        summary: "Old summary",
+        body: "Human body",
+        changed,
+        contradictions: [],
+      });
+      await capture();
+      await worker().runOnce();
+      const page = (
+        await owner.query("SELECT entities, version FROM pages WHERE id = $1", [pageId])
+      ).rows[0];
+      expect(page?.entities).toEqual([
+        "legacy",
+        "new",
+        ...Array.from({ length: 18 }, (_, i) => `entity ${i}`),
+      ]);
+      expect(page?.version).toBe(changed ? 2 : 1);
+      expect(routing[0]).toMatchObject({ action: "place", reason: "score", entityOverlap: 0 });
+    },
+  );
 
   test("placing a fact patches and versions the page and refreshes its embedding", async () => {
     const pageId = await seedCandidate("target");
@@ -634,6 +858,59 @@ describe("capture.compile", () => {
         tenantId,
         brainId,
         embeddingModel,
+      ]);
+      expect(plan.rows.map((row) => row["QUERY PLAN"]).join("\n")).toContain("Limit");
+    });
+  });
+
+  test("entity lookup is scoped, filters inactive pages and orders overlaps deterministically", async () => {
+    const entities = ["acme", "beta"];
+    const less = await seedCandidate("a-less", note, embeddingModel, ["acme"]);
+    const last = await seedCandidate("z-tied", note, embeddingModel, entities);
+    const first = await seedCandidate("b-tied", note, embeddingModel, entities);
+    const foreign = newId("page");
+    await owner.query(
+      `INSERT INTO pages (id, tenant_id, subject_id, brain_id, slug, title, content_hash, entities)
+       VALUES ($1, $2, $3, $4, 'foreign', 'Foreign', 'foreign', $5)`,
+      [foreign, foreignTenantId, subjectId, foreignBrainId, entities],
+    );
+    const otherBrain = newId("brain");
+    await owner.query(
+      "INSERT INTO brains (id, tenant_id, subject_id, name, slug) VALUES ($1, $2, $3, 'Other', $1)",
+      [otherBrain, tenantId, subjectId],
+    );
+    const hidden = [
+      await seedCandidate("archived", note, embeddingModel, entities),
+      await seedCandidate("deleted", note, embeddingModel, entities),
+      await seedCandidate("other-brain", note, embeddingModel, entities),
+    ];
+    await owner.query("UPDATE pages SET status = 'archived' WHERE id = $1", [hidden[0]]);
+    await owner.query("UPDATE pages SET deletion_state = 'deleted' WHERE id = $1", [hidden[1]]);
+    await owner.query("UPDATE pages SET brain_id = $2 WHERE id = $1", [hidden[2], otherBrain]);
+    await owner.query("UPDATE pages SET status = 'contested' WHERE id = $1", [last]);
+    await withTenant(tenantId, async (client) => {
+      expect(
+        (await client.query(ENTITY_PAGES_SQL, [entities, foreignTenantId, foreignBrainId, null]))
+          .rows,
+      ).toEqual([]);
+      expect(
+        (await client.query(ENTITY_PAGES_SQL, [entities, tenantId, foreignBrainId, null])).rows,
+      ).toEqual([]);
+      expect(
+        (await client.query(ENTITY_PAGES_SQL, [entities, tenantId, brainId, null])).rows,
+      ).toEqual([
+        { id: first, overlap: 2 },
+        { id: last, overlap: 2 },
+      ]);
+      expect(
+        (await client.query(ENTITY_PAGES_SQL, [entities, tenantId, brainId, [less, ...hidden]]))
+          .rows,
+      ).toEqual([{ id: less, overlap: 1 }]);
+      const plan = await client.query(`EXPLAIN (ANALYZE, BUFFERS) ${ENTITY_PAGES_SQL}`, [
+        entities,
+        tenantId,
+        brainId,
+        null,
       ]);
       expect(plan.rows.map((row) => row["QUERY PLAN"]).join("\n")).toContain("Limit");
     });
