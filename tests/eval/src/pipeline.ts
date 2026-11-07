@@ -5,6 +5,7 @@ import type {
   CompilerConfig,
   CompilerUsage,
   JobContext,
+  RoutingEvent,
 } from "../../../apps/worker/src/types";
 import { newId } from "../../../packages/shared/src/ids";
 import { contentHash } from "../../../packages/storage/src/keys";
@@ -35,6 +36,7 @@ export interface CompiledConversation {
   sourceIds: string[];
   counts: CompileCounts;
   failures: { sourceId: string; message: string }[];
+  routing: RoutingEvent[];
 }
 
 export function sessionSourceText(session: Session): string {
@@ -130,9 +132,10 @@ export class EvalPipeline {
     }
 
     const failures: { sourceId: string; message: string }[] = [];
+    const routing: RoutingEvent[] = [];
     for (const sourceId of sourceIds) {
       try {
-        await this.compileSource(brainId, sourceId);
+        await this.compileSource(brainId, sourceId, (event) => routing.push(event));
       } catch (error) {
         if (error instanceof BudgetExceededError) throw error;
         const message = error instanceof Error ? error.message : String(error);
@@ -141,7 +144,7 @@ export class EvalPipeline {
       }
     }
     const counts = await this.collectCounts(brainId);
-    return { conversationId: conversation.id, brainId, sourceIds, counts, failures };
+    return { conversationId: conversation.id, brainId, sourceIds, counts, failures, routing };
   }
 
   private async failSource(brainId: string, sourceId: string, message: string): Promise<void> {
@@ -186,7 +189,11 @@ export class EvalPipeline {
     return withTenant(this.app, this.tenantId, this.subjectId, fn);
   }
 
-  private async compileSource(brainId: string, sourceId: string): Promise<void> {
+  private async compileSource(
+    brainId: string,
+    sourceId: string,
+    onRouting: (event: RoutingEvent) => void,
+  ): Promise<void> {
     const job: ClaimedJob = {
       id: crypto.randomUUID(),
       tenantId: this.tenantId,
@@ -208,6 +215,7 @@ export class EvalPipeline {
         recordUsage: async (usage) => {
           await this.onUsage(usage);
         },
+        onRouting,
       };
       await compileCapture(context);
     });

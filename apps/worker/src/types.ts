@@ -21,6 +21,19 @@ export interface JobContext {
   fetchDocument: (url: string) => Promise<FetchedDocument>;
   compiler?: CompilerConfig | undefined;
   recordUsage?: (usage: CompilerUsage) => Promise<void>;
+  onRouting?: ((event: RoutingEvent) => void) | undefined;
+}
+
+export interface RoutingEvent {
+  sourceId: string;
+  factClaim: string;
+  action: "place" | "review" | "new";
+  best: number;
+  second: number;
+  gap: number;
+  candidateCount: number;
+  candidateIds: string[];
+  chosenPageId?: string;
 }
 
 export interface CompilerUsage {

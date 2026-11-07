@@ -63,6 +63,7 @@ async function compileSource({
   store,
   compiler,
   recordUsage,
+  onRouting,
 }: JobContext): Promise<void> {
   const sourceId = job.payload.sourceId;
   if (typeof sourceId !== "string" || !sourceId || job.payload.brainId !== job.brainId) {
@@ -203,6 +204,17 @@ async function compileSource({
         createdAt: row.createdAt.toISOString(),
       })),
     );
+    onRouting?.({
+      sourceId,
+      factClaim: fact.claim,
+      action: decision.action,
+      best: decision.best,
+      second: decision.second,
+      gap: decision.gap,
+      candidateCount: candidates.rows.length,
+      candidateIds: candidates.rows.map((row) => row.id),
+      ...(decision.action === "place" ? { chosenPageId: decision.pageId } : {}),
+    });
     if (decision.action === "review") {
       await client.query(
         `INSERT INTO routing_reviews

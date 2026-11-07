@@ -67,6 +67,29 @@ export interface ConversationSummary {
   counts: CompileCounts;
 }
 
+export interface RoutingBucket {
+  bucket: string;
+  count: number;
+}
+
+export interface RoutingReviewExample {
+  claim: string;
+  best: number;
+  second: number;
+  gap: number;
+  candidateCount: number;
+}
+
+export interface RoutingAggregate {
+  total: number;
+  actions: { place: number; review: number; new: number };
+  bestBuckets: RoutingBucket[];
+  gapBuckets: RoutingBucket[];
+  best: { mean: number; median: number };
+  meanCandidateCount: number;
+  topReviews: RoutingReviewExample[];
+}
+
 export interface EvalResults {
   mode: "fake" | "live";
   label: "plumbing check, not accuracy" | "measured";
@@ -78,6 +101,7 @@ export interface EvalResults {
   spentUsd: number;
   stoppedReason: string | null;
   aggregates: Aggregates;
+  routing: RoutingAggregate;
   conversations: ConversationSummary[];
   results: QuestionResult[];
   errors: string[];

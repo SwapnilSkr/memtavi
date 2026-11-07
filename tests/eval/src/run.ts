@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import type { CompilerConfig, CompilerUsage } from "../../../apps/worker/src/types";
+import type { CompilerConfig, CompilerUsage, RoutingEvent } from "../../../apps/worker/src/types";
 import type { ChatPrices } from "../../../packages/llm/src/cost";
 import type { ChatProvider } from "../../../packages/llm/src/provider";
 import { createFakeStore } from "../../../packages/storage/src/fake";
@@ -16,6 +16,7 @@ import {
 import { BudgetExceededError, type EvalBudget } from "./budget";
 import { judge } from "./judge";
 import { type CompiledConversation, EvalPipeline } from "./pipeline";
+import { aggregateRouting } from "./routing";
 import type {
   Aggregates,
   ConversationSummary,
@@ -144,6 +145,7 @@ export async function runEval(config: RunConfig): Promise<RunOutput> {
   const errors: string[] = [];
   const collected: QuestionResult[] = [];
   const conversations: ConversationSummary[] = [];
+  const routingEvents: RoutingEvent[] = [];
   let stoppedReason: string | null = null;
   const startedAt = new Date();
 
@@ -178,6 +180,7 @@ export async function runEval(config: RunConfig): Promise<RunOutput> {
         brainId: compiled.brainId,
         counts: compiled.counts,
       });
+      routingEvents.push(...compiled.routing);
       for (const failure of compiled.failures) {
         errors.push(`source ${failure.sourceId}: ${failure.message}`);
       }
@@ -227,6 +230,7 @@ export async function runEval(config: RunConfig): Promise<RunOutput> {
       spentUsd: round(spentUsd, 8),
       stoppedReason,
       aggregates: summarise(collected, config.dataset.questions.length, spentUsd),
+      routing: aggregateRouting(routingEvents),
       conversations,
       results: collected,
       errors,
@@ -291,6 +295,32 @@ export function printResults(output: RunOutput): void {
     `answered:               ${results.aggregates.answered}/${results.aggregates.questions}`,
   );
   for (const error of results.errors) console.log(`error: ${error}`);
+  console.log("");
+  const { routing } = results;
+  console.log(`routing: ${routing.total} facts decided`);
+  console.log(
+    `  actions:               place ${routing.actions.place}, review ${routing.actions.review}, new ${routing.actions.new}`,
+  );
+  console.log(
+    `  best score:            mean ${routing.best.mean.toFixed(3)}, median ${routing.best.median.toFixed(3)}`,
+  );
+  console.log(`  mean candidates:       ${routing.meanCandidateCount.toFixed(2)}`);
+  console.log(`  best buckets:`);
+  for (const bucket of routing.bestBuckets) {
+    console.log(`    ${pad(bucket.bucket, 12)}${bucket.count}`);
+  }
+  console.log(`  gap buckets (best >= 0.45):`);
+  for (const bucket of routing.gapBuckets) {
+    console.log(`    ${pad(bucket.bucket, 12)}${bucket.count}`);
+  }
+  console.log(`  top reviews:`);
+  for (const review of routing.topReviews) {
+    console.log(
+      `    best ${review.best.toFixed(3)}  second ${review.second.toFixed(3)}  gap ${review.gap.toFixed(
+        3,
+      )}  candidates ${review.candidateCount}  ${review.claim}`,
+    );
+  }
   console.log("");
   console.log(`results: ${path}`);
 }
