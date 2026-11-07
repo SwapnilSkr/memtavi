@@ -1,0 +1,31 @@
+{
+  "name": "memtavi",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.3.5",
+  "engines": {
+    "bun": ">=1.3.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "tests/*"
+  ],
+  "scripts": {
+    "dev:api": "bun run --cwd apps/api dev",
+    "start:api": "bun run --cwd apps/api start",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "spec:lint": "bun packages/spec/lint.mjs",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "test:unit": "bun test packages",
+    "test:integration": "bun test tests/integration --pass-with-no-tests",
+    "test:isolation": "bun test tests/isolation --pass-with-no-tests",
+    "test:contract": "bun test tests/contract --pass-with-no-tests"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.6",
+    "@types/bun": "^1.4.4",
+    "typescript": "^7.0.2"
+  }
+}

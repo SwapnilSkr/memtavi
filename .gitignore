@@ -1,0 +1,12 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+node_modules/
+bun.lockb
+.agents/
+.commandcode/
+dist/
+coverage/
+.turbo/
+*.tsbuildinfo
