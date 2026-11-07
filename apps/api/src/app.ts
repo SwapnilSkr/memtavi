@@ -8,6 +8,8 @@ import { captureRoutes } from "./routes/captures";
 import { changeRoutes } from "./routes/changes";
 import { graphRoutes } from "./routes/graph";
 import { pageRoutes } from "./routes/pages";
+import { profileRoutes } from "./routes/profile";
+import { scoreRoutes } from "./routes/score";
 import { tenantRoutes } from "./routes/tenant";
 
 export function createApp(config: AppConfig) {
@@ -21,6 +23,8 @@ export function createApp(config: AppConfig) {
     .use(pageRoutes(config))
     .use(changeRoutes(config))
     .use(graphRoutes(config))
+    .use(scoreRoutes(config))
+    .use(profileRoutes(config))
     .use(apiKeyRoutes(config))
     .use(tenantRoutes(config));
 }

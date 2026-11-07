@@ -71,6 +71,17 @@ export const pageUpdate = t.Object({
   version: t.Optional(t.Integer({ minimum: 1 })),
 });
 
+export const profileUpdate = t.Object({
+  whoTheyAre: t.Optional(t.String()),
+  whatTheyDo: t.Optional(t.String()),
+  focus: t.Optional(t.String()),
+  goals: t.Optional(t.String()),
+  currentProjects: t.Optional(t.String()),
+  stuckOn: t.Optional(t.String()),
+  vaultOrganization: t.Optional(t.String()),
+  directives: t.Optional(t.Record(t.String(), t.Unknown())),
+});
+
 export const apiKeyCreate = t.Object({
   name: t.String({ minLength: 1, maxLength: 200 }),
   role: t.Optional(
