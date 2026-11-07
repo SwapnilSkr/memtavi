@@ -1,0 +1,17 @@
+{
+  "name": "@memtavi/storage",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./types": "./src/types.ts",
+    "./keys": "./src/keys.ts",
+    "./s3": "./src/s3.ts",
+    "./local": "./src/local.ts",
+    "./fake": "./src/fake.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1164.0",
+    "@aws-sdk/cloudfront-signer": "^3.1161.0"
+  }
+}
