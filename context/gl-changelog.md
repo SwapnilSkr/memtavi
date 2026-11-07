@@ -9,6 +9,7 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-06** — Eval harness shipped: `tests/eval` compiles a labelled set through the real compiler, answers from a budgeted summaries index plus FTS pages, and reports exact match, F1, injected tokens, accuracy per 1k tokens, latency and cost. Fake mode is CI-safe; live mode is budget-gated.
 - **2026-11-06** — `capture.compile` shipped: paragraph chunking to the store, extraction with evidence enforcement, MWS, PFS over pgvector candidates, patch/create paths, immutable versions, change events, embeddings, usage ledger, and source failure handling. 315 unit, 84 integration.
 - **2026-11-06** — Two-tier storage shipped: migration `0008` (`body_ref`, `body_bytes`, nullable chunk text, `memory_settings` with RLS, budget caps), capture and worker write bodies through `@memtavi/storage`, and the wire exposes `contentPreview`, `contentUrl` and a signed content endpoint.
 - **2026-11-06** — Storage live: private S3 + CloudFront with OAC, signed URLs, SSE-S3, lifecycle and least-privilege policies, deployed as `memtavi-storage-dev`. `@memtavi/storage` added with s3/local/fake drivers; 307 unit tests.
