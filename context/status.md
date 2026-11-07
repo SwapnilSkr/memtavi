@@ -39,7 +39,9 @@ Last updated 2026-11-06. One line per open item; detail lives in the linked node
 - **Pre-correction cost figures are inflated ~20×** on input: every number recorded before the pricing fix used $8/M, not the model's $0.40/M. Treat them as relative only.
 - **Cost model was wrong and is fixed**: `DEFAULT_CHAT_PRICES` is $8/M input, but `gpt-4.1-mini` is $0.40/M (OpenRouter). Reported costs were inflated ~20×; actual spend across all eval runs is well under a dollar, not $7.50. The eval and the worker ledger now read input/output rates from env (`OPENROUTER_*_USD_PER_M`, `EVAL_CHAT_*_USD_PER_M`), set to 0.40 / 1.60.
 - **Batching shipped**: all facts route first, then one patch call per page. A run is now **$0.097**, with 18/19 sources, 7 pages, 38 versions, 10 reviews; accuracy 5.0% / F1 0.138. Cost is fixed; quality is not.
-- **Budget policy**: hard cap $0.50 per live run, one run per change until a run is reliably under $0.20, no three-run loops without a stated reason.
-- **Next: `p1-page-split`** — cap and split page size, and retry a transient source failure once in the eval, as the worker does.
+- **Budget policy**: hard cap **$0.20** per live run, one run per change until a run is reliably under $0.20, no three-run loops without a stated reason.
+- **Page split shipped and measured** (one run, $0.20 cap): 13 pages, 39 versions, 37 reviews, **19/19 sources completed** (the retry recovered the transient loss). Accuracy **15.0% exact / 0.205 F1**, 1,025 injected tokens/question, p50 860 ms, **$0.083**. Two splits fired at the 6,000-character cap.
+- **Cost is under control**: a complete run is about 8 cents. The earlier `$7.50` was an estimate at a wrong $8/M default; real spend across the whole eval history is well under a dollar.
+- **Next: Phase 2, no live spend** — search endpoint and prompt index over the wire, change feed, contested/resolve. Compiler quality work resumes only with a batch of changes and one capped run.
 - **Evidence anchor fix shipped**: the first live run exposed that models return exact quotes with wrong character offsets, so every fact was dropped. `extractFacts` now re-anchors a verbatim quote and drops only text that is absent. Without it, zero pages compiled.
 - **Phase 1 complete**: capture, storage, worker, LLM, compiler core, compiler wire, eval harness and the first live measurement are recorded.
