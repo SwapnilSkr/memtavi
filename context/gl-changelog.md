@@ -9,6 +9,7 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-06** — `p1-capture` approved: capture endpoints, source lifecycle, idempotent replay, `originRef` dedupe, job enqueue, and `ingest_sources.created_at` with a newest-first index; 53 integration tests.
 - **2026-11-06** — Phase 0 complete. `p0-ci` approved: GitHub Actions `static` and `test` jobs, Postgres 18 with pgvector, migrations, and all three suites; both runs on `main` green.
 - **2026-11-06** — `p0-auth` approved: API-key issuance and revocation with the role ladder, tenant/subject scope, error envelope, request id, and brains routes; 34 integration tests. Public repo published at `github.com/SwapnilSkr/memtavi`.
 - **2026-11-06** — `p0-spec` approved: OpenAPI 3.1, 23 paths, 32 operations, 40 schemas, error envelope, pagination, idempotency, rate-limit headers, tenant/subject security split, and `spec:lint` with negative checks. Fern config for four generators.
