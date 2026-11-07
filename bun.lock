@@ -51,6 +51,10 @@
       "name": "@memtavi/fetch",
       "version": "0.0.0",
     },
+    "packages/llm": {
+      "name": "@memtavi/llm",
+      "version": "0.0.0",
+    },
     "packages/shared": {
       "name": "@memtavi/shared",
       "version": "0.0.0",
@@ -184,6 +188,8 @@
     "@memtavi/integration-tests": ["@memtavi/integration-tests@workspace:tests/integration"],
 
     "@memtavi/isolation-tests": ["@memtavi/isolation-tests@workspace:tests/isolation"],
+
+    "@memtavi/llm": ["@memtavi/llm@workspace:packages/llm"],
 
     "@memtavi/shared": ["@memtavi/shared@workspace:packages/shared"],
 

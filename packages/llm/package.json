@@ -1,0 +1,13 @@
+{
+  "name": "@memtavi/llm",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./provider": "./src/provider.ts",
+    "./openrouter": "./src/openrouter.ts",
+    "./openai-embeddings": "./src/openai-embeddings.ts",
+    "./fake": "./src/fake.ts",
+    "./cost": "./src/cost.ts"
+  }
+}
