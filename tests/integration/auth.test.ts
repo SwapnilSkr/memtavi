@@ -342,6 +342,57 @@ describe.skipIf(!ownerUrl || !appUrl)("API authentication and tenant scope", () 
     expect(JSON.stringify(audit.rows).includes(body.key)).toBe(false);
   });
 
+  test.each([
+    ["admin", "owner", 403],
+    ["admin", "developer", 204],
+    ["owner", "admin", 204],
+  ] as const)(
+    "%s revoking %s returns %i and preserves authentication state",
+    async (caller, role, status) => {
+      const created = await request("/v1/api-keys", {
+        key: keys.get("owner"),
+        subject: null,
+        method: "POST",
+        body: { name: `Revocation ${caller} to ${role}`, role },
+      });
+      expect(created.status).toBe(201);
+      const target = (await created.json()) as KeyBody;
+      const foreign = await request(`/v1/api-keys/${target.id}`, {
+        key: keys.get("foreign"),
+        subject: null,
+        method: "DELETE",
+      });
+      expect(foreign.status).toBe(404);
+      matchesContract(foreign, await foreign.json(), "/v1/api-keys/{keyId}", "delete");
+      const revoked = await request(`/v1/api-keys/${target.id}`, {
+        key: keys.get(caller),
+        subject: null,
+        method: "DELETE",
+      });
+      expect(revoked.status).toBe(status);
+      const body = status === 403 ? ((await revoked.json()) as ErrorBody) : null;
+      matchesContract(revoked, body, "/v1/api-keys/{keyId}", "delete");
+      if (body) expect(body.body.error).toBe("ForbiddenError");
+      const authenticated = await request("/v1/brains", { key: target.key });
+      expect(authenticated.status).toBe(status === 403 ? 200 : 401);
+    },
+  );
+
+  test("listing API keys writes no audit rows", async () => {
+    const before = await owner.query<{ total: number }>(
+      "SELECT count(*)::int AS total FROM audit_events WHERE tenant_id = $1",
+      [tenantA],
+    );
+    const listed = await request("/v1/api-keys", { key: keys.get("owner"), subject: null });
+    expect(listed.status).toBe(200);
+    matchesContract(listed, await listed.json(), "/v1/api-keys", "get");
+    const after = await owner.query<{ total: number }>(
+      "SELECT count(*)::int AS total FROM audit_events WHERE tenant_id = $1",
+      [tenantA],
+    );
+    expect(after.rows[0]?.total).toBe(before.rows[0]?.total);
+  });
+
   test.each(["viewer", "developer"])("%s cannot manage keys", async (role) => {
     for (const [method, path, body] of [
       ["GET", "/v1/api-keys", undefined],

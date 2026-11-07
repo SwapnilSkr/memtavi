@@ -4,7 +4,7 @@ import type { Auth } from "../middleware/auth";
 import { DomainError } from "../middleware/errors";
 import { uuidPattern } from "../middleware/scope";
 import { issueKey } from "./keys";
-import { requireRole } from "./roles";
+import { type Role, requireRole } from "./roles";
 import type { apiKeyCreate } from "./schemas";
 
 const columns = `id, name, prefix, role, scopes, last_used_at AS "lastUsedAt",
@@ -55,12 +55,18 @@ export async function listApiKeys(client: PoolClient, auth: Auth, limit: number,
     `SELECT ${columns} FROM api_keys WHERE tenant_id = $1 ORDER BY id LIMIT $2 OFFSET $3`,
     [auth.tenantId, limit, offset],
   );
-  await auditKey(client, auth, "api_key.listed", auth.tenantId);
   return { items: items.rows, total: total.rows[0]?.total ?? 0, limit, offset };
 }
 
 export async function revokeApiKey(client: PoolClient, auth: Auth, keyId: string) {
   if (!uuidPattern.test(keyId)) throw new DomainError("NotFoundError", 404, "Not found");
+  const target = await client.query<{ role: Role; revoked_at: Date | null }>(
+    "SELECT role, revoked_at FROM api_keys WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+    [auth.tenantId, keyId],
+  );
+  const key = target.rows[0];
+  if (!key) throw new DomainError("NotFoundError", 404, "Not found");
+  requireRole(auth.role, key.role);
   const result = await client.query(
     `UPDATE api_keys SET revoked_at = COALESCE(revoked_at, now())
      WHERE tenant_id = $1 AND id = $2 RETURNING id`,
