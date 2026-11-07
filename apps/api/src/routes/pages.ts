@@ -1,7 +1,7 @@
 import { Elysia } from "elysia";
 import type { AppConfig } from "../lib/config";
-import { getIndex, getPageBySlug, listPages } from "../lib/pages";
-import { indexLimit, pagination, searchQuery } from "../lib/schemas";
+import { getIndex, getPageBySlug, listPages, updatePageBySlug } from "../lib/pages";
+import { indexLimit, pageUpdate, pagination, searchQuery } from "../lib/schemas";
 import { searchPages } from "../lib/search";
 import { auth } from "../middleware/auth";
 import { scope, subjectId } from "../middleware/scope";
@@ -32,6 +32,24 @@ export function pageRoutes(config: AppConfig) {
         getPageBySlug(client, auth.tenantId, subject, params.brainId, params.slug),
       );
     })
+    .patch(
+      "/v1/brains/:brainId/pages/:slug",
+      ({ auth, request, params, body }) => {
+        const subject = subjectId(request);
+        return scope(config, auth, subject, (client) =>
+          updatePageBySlug(
+            client,
+            auth.tenantId,
+            subject,
+            params.brainId,
+            params.slug,
+            body,
+            config.embeddings ?? null,
+          ),
+        );
+      },
+      { body: pageUpdate },
+    )
     .get(
       "/v1/brains/:brainId/index",
       ({ auth, request, params, query }) => {

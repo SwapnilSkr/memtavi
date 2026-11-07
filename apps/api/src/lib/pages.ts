@@ -1,5 +1,10 @@
+import type { EmbeddingProvider } from "@memtavi/llm/provider";
+import { newId } from "@memtavi/shared/ids";
+import { contentHash } from "@memtavi/storage/keys";
+import type { Static } from "elysia";
 import type { PoolClient } from "pg";
 import { DomainError } from "../middleware/errors";
+import type { pageUpdate } from "./schemas";
 
 const pageColumns = `id, subject_id AS "subjectId", brain_id AS "brainId", slug, title, summary,
   body, page_type AS "pageType", bucket, bucket_source AS "bucketSource", status, pinned, archived,
@@ -93,4 +98,90 @@ export async function getIndex(
     [tenantId, subjectId, brainId, limit, offset],
   );
   return { items: items.rows, total: total.rows[0]?.total ?? 0, limit, offset };
+}
+
+export async function updatePageBySlug(
+  client: PoolClient,
+  tenantId: string,
+  subjectId: string,
+  brainId: string,
+  slug: string,
+  update: Static<typeof pageUpdate>,
+  embeddings: EmbeddingProvider | null,
+) {
+  await requireBrain(client, tenantId, subjectId, brainId);
+  const current = await client.query(
+    `SELECT ${pageColumns} FROM pages
+     WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND slug = $4
+     AND deletion_state = 'active'
+     FOR UPDATE`,
+    [tenantId, subjectId, brainId, slug],
+  );
+  const page = current.rows[0];
+  if (!page) throw new DomainError("NotFoundError", 404, "Not found");
+  if (update.version !== undefined && update.version !== page.version) {
+    throw new DomainError("ConflictError", 409, "Version conflict");
+  }
+
+  const title = update.title ?? page.title;
+  const summary = update.summary ?? page.summary;
+  const body = update.body ?? page.body;
+  const embeddingText = `${title}\n${summary}\n${body}`;
+  const hash = contentHash(embeddingText);
+  const version = page.version + 1;
+
+  let embeddingModel = page.embeddingModel;
+  if (embeddings) {
+    const embedded = await embeddings.embed([embeddingText]);
+    const vector = embedded.vectors[0];
+    if (vector) {
+      await client.query(
+        `INSERT INTO page_embeddings (tenant_id, page_id, model, dimensions, embedding, content_hash)
+         VALUES ($1, $2, $3, $4, $5::vector, $6)
+         ON CONFLICT (page_id, model) DO UPDATE SET embedding = EXCLUDED.embedding,
+         dimensions = EXCLUDED.dimensions, content_hash = EXCLUDED.content_hash
+         WHERE page_embeddings.tenant_id = $1`,
+        [tenantId, page.id, embedded.model, embedded.dimensions, JSON.stringify(vector), hash],
+      );
+      embeddingModel = embedded.model;
+    }
+  }
+
+  const updated = await client.query(
+    `UPDATE pages SET title = $5, summary = $6, body = $7, bucket = $8, pinned = $9,
+       archived = $10, status = $11, content_hash = $12, version = $13,
+       user_edited_at = now(), embedding_model = $14
+     WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND id = $4
+     RETURNING ${pageColumns}`,
+    [
+      tenantId,
+      subjectId,
+      brainId,
+      page.id,
+      title,
+      summary,
+      body,
+      update.bucket ?? page.bucket,
+      update.pinned ?? page.pinned,
+      update.archived ?? page.archived,
+      update.status ?? page.status,
+      hash,
+      version,
+      embeddingModel,
+    ],
+  );
+
+  await client.query(
+    `INSERT INTO page_versions (tenant_id, page_id, version, title, summary, body, ingest_source_id, actor)
+     VALUES ($1, $2, $3, $4, $5, $6, NULL, 'user')`,
+    [tenantId, page.id, version, title, summary, body],
+  );
+  await client.query(
+    `INSERT INTO change_events
+       (id, tenant_id, brain_id, page_id, action, change_summary, from_version, to_version)
+     VALUES ($1, $2, $3, $4, 'updated', 'Edited by user', $5, $6)`,
+    [newId("change"), tenantId, brainId, page.id, page.version, version],
+  );
+
+  return updated.rows[0];
 }

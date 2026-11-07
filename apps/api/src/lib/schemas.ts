@@ -42,6 +42,31 @@ export const captureCreate = t.Object({
   metadata: t.Optional(t.Record(t.String(), t.Unknown())),
 });
 
+export const changeAck = t.Object({
+  acked: t.Boolean(),
+});
+
+export const pageUpdate = t.Object({
+  title: t.Optional(t.String()),
+  summary: t.Optional(t.String()),
+  body: t.Optional(t.String()),
+  bucket: t.Optional(
+    t.Union([t.Literal("inbox"), t.Literal("notes"), t.Literal("ideas"), t.Literal("projects")]),
+  ),
+  pinned: t.Optional(t.Boolean()),
+  archived: t.Optional(t.Boolean()),
+  status: t.Optional(
+    t.Union([
+      t.Literal("active"),
+      t.Literal("stale"),
+      t.Literal("contested"),
+      t.Literal("deprecated"),
+      t.Literal("archived"),
+    ]),
+  ),
+  version: t.Optional(t.Integer({ minimum: 1 })),
+});
+
 export const apiKeyCreate = t.Object({
   name: t.String({ minLength: 1, maxLength: 200 }),
   role: t.Optional(
