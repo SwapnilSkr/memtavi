@@ -9,6 +9,7 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-06** — Inspector shell shipped: Vite/React/Tailwind app with a typed API client, sessionStorage session, brains/pages/detail/search routes, safe markdown, and web typecheck/build in CI.
 - **2026-11-06** — Phase 2 score/profile shipped: latest score snapshot, empty-default profile, partial profile upsert with a tenant guard.
 - **2026-11-06** — Phase 2 graph shipped: live-only graph nodes and edges, similarity-ordered connections, idempotent connection ack.
 - **2026-11-06** — Phase 2 changes shipped: change feed, idempotent ack, and page PATCH with version conflict, user version, change event and contested resolution.
