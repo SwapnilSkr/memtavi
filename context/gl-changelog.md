@@ -9,6 +9,7 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-06** — Export and permanent delete shipped: JSON brain bundle, `permanent=true` guard, `deletion_ops` audit, cascade delete, inspector download and two-step confirmation.
 - **2026-11-06** — Inspector graph/score/profile shipped: deterministic graph, health meters with a 404 empty state, profile editing with validated directives.
 - **2026-11-06** — Hardening: strict CSP for production/preview with a dev-only refresh allowance, and best-effort page embedding that cannot block an edit.
 - **2026-11-06** — Inspector capture/edit shipped: note/URL capture with polling, page edit with 409 reload, contested resolve. Phase 2 gate closed.

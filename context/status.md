@@ -52,6 +52,7 @@ Last updated 2026-11-06. One line per open item; detail lives in the linked node
 - **Phase 2 gate closed**: capture → read → correct is possible entirely in the inspector, against the live API.
 - **Hardening shipped**: strict CSP in the production build and preview headers, with a dev-only inline allowance for Vite's refresh preamble; page updates now write first and refresh the embedding best-effort inside a savepoint. 51 web, 153 integration tests.
 - **Inspector graph/score/profile shipped**: deterministic SVG graph with clickable nodes, score meters and factors with a 404 empty state, and a profile form with validated directives JSON. 79 web tests.
-- **Next: `p3-export-delete`** — export and permanent delete, API and inspector, then the remaining Phase 3 polish.
+- **Export and permanent delete shipped**: `GET /export` returns the brain bundle (pages, versions, preview-only sources, connections) and `DELETE /pages/{slug}?permanent=true` records a `deletion_ops` row and cascades the page. The inspector downloads the JSON and requires a two-step delete confirmation. 88 web, 158 integration tests.
+- **Next: connections UI and webhooks** — surface the graph relationships and the change feed in the inspector, then the MCP server for Phase 4.
 - **Evidence anchor fix shipped**: the first live run exposed that models return exact quotes with wrong character offsets, so every fact was dropped. `extractFacts` now re-anchors a verbatim quote and drops only text that is absent. Without it, zero pages compiled.
 - **Phase 1 complete**: capture, storage, worker, LLM, compiler core, compiler wire, eval harness and the first live measurement are recorded.
