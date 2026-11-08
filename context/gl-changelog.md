@@ -9,6 +9,7 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-06** — Hardening: strict CSP for production/preview with a dev-only refresh allowance, and best-effort page embedding that cannot block an edit.
 - **2026-11-06** — Inspector capture/edit shipped: note/URL capture with polling, page edit with 409 reload, contested resolve. Phase 2 gate closed.
 - **2026-11-06** — Inspector shell shipped: Vite/React/Tailwind app with a typed API client, sessionStorage session, brains/pages/detail/search routes, safe markdown, and web typecheck/build in CI.
 - **2026-11-06** — Phase 2 score/profile shipped: latest score snapshot, empty-default profile, partial profile upsert with a tenant guard.
