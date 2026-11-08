@@ -60,6 +60,51 @@ export interface SearchHit {
   updatedAt?: string;
 }
 
+export type CaptureKind = "note" | "url" | "file" | "transcript" | "chat_turn" | "integration";
+export type SourceStatus = "pending" | "compiling" | "completed" | "failed";
+
+export interface CaptureInput {
+  kind: CaptureKind;
+  content?: string | null;
+  fetchUrl?: string | null;
+  label?: string | null;
+  originRef?: string | null;
+  bucket?: Page["bucket"];
+  metadata?: Record<string, unknown>;
+}
+
+export interface IngestSource {
+  id: string;
+  brainId: string;
+  kind: CaptureKind;
+  contentPreview: string;
+  contentUrl: string | null;
+  contentHash: string;
+  originRef: string | null;
+  label: string | null;
+  bucket: Page["bucket"];
+  metadata: Record<string, unknown>;
+  status: SourceStatus;
+  attempts: number;
+  lastError: string | null;
+  affectedPageIds: string[];
+  originalBytes: number;
+  createdAt: string;
+  compiledAt: string | null;
+  deletedAt: string | null;
+}
+
+export interface PageUpdate {
+  title?: string;
+  summary?: string;
+  body?: string;
+  bucket?: Page["bucket"];
+  pinned?: boolean;
+  archived?: boolean;
+  status?: PageStatus;
+  version: number;
+}
+
 export interface ListResponse<T> {
   items: T[];
   total: number;
@@ -93,7 +138,10 @@ export class ApiError extends Error {
 export type Fetcher = (input: string, init: RequestInit) => Promise<Response>;
 
 export function createApi(session: Session, fetcher: Fetcher = fetch) {
-  async function request<T>(path: string, body?: unknown): Promise<T> {
+  async function request<T>(
+    path: string,
+    { method, body }: { method?: "GET" | "POST" | "PATCH"; body?: unknown } = {},
+  ): Promise<T> {
     const headers = new Headers({
       "x-api-key": session.apiKey,
       "x-subject-id": session.subjectId,
@@ -103,7 +151,7 @@ export function createApi(session: Session, fetcher: Fetcher = fetch) {
     let response: Response;
     try {
       response = await fetcher(`${session.baseUrl.replace(/\/+$/, "")}/v1${path}`, {
-        method: body === undefined ? "GET" : "POST",
+        method: method ?? (body === undefined ? "GET" : "POST"),
         headers,
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
         credentials: "omit",
@@ -161,7 +209,21 @@ export function createApi(session: Session, fetcher: Fetcher = fetch) {
       return request<Brain>(`/brains/${encodeURIComponent(brainId)}`);
     },
     createBrain(body: BrainCreate) {
-      return request<Brain>("/brains", body);
+      return request<Brain>("/brains", { body });
+    },
+    capture(brainId: string, body: CaptureInput) {
+      return request<IngestSource>(`/brains/${encodeURIComponent(brainId)}/captures`, { body });
+    },
+    getSource(brainId: string, sourceId: string) {
+      return request<IngestSource>(
+        `/brains/${encodeURIComponent(brainId)}/sources/${encodeURIComponent(sourceId)}`,
+      );
+    },
+    updatePage(brainId: string, slug: string, body: PageUpdate) {
+      return request<Page>(
+        `/brains/${encodeURIComponent(brainId)}/pages/${encodeURIComponent(slug)}`,
+        { method: "PATCH", body },
+      );
     },
     listPages(brainId: string, params: Pagination = {}) {
       const query = new URLSearchParams({

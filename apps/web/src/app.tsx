@@ -7,6 +7,7 @@ import { createApi } from "./lib/api";
 import { ApiContext } from "./lib/api-context";
 import { clearSession, readSession, type Session } from "./lib/session";
 import { Brains } from "./screens/brains";
+import { Capture } from "./screens/capture";
 import { Pages } from "./screens/pages";
 import { Search } from "./screens/search";
 import { Setup } from "./screens/setup";
@@ -45,6 +46,7 @@ function Inspector({ session, onDisconnect }: { session: Session; onDisconnect: 
             }
           >
             <Route index element={<Brains />} />
+            <Route path="brains/:brainId/capture" element={<Capture />} />
             <Route path="brains/:brainId/pages" element={<Pages />} />
             <Route
               path="brains/:brainId/pages/:slug"

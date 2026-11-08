@@ -22,7 +22,8 @@ export function Pages() {
         <EmptyState>
           <p>
             No pages on this page.{" "}
-            <Link to={`/brains/${encodeURIComponent(brainId)}/search`}>Search this brain</Link> or{" "}
+            <Link to={`/brains/${encodeURIComponent(brainId)}/capture`}>Capture a note or URL</Link>
+            , <Link to={`/brains/${encodeURIComponent(brainId)}/search`}>Search this brain</Link> or{" "}
             <Link to="/">choose another brain</Link>.
           </p>
         </EmptyState>

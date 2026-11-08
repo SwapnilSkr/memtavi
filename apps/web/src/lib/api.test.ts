@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { ApiError, createApi, type Fetcher } from "./api";
+import { ApiError, type CaptureInput, createApi, type Fetcher, type PageUpdate } from "./api";
 
 const session = {
   baseUrl: "",
@@ -11,6 +11,7 @@ describe("API client", () => {
   test("adds both session headers to reads without a JSON body", async () => {
     const fetcher = (async (input, init) => {
       expect(input).toBe("/v1/brains?limit=50&offset=0");
+      expect(init.method).toBe("GET");
       const headers = new Headers(init?.headers);
       expect(headers.get("x-api-key")).toBe(session.apiKey);
       expect(headers.get("x-subject-id")).toBe(session.subjectId);
@@ -47,6 +48,7 @@ describe("API client", () => {
     { status: 400, code: "BadRequestError", kind: "permanent" },
     { status: 401, code: "UnauthorizedError", kind: "permanent" },
     { status: 404, code: "NotFoundError", kind: "permanent" },
+    { status: 409, code: "ConflictError", kind: "permanent" },
     { status: 429, code: "RateLimitError", kind: "transient" },
     { status: 500, code: "InternalServerError", kind: "transient" },
   ])("maps the error envelope for $status", async ({ status, code, kind }) => {
@@ -132,5 +134,66 @@ describe("API client", () => {
       "/v1/brains/brn%2Fa/pages/a%2Fb%20%3F%23",
       "/v1/brains/brn%2Fa/search?q=hello+%26+world&limit=10&minSimilarity=0",
     ]);
+  });
+
+  test.each<CaptureInput>([
+    { kind: "note", content: "A note", label: "Research", originRef: "note-1" },
+    { kind: "url", fetchUrl: "https://example.test/article" },
+  ])("capture sends $kind JSON and session headers with POST", async (body) => {
+    const fetcher = (async (input, init) => {
+      expect(input).toBe("/v1/brains/brn%2Fa/captures");
+      expect(init.method).toBe("POST");
+      expect(JSON.parse(String(init.body))).toEqual(body);
+      const headers = new Headers(init.headers);
+      expect(headers.get("Content-Type")).toBe("application/json");
+      expect(headers.get("Accept")).toBe("application/json");
+      expect(headers.get("x-api-key")).toBe(session.apiKey);
+      expect(headers.get("x-subject-id")).toBe(session.subjectId);
+      return Response.json({ id: "src_test", status: "pending" }, { status: 201 });
+    }) satisfies Fetcher;
+    expect((await createApi(session, fetcher).capture("brn/a", body)).status).toBe("pending");
+  });
+
+  test("source polling reads an encoded source path without a body", async () => {
+    const fetcher = (async (input, init) => {
+      expect(input).toBe("/v1/brains/brn%2Fa/sources/src%2Fb");
+      expect(init.method).toBe("GET");
+      expect(init.body).toBeUndefined();
+      expect(new Headers(init.headers).has("Content-Type")).toBe(false);
+      return Response.json({ id: "src/b", status: "compiling" });
+    }) satisfies Fetcher;
+    expect((await createApi(session, fetcher).getSource("brn/a", "src/b")).status).toBe(
+      "compiling",
+    );
+  });
+
+  test.each<PageUpdate>([
+    { title: "Updated", body: "# Markdown", version: 3 },
+    { status: "active", version: 4 },
+  ])("page changes and resolution use PATCH with version: %j", async (body) => {
+    const fetcher = (async (input, init) => {
+      expect(input).toBe("/v1/brains/brn%2Fa/pages/a%2Fb%20%3F%23");
+      expect(init.method).toBe("PATCH");
+      expect(JSON.parse(String(init.body))).toEqual(body);
+      const headers = new Headers(init.headers);
+      expect(headers.get("Content-Type")).toBe("application/json");
+      expect(headers.get("x-api-key")).toBe(session.apiKey);
+      expect(headers.get("x-subject-id")).toBe(session.subjectId);
+      return Response.json({ title: "Updated", version: body.version + 1 });
+    }) satisfies Fetcher;
+    expect((await createApi(session, fetcher).updatePage("brn/a", "a/b ?#", body)).version).toBe(
+      body.version + 1,
+    );
+  });
+
+  test("a stale page PATCH preserves the conflict status for reload handling", async () => {
+    const fetcher = (async () =>
+      Response.json(
+        { body: { message: "Version conflict", error: "ConflictError", statusCode: 409 } },
+        { status: 409 },
+      )) satisfies Fetcher;
+    await expect(
+      createApi(session, fetcher).updatePage("brn_test", "page", { summary: "Edit", version: 1 }),
+    ).rejects.toMatchObject({ status: 409, code: "ConflictError", kind: "permanent" });
   });
 });
