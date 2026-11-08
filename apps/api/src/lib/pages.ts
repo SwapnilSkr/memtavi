@@ -130,27 +130,10 @@ export async function updatePageBySlug(
   const hash = contentHash(embeddingText);
   const version = page.version + 1;
 
-  let embeddingModel = page.embeddingModel;
-  if (embeddings) {
-    const embedded = await embeddings.embed([embeddingText]);
-    const vector = embedded.vectors[0];
-    if (vector) {
-      await client.query(
-        `INSERT INTO page_embeddings (tenant_id, page_id, model, dimensions, embedding, content_hash)
-         VALUES ($1, $2, $3, $4, $5::vector, $6)
-         ON CONFLICT (page_id, model) DO UPDATE SET embedding = EXCLUDED.embedding,
-         dimensions = EXCLUDED.dimensions, content_hash = EXCLUDED.content_hash
-         WHERE page_embeddings.tenant_id = $1`,
-        [tenantId, page.id, embedded.model, embedded.dimensions, JSON.stringify(vector), hash],
-      );
-      embeddingModel = embedded.model;
-    }
-  }
-
   const updated = await client.query(
     `UPDATE pages SET title = $5, summary = $6, body = $7, bucket = $8, pinned = $9,
        archived = $10, status = $11, content_hash = $12, version = $13,
-       user_edited_at = now(), embedding_model = $14
+       user_edited_at = now()
      WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND id = $4
      RETURNING ${pageColumns}`,
     [
@@ -167,7 +150,6 @@ export async function updatePageBySlug(
       update.status ?? page.status,
       hash,
       version,
-      embeddingModel,
     ],
   );
 
@@ -183,5 +165,34 @@ export async function updatePageBySlug(
     [newId("change"), tenantId, brainId, page.id, page.version, version],
   );
 
-  return updated.rows[0];
+  let result = updated.rows[0];
+  if (embeddings) {
+    await client.query("SAVEPOINT page_embedding");
+    try {
+      const embedded = await embeddings.embed([embeddingText]);
+      const vector = embedded.vectors[0];
+      if (vector) {
+        await client.query(
+          `INSERT INTO page_embeddings (tenant_id, page_id, model, dimensions, embedding, content_hash)
+           VALUES ($1, $2, $3, $4, $5::vector, $6)
+           ON CONFLICT (page_id, model) DO UPDATE SET embedding = EXCLUDED.embedding,
+           dimensions = EXCLUDED.dimensions, content_hash = EXCLUDED.content_hash
+           WHERE page_embeddings.tenant_id = $1`,
+          [tenantId, page.id, embedded.model, embedded.dimensions, JSON.stringify(vector), hash],
+        );
+        const embeddedPage = await client.query(
+          `UPDATE pages SET embedding_model = $5
+           WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND id = $4
+           RETURNING ${pageColumns}`,
+          [tenantId, subjectId, brainId, page.id, embedded.model],
+        );
+        result = embeddedPage.rows[0] ?? result;
+      }
+      await client.query("RELEASE SAVEPOINT page_embedding");
+    } catch {
+      await client.query("ROLLBACK TO SAVEPOINT page_embedding");
+    }
+  }
+
+  return result;
 }

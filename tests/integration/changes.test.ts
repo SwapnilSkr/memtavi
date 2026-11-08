@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createApp } from "@memtavi/api/app";
 import { createFakeProvider, type FakeEmbeddingCall } from "@memtavi/llm/fake";
+import { type EmbeddingProvider, ProviderError } from "@memtavi/llm/provider";
 import { newId } from "@memtavi/shared/ids";
 import { createFakeStore } from "@memtavi/storage/fake";
 import { contentHash } from "@memtavi/storage/keys";
@@ -94,6 +95,7 @@ describe.skipIf(!ownerUrl || !appUrl)("change feed, acknowledgements and page ed
   let db: typeof import("@memtavi/db/client");
   let app: ReturnType<typeof createApp>;
   let semanticApp: ReturnType<typeof createApp>;
+  let embeddingFailureApp: ReturnType<typeof createApp>;
   let changesBrain: string;
   let pagesBrain: string;
   let otherSubjectBrain: string;
@@ -104,6 +106,7 @@ describe.skipIf(!ownerUrl || !appUrl)("change feed, acknowledgements and page ed
   let contestedPage: string;
   let embeddedPage: string;
   let staleEmbeddedPage: string;
+  let embeddingFailurePage: string;
   let eventOld: string;
   let eventMid: string;
   let eventNew: string;
@@ -246,6 +249,18 @@ describe.skipIf(!ownerUrl || !appUrl)("change feed, acknowledgements and page ed
       now: () => fixedNow,
       embeddings: embedder,
     });
+    const failingEmbedder: EmbeddingProvider = {
+      async embed() {
+        throw new ProviderError("server_error", true, "Embedding unavailable", 503);
+      },
+    };
+    embeddingFailureApp = createApp({
+      ownerPool: owner,
+      withTenant: db.withTenant,
+      store: createFakeStore(),
+      now: () => fixedNow,
+      embeddings: failingEmbedder,
+    });
     keys.set("owner", await bootstrap(owner, "Changes A", slugA));
     keys.set("foreign", await bootstrap(owner, "Changes B", slugB));
     const tenants = await owner.query<{ id: string; slug: string }>(
@@ -352,6 +367,27 @@ describe.skipIf(!ownerUrl || !appUrl)("change feed, acknowledgements and page ed
     );
     await owner.query("UPDATE pages SET embedding_model = 'seed-model' WHERE id = $1", [
       staleEmbeddedPage,
+    ]);
+
+    embeddingFailurePage = await seedPage(pagesBrain, {
+      slug: "embedding-failure",
+      title: "Failure title",
+      summary: "Failure summary",
+      body: "Failure body",
+    });
+    await owner.query(
+      `INSERT INTO page_embeddings
+         (tenant_id, page_id, model, dimensions, embedding, content_hash)
+       VALUES ($1, $2, 'seed-model', 1536, $3::vector, $4)`,
+      [
+        tenantA,
+        embeddingFailurePage,
+        JSON.stringify(unitVector()),
+        contentHash("Failure title\nFailure summary\nFailure body"),
+      ],
+    );
+    await owner.query("UPDATE pages SET embedding_model = 'seed-model' WHERE id = $1", [
+      embeddingFailurePage,
     ]);
   });
 
@@ -656,6 +692,49 @@ describe.skipIf(!ownerUrl || !appUrl)("change feed, acknowledgements and page ed
       [staleEmbeddedPage],
     );
     expect(stored.rows).toEqual([{ model: "seed-model", content_hash: oldHash }]);
+  });
+
+  test("an embedder failure still commits the edit and leaves the old embedding intact", async () => {
+    const oldHash = contentHash("Failure title\nFailure summary\nFailure body");
+    const expectedHash = contentHash("Failure title\nFailure summary\nChanged failure body");
+    const response = await request(`/v1/brains/${pagesBrain}/pages/embedding-failure`, {
+      method: "PATCH",
+      body: { body: "Changed failure body" },
+      target: embeddingFailureApp,
+    });
+    expect(response.status).toBe(200);
+    const page = (await response.json()) as PageBody;
+    matchesContract(response, page, "/v1/brains/{brainId}/pages/{slug}", "patch");
+    expect(page.version).toBe(2);
+    expect(page.body).toBe("Changed failure body");
+    expect(page.contentHash).toBe(expectedHash);
+    expect(page.embeddingModel).toBe("seed-model");
+
+    const committed = await owner.query<{ version: number; body: string; embedding_model: string }>(
+      "SELECT version, body, embedding_model FROM pages WHERE id = $1",
+      [embeddingFailurePage],
+    );
+    expect(committed.rows).toEqual([
+      { version: 2, body: "Changed failure body", embedding_model: "seed-model" },
+    ]);
+
+    const versions = await owner.query<{ version: number; body: string }>(
+      "SELECT version, body FROM page_versions WHERE page_id = $1",
+      [embeddingFailurePage],
+    );
+    expect(versions.rows).toEqual([{ version: 2, body: "Changed failure body" }]);
+
+    const changes = await owner.query<{ action: string; to_version: number }>(
+      "SELECT action, to_version FROM change_events WHERE page_id = $1",
+      [embeddingFailurePage],
+    );
+    expect(changes.rows).toEqual([{ action: "updated", to_version: 2 }]);
+
+    const embedding = await owner.query<{ model: string; content_hash: string }>(
+      "SELECT model, content_hash FROM page_embeddings WHERE page_id = $1",
+      [embeddingFailurePage],
+    );
+    expect(embedding.rows).toEqual([{ model: "seed-model", content_hash: oldHash }]);
   });
 
   test("edits and acks 404 on a foreign brain, a foreign subject and an unknown slug", async () => {
