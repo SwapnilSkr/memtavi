@@ -51,6 +51,7 @@ Last updated 2026-11-06. One line per open item; detail lives in the linked node
 - **Inspector capture/edit shipped**: note/URL capture, 1.5 s source polling until a terminal status, page edit with a changed-field diff and 409 reload, contested resolve. 39 web tests; UI makes no provider calls.
 - **Phase 2 gate closed**: capture → read → correct is possible entirely in the inspector, against the live API.
 - **Hardening shipped**: strict CSP in the production build and preview headers, with a dev-only inline allowance for Vite's refresh preamble; page updates now write first and refresh the embedding best-effort inside a savepoint. 51 web, 153 integration tests.
-- **Next: `p3-web-graph`** — graph and health/score screens in the inspector, then export and permanent delete.
+- **Inspector graph/score/profile shipped**: deterministic SVG graph with clickable nodes, score meters and factors with a 404 empty state, and a profile form with validated directives JSON. 79 web tests.
+- **Next: `p3-export-delete`** — export and permanent delete, API and inspector, then the remaining Phase 3 polish.
 - **Evidence anchor fix shipped**: the first live run exposed that models return exact quotes with wrong character offsets, so every fact was dropped. `extractFacts` now re-anchors a verbatim quote and drops only text that is absent. Without it, zero pages compiled.
 - **Phase 1 complete**: capture, storage, worker, LLM, compiler core, compiler wire, eval harness and the first live measurement are recorded.
