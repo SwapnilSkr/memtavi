@@ -50,6 +50,10 @@ export const connectionAck = t.Object({
   acked: t.Boolean(),
 });
 
+export const permanentQuery = t.Object({
+  permanent: t.Optional(t.String()),
+});
+
 export const pageUpdate = t.Object({
   title: t.Optional(t.String()),
   summary: t.Optional(t.String()),

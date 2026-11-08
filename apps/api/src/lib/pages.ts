@@ -6,7 +6,7 @@ import type { PoolClient } from "pg";
 import { DomainError } from "../middleware/errors";
 import type { pageUpdate } from "./schemas";
 
-const pageColumns = `id, subject_id AS "subjectId", brain_id AS "brainId", slug, title, summary,
+export const pageColumns = `id, subject_id AS "subjectId", brain_id AS "brainId", slug, title, summary,
   body, page_type AS "pageType", bucket, bucket_source AS "bucketSource", status, pinned, archived,
   version, entities, backlinks, content_hash AS "contentHash",
   embedding_model AS "embeddingModel", last_compiled_at AS "lastCompiledAt",
@@ -98,6 +98,36 @@ export async function getIndex(
     [tenantId, subjectId, brainId, limit, offset],
   );
   return { items: items.rows, total: total.rows[0]?.total ?? 0, limit, offset };
+}
+
+export async function deletePagePermanently(
+  client: PoolClient,
+  tenantId: string,
+  subjectId: string,
+  brainId: string,
+  slug: string,
+  permanent: string | undefined,
+) {
+  if (permanent !== "true") {
+    throw new DomainError("BadRequestError", 400, "permanent=true is required");
+  }
+  await requireBrain(client, tenantId, subjectId, brainId);
+  const found = await client.query<{ id: string }>(
+    `SELECT id FROM pages
+     WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND slug = $4
+     AND deletion_state = 'active'
+     FOR UPDATE`,
+    [tenantId, subjectId, brainId, slug],
+  );
+  const page = found.rows[0];
+  if (!page) throw new DomainError("NotFoundError", 404, "Not found");
+  await client.query(
+    `INSERT INTO deletion_ops (tenant_id, brain_id, target_type, target_id, state, detail)
+     VALUES ($1, $2, 'page', $3, 'deleted', jsonb_build_object('deletedAt', now()))`,
+    [tenantId, brainId, page.id],
+  );
+  await client.query("DELETE FROM pages WHERE tenant_id = $1 AND id = $2", [tenantId, page.id]);
+  return { id: page.id, targetType: "page", state: "deleted" };
 }
 
 export async function updatePageBySlug(

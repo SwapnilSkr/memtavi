@@ -105,6 +105,44 @@ export interface PageUpdate {
   version: number;
 }
 
+export interface PageVersion {
+  id: string;
+  pageId: string;
+  version: number;
+  title: string;
+  summary: string;
+  body: string;
+  ingestSourceId: string | null;
+  actor: "compiler" | "user";
+  createdAt: string;
+}
+
+export interface Connection {
+  id: string;
+  brainId: string;
+  pageAId: string;
+  pageBId: string;
+  similarity: number;
+  strength: "weak" | "medium" | "strong";
+  reasoning: string;
+  source: "auto" | "manual";
+  ackedAt: string | null;
+}
+
+export interface ExportBundle {
+  brain: Brain;
+  pages: Page[];
+  versions: PageVersion[];
+  sources: IngestSource[];
+  connections: Connection[];
+}
+
+export interface DeletionReceipt {
+  id: string;
+  targetType: "brain" | "source" | "page";
+  state: string;
+}
+
 export interface ListResponse<T> {
   items: T[];
   total: number;
@@ -185,7 +223,7 @@ export type Fetcher = (input: string, init: RequestInit) => Promise<Response>;
 export function createApi(session: Session, fetcher: Fetcher = fetch) {
   async function request<T>(
     path: string,
-    { method, body }: { method?: "GET" | "POST" | "PATCH"; body?: unknown } = {},
+    { method, body }: { method?: "GET" | "POST" | "PATCH" | "DELETE"; body?: unknown } = {},
   ): Promise<T> {
     const headers = new Headers({
       "x-api-key": session.apiKey,
@@ -295,6 +333,15 @@ export function createApi(session: Session, fetcher: Fetcher = fetch) {
     getPage(brainId: string, slug: string) {
       return request<Page>(
         `/brains/${encodeURIComponent(brainId)}/pages/${encodeURIComponent(slug)}`,
+      );
+    },
+    exportBrain(brainId: string) {
+      return request<ExportBundle>(`/brains/${encodeURIComponent(brainId)}/export`);
+    },
+    deletePage(brainId: string, slug: string) {
+      return request<DeletionReceipt>(
+        `/brains/${encodeURIComponent(brainId)}/pages/${encodeURIComponent(slug)}?permanent=true`,
+        { method: "DELETE" },
       );
     },
     search(brainId: string, params: SearchParams) {

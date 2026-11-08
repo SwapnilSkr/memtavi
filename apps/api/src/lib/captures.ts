@@ -32,7 +32,7 @@ const fields = [
   "deletedAt",
 ] as const;
 
-const columns = `id, brain_id AS "brainId", kind, content AS "contentPreview",
+export const sourceColumns = `id, brain_id AS "brainId", kind, content AS "contentPreview",
   content_hash AS "contentHash", body_ref AS "bodyRef",
   origin_ref AS "originRef", label, bucket, metadata, status, attempts,
   last_error AS "lastError", affected_page_ids AS "affectedPageIds",
@@ -46,7 +46,7 @@ interface StoredResponse {
   body: Record<string, unknown>;
 }
 
-function sourceBody(row: Row): Record<string, unknown> {
+export function sourceBody(row: Row): Record<string, unknown> {
   const body: Record<string, unknown> = {};
   for (const field of fields) body[field] = row[field] ?? null;
   return body;
@@ -163,7 +163,7 @@ async function findOrigin(
   originRef: string,
 ) {
   const result = await client.query(
-    `SELECT ${columns} FROM ingest_sources
+    `SELECT ${sourceColumns} FROM ingest_sources
      WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND origin_ref = $4
      AND deleted_at IS NULL`,
     [tenantId, subjectId, brainId, originRef],
@@ -218,7 +218,7 @@ export async function createCapture(
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        ON CONFLICT (brain_id, origin_ref)
          WHERE origin_ref IS NOT NULL AND deleted_at IS NULL DO NOTHING
-       RETURNING ${columns}`,
+       RETURNING ${sourceColumns}`,
       [
         id,
         tenantId,
@@ -273,7 +273,7 @@ export async function listSources(
     [tenantId, subjectId, brainId],
   );
   const items = await client.query(
-    `SELECT ${columns} FROM ingest_sources
+    `SELECT ${sourceColumns} FROM ingest_sources
      WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND deleted_at IS NULL
      ORDER BY created_at DESC NULLS LAST, id LIMIT $4 OFFSET $5`,
     [tenantId, subjectId, brainId, limit, offset],
@@ -296,7 +296,7 @@ export async function getSource(
 ) {
   await requireBrain(client, tenantId, subjectId, brainId);
   const result = await client.query(
-    `SELECT ${columns} FROM ingest_sources
+    `SELECT ${sourceColumns} FROM ingest_sources
      WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND id = $4
      AND deleted_at IS NULL`,
     [tenantId, subjectId, brainId, sourceId],

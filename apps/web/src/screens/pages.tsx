@@ -1,7 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router";
 import { EmptyState, ErrorBanner, Loading, Pagination } from "../components/feedback";
 import { useApi } from "../lib/api-context";
+import { exportFilename } from "../lib/export";
 
 export function Pages() {
   const api = useApi();
@@ -13,10 +14,32 @@ export function Pages() {
     queryKey: ["pages", brainId, { limit: 50, offset }],
     queryFn: () => api.listPages(brainId, { limit: 50, offset }),
   });
+  const download = useMutation({
+    mutationFn: () => api.exportBrain(brainId),
+    onSuccess: (bundle) => {
+      const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = exportFilename(bundle.brain.slug);
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    },
+  });
   return (
     <>
-      <h1>Pages</h1>
-      <ErrorBanner error={pages.error} />
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1>Pages</h1>
+        <button type="button" disabled={download.isPending} onClick={() => download.mutate()}>
+          {download.isPending ? "Exporting…" : "Download export"}
+        </button>
+      </div>
+      <div aria-live="polite" aria-atomic="true">
+        <ErrorBanner error={pages.error ?? download.error} />
+        {download.isSuccess ? <p className="help">Export downloaded.</p> : null}
+      </div>
       {pages.isPending ? <Loading label="Loading pages" /> : null}
       {pages.data?.items.length === 0 ? (
         <EmptyState>

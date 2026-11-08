@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import remarkGfm from "remark-gfm";
 import { ErrorBanner, Loading } from "../components/feedback";
 import { ApiError, type Page, type PageUpdate } from "../lib/api";
@@ -23,6 +23,8 @@ function PageContent({
 }) {
   const api = useApi();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [draft, setDraft] = useState<{
     original: PageFields & Pick<Page, "version">;
     edited: PageFields;
@@ -45,6 +47,24 @@ function PageContent({
           )
           .map((query) => queryClient.invalidateQueries({ queryKey: query.queryKey, exact: true })),
       );
+    },
+  });
+  const remove = useMutation({
+    mutationFn: () => api.deletePage(brainId, slug),
+    onSuccess: async () => {
+      await Promise.all(
+        queryClient
+          .getQueryCache()
+          .findAll()
+          .filter(
+            (query) =>
+              query.queryKey[1] === brainId &&
+              (query.queryKey[0] === "pages" || query.queryKey[0] === "search"),
+          )
+          .map((query) => queryClient.invalidateQueries({ queryKey: query.queryKey, exact: true })),
+      );
+      queryClient.removeQueries({ queryKey: ["page", brainId, { slug }] });
+      navigate(`/brains/${encodeURIComponent(brainId)}/pages`);
     },
   });
   const conflict = update.error instanceof ApiError && update.error.status === 409;
@@ -210,6 +230,50 @@ function PageContent({
         >
           {data.body}
         </ReactMarkdown>
+      </section>
+      <section className="panel space-y-3" aria-labelledby="delete-page-heading">
+        <h2 id="delete-page-heading">Delete this page</h2>
+        <p className="text-slate-600">
+          Deleting a page removes its versions, evidence links, embeddings, briefs and connections.
+          Sources are kept.
+        </p>
+        {confirmingDelete ? (
+          <>
+            <p>Permanently delete “{data.title}”? This cannot be undone.</p>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                className="border-red-300 bg-red-50 text-red-900 hover:bg-red-100"
+                disabled={remove.isPending}
+                onClick={() => remove.mutate()}
+              >
+                {remove.isPending ? "Deleting…" : `Permanently delete ${data.title}`}
+              </button>
+              <button
+                type="button"
+                disabled={remove.isPending}
+                onClick={() => {
+                  setConfirmingDelete(false);
+                  remove.reset();
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </>
+        ) : (
+          <button
+            type="button"
+            className="border-red-300 bg-red-50 text-red-900 hover:bg-red-100"
+            disabled={busy || remove.isPending}
+            onClick={() => setConfirmingDelete(true)}
+          >
+            Permanently delete page
+          </button>
+        )}
+        <div aria-live="polite" aria-atomic="true">
+          <ErrorBanner error={remove.error} />
+        </div>
       </section>
     </article>
   );

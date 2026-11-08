@@ -267,4 +267,52 @@ describe("API client", () => {
       createApi(session, fetcher).updatePage("brn_test", "page", { summary: "Edit", version: 1 }),
     ).rejects.toMatchObject({ status: 409, code: "ConflictError", kind: "permanent" });
   });
+
+  test("export reads the encoded brain export path without a body", async () => {
+    const fetcher = (async (input, init) => {
+      expect(input).toBe("/v1/brains/brn%2Fa/export");
+      expect(init.method).toBe("GET");
+      expect(init.body).toBeUndefined();
+      const headers = new Headers(init.headers);
+      expect(headers.has("Content-Type")).toBe(false);
+      expect(headers.get("x-api-key")).toBe(session.apiKey);
+      expect(headers.get("x-subject-id")).toBe(session.subjectId);
+      return Response.json({ brain: {}, pages: [], versions: [], sources: [], connections: [] });
+    }) satisfies Fetcher;
+    const bundle = await createApi(session, fetcher).exportBrain("brn/a");
+    expect(bundle.pages).toEqual([]);
+    expect(bundle.connections).toEqual([]);
+  });
+
+  test("permanent delete sends DELETE with permanent=true and no body", async () => {
+    const fetcher = (async (input, init) => {
+      expect(input).toBe("/v1/brains/brn%2Fa/pages/a%2Fb%20%3F%23?permanent=true");
+      expect(init.method).toBe("DELETE");
+      expect(init.body).toBeUndefined();
+      expect(new Headers(init.headers).has("Content-Type")).toBe(false);
+      return Response.json(
+        { id: "pg_test", targetType: "page", state: "deleted" },
+        { status: 202 },
+      );
+    }) satisfies Fetcher;
+    expect(await createApi(session, fetcher).deletePage("brn/a", "a/b ?#")).toEqual({
+      id: "pg_test",
+      targetType: "page",
+      state: "deleted",
+    });
+  });
+
+  test("a rejected permanent delete keeps the API message and status", async () => {
+    const fetcher = (async () =>
+      Response.json(
+        { body: { message: "Not found", error: "NotFoundError", statusCode: 404 } },
+        { status: 404 },
+      )) satisfies Fetcher;
+    await expect(createApi(session, fetcher).deletePage("brn_test", "gone")).rejects.toMatchObject({
+      status: 404,
+      code: "NotFoundError",
+      message: "Not found",
+      kind: "permanent",
+    });
+  });
 });

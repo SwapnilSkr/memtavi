@@ -2,7 +2,7 @@ import type { PoolClient } from "pg";
 import { DomainError } from "../middleware/errors";
 import { requireBrain } from "./pages";
 
-const connectionColumns = `id, brain_id AS "brainId", page_a_id AS "pageAId",
+export const connectionColumns = `id, brain_id AS "brainId", page_a_id AS "pageAId",
   page_b_id AS "pageBId", similarity, strength, reasoning, source, acked_at AS "ackedAt"`;
 
 const nodeColumns = `id, slug, title, page_type AS "pageType", bucket, status, pinned`;

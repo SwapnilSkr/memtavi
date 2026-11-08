@@ -1,7 +1,13 @@
 import { Elysia } from "elysia";
 import type { AppConfig } from "../lib/config";
-import { getIndex, getPageBySlug, listPages, updatePageBySlug } from "../lib/pages";
-import { indexLimit, pageUpdate, pagination, searchQuery } from "../lib/schemas";
+import {
+  deletePagePermanently,
+  getIndex,
+  getPageBySlug,
+  listPages,
+  updatePageBySlug,
+} from "../lib/pages";
+import { indexLimit, pageUpdate, pagination, permanentQuery, searchQuery } from "../lib/schemas";
 import { searchPages } from "../lib/search";
 import { auth } from "../middleware/auth";
 import { scope, subjectId } from "../middleware/scope";
@@ -49,6 +55,25 @@ export function pageRoutes(config: AppConfig) {
         );
       },
       { body: pageUpdate },
+    )
+    .delete(
+      "/v1/brains/:brainId/pages/:slug",
+      async ({ auth, request, params, query, set }) => {
+        const subject = subjectId(request);
+        const receipt = await scope(config, auth, subject, (client) =>
+          deletePagePermanently(
+            client,
+            auth.tenantId,
+            subject,
+            params.brainId,
+            params.slug,
+            query.permanent,
+          ),
+        );
+        set.status = 202;
+        return receipt;
+      },
+      { query: permanentQuery },
     )
     .get(
       "/v1/brains/:brainId/index",

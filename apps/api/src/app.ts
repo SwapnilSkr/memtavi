@@ -6,6 +6,7 @@ import { apiKeyRoutes } from "./routes/api-keys";
 import { brainRoutes } from "./routes/brains";
 import { captureRoutes } from "./routes/captures";
 import { changeRoutes } from "./routes/changes";
+import { exportRoutes } from "./routes/export";
 import { graphRoutes } from "./routes/graph";
 import { pageRoutes } from "./routes/pages";
 import { profileRoutes } from "./routes/profile";
@@ -21,6 +22,7 @@ export function createApp(config: AppConfig) {
     .use(brainRoutes(config))
     .use(captureRoutes(config))
     .use(pageRoutes(config))
+    .use(exportRoutes(config))
     .use(changeRoutes(config))
     .use(graphRoutes(config))
     .use(scoreRoutes(config))
