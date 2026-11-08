@@ -23,7 +23,10 @@
     "eval:smoke": "bun tests/eval/src/smoke.ts",
     "test:integration": "bun test tests/integration --pass-with-no-tests",
     "test:isolation": "bun test tests/isolation --pass-with-no-tests",
-    "test:contract": "bun test tests/contract --pass-with-no-tests"
+    "test:contract": "bun test tests/contract --pass-with-no-tests",
+    "dev:web": "bun run --cwd apps/web dev",
+    "build:web": "bun run --cwd apps/web build",
+    "typecheck:web": "bun run --cwd apps/web typecheck"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.6",

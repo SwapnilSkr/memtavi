@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@layer base {
+  body { @apply m-0 bg-slate-50 font-sans text-slate-900 antialiased; }
+  h1 { @apply text-2xl font-semibold tracking-tight sm:text-3xl; }
+  h2 { @apply text-lg font-semibold; }
+  a { @apply text-indigo-700 underline-offset-4 hover:underline; }
+  a[aria-current="page"] { @apply font-semibold underline; }
+  button { @apply min-h-11 cursor-pointer rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50; }
+  input { @apply block min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2; }
+  label { @apply mb-2 block text-sm font-medium; }
+  :focus-visible { @apply outline-2 outline-offset-4 outline-indigo-600; }
+  table { @apply w-full border-collapse text-left text-sm; }
+  th, td { @apply border-b border-slate-200 px-3 py-4 align-top; }
+  th { @apply font-semibold; }
+}
+
+@layer components {
+  .panel { @apply rounded-xl border border-slate-200 bg-white p-4 sm:p-6; }
+  .primary { @apply border-indigo-700 bg-indigo-700 text-white hover:bg-indigo-800; }
+  .help { @apply mt-2 text-sm text-slate-500; }
+  .error-banner { @apply my-4 break-words rounded-lg border border-red-300 bg-red-50 p-4 text-red-900; }
+  .disputed { @apply rounded bg-amber-100 px-2 py-1 font-semibold text-amber-950; }
+  .skip-link { @apply sr-only focus:not-sr-only focus:absolute focus:z-10 focus:bg-white focus:p-4; }
+  .markdown { overflow-wrap: anywhere; }
+  .markdown > * + * { @apply mt-4; }
+  .markdown h1, .markdown h2, .markdown h3 { @apply mt-6 font-semibold; }
+  .markdown h3 { @apply text-base; }
+  .markdown ul { @apply list-disc pl-6; }
+  .markdown ol { @apply list-decimal pl-6; }
+  .markdown li + li { @apply mt-1; }
+  .markdown pre { @apply overflow-x-auto rounded-lg bg-slate-100 p-4; }
+  .markdown code { @apply rounded bg-slate-100 px-1; }
+  .markdown pre code { @apply p-0; }
+  .markdown blockquote { @apply border-l-4 border-slate-300 pl-4 text-slate-600; }
+  .markdown table { @apply block overflow-x-auto; }
+  .markdown hr { @apply border-slate-200; }
+}
+
+@media (width < 640px) {
+  .pages-table, .pages-table tbody, .pages-table tr, .pages-table th, .pages-table td { display: block; width: 100%; }
+  .pages-table thead { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); }
+  .pages-table tr + tr { margin-top: 1.5rem; }
+  .pages-table th, .pages-table td { padding: 0.75rem 0; overflow-wrap: anywhere; }
+  .pages-table td::before { content: attr(data-label); display: block; margin-bottom: 0.25rem; font-weight: 600; color: var(--color-slate-500); }
+}
