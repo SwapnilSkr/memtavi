@@ -9,6 +9,7 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-06** — MCP read-only server shipped: stdio server with `list_brains`, `index`, `search`, `read`, API-key auth, brain resolution and stderr-only diagnostics. 46 package tests.
 - **2026-11-06** — Inspector connections/changes shipped: ackable connection list, change feed with version transitions and contradictions. 113 web tests.
 - **2026-11-06** — Export and permanent delete shipped: JSON brain bundle, `permanent=true` guard, `deletion_ops` audit, cascade delete, inspector download and two-step confirmation.
 - **2026-11-06** — Inspector graph/score/profile shipped: deterministic graph, health meters with a 404 empty state, profile editing with validated directives.
