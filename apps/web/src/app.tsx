@@ -8,6 +8,8 @@ import { ApiContext } from "./lib/api-context";
 import { clearSession, readSession, type Session } from "./lib/session";
 import { Brains } from "./screens/brains";
 import { Capture } from "./screens/capture";
+import { Changes } from "./screens/changes";
+import { Connections } from "./screens/connections";
 import { GraphScreen } from "./screens/graph";
 import { Pages } from "./screens/pages";
 import { ProfileScreen } from "./screens/profile";
@@ -61,6 +63,8 @@ function Inspector({ session, onDisconnect }: { session: Session; onDisconnect: 
             />
             <Route path="brains/:brainId/search" element={<Search />} />
             <Route path="brains/:brainId/graph" element={<GraphScreen />} />
+            <Route path="brains/:brainId/connections" element={<Connections />} />
+            <Route path="brains/:brainId/changes" element={<Changes />} />
             <Route path="brains/:brainId/score" element={<ScoreScreen />} />
             <Route path="brains/:brainId/profile" element={<ProfileScreen />} />
             <Route path="*" element={<NotFound />} />

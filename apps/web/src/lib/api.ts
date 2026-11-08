@@ -129,6 +129,29 @@ export interface Connection {
   ackedAt: string | null;
 }
 
+export interface ChangeEvent {
+  id: string;
+  brainId: string;
+  pageId: string;
+  action:
+    | "created"
+    | "updated"
+    | "renamed"
+    | "merged"
+    | "split"
+    | "archived"
+    | "restored"
+    | "recovered"
+    | "routed";
+  changeSummary: string;
+  fromVersion: number | null;
+  toVersion: number;
+  ingestSourceId: string | null;
+  contradictions: unknown[];
+  ackedAt: string | null;
+  createdAt: string;
+}
+
 export interface ExportBundle {
   brain: Brain;
   pages: Page[];
@@ -329,6 +352,36 @@ export function createApi(session: Session, fetcher: Fetcher = fetch) {
         offset: String(params.offset ?? 0),
       });
       return request<ListResponse<Page>>(`/brains/${encodeURIComponent(brainId)}/pages?${query}`);
+    },
+    listConnections(brainId: string, params: Pagination = {}) {
+      const query = new URLSearchParams({
+        limit: String(params.limit ?? 50),
+        offset: String(params.offset ?? 0),
+      });
+      return request<ListResponse<Connection>>(
+        `/brains/${encodeURIComponent(brainId)}/connections?${query}`,
+      );
+    },
+    ackConnection(brainId: string, connectionId: string, acked: boolean) {
+      return request<Connection>(
+        `/brains/${encodeURIComponent(brainId)}/connections/${encodeURIComponent(connectionId)}`,
+        { method: "PATCH", body: { acked } },
+      );
+    },
+    listChanges(brainId: string, params: Pagination = {}) {
+      const query = new URLSearchParams({
+        limit: String(params.limit ?? 50),
+        offset: String(params.offset ?? 0),
+      });
+      return request<ListResponse<ChangeEvent>>(
+        `/brains/${encodeURIComponent(brainId)}/changes?${query}`,
+      );
+    },
+    ackChange(brainId: string, changeId: string, acked: boolean) {
+      return request<ChangeEvent>(
+        `/brains/${encodeURIComponent(brainId)}/changes/${encodeURIComponent(changeId)}`,
+        { method: "PATCH", body: { acked } },
+      );
     },
     getPage(brainId: string, slug: string) {
       return request<Page>(

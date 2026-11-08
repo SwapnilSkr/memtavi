@@ -15,6 +15,68 @@ const session = {
 };
 
 describe("API client", () => {
+  describe.each([
+    { list: "listConnections", ack: "ackConnection", resource: "connections", id: "cnn/a ?#" },
+    { list: "listChanges", ack: "ackChange", resource: "changes", id: "chg/a ?#" },
+  ] as const)("$resource", ({ list, ack, resource, id }) => {
+    test.each([
+      { params: undefined, limit: 50, offset: 0 },
+      { params: { limit: 20, offset: 40 }, limit: 20, offset: 40 },
+    ])("lists with GET and pagination: %j", async ({ params, limit, offset }) => {
+      const fetcher = (async (input, init) => {
+        expect(input).toBe(`/v1/brains/brn%2Fa/${resource}?limit=${limit}&offset=${offset}`);
+        expect(init.method).toBe("GET");
+        expect(init.body).toBeUndefined();
+        const headers = new Headers(init.headers);
+        expect(headers.has("Content-Type")).toBe(false);
+        expect(headers.get("x-api-key")).toBe(session.apiKey);
+        expect(headers.get("x-subject-id")).toBe(session.subjectId);
+        return Response.json({ items: [{ id }], total: 75, limit, offset });
+      }) satisfies Fetcher;
+      const result = await createApi(session, fetcher)[list]("brn/a", params);
+      expect(result.items[0]?.id).toBe(id);
+      expect(result.total).toBe(75);
+      expect(result.limit).toBe(limit);
+      expect(result.offset).toBe(offset);
+    });
+
+    test.each([true, false])(
+      "ack PATCH sends only acked=%s and returns the updated row",
+      async (acked) => {
+        const ackedAt = acked ? "2026-11-08T12:00:00Z" : null;
+        const fetcher = (async (input, init) => {
+          expect(input).toBe(`/v1/brains/brn%2Fa/${resource}/${encodeURIComponent(id)}`);
+          expect(init.method).toBe("PATCH");
+          expect(JSON.parse(String(init.body))).toEqual({ acked });
+          const headers = new Headers(init.headers);
+          expect(headers.get("Content-Type")).toBe("application/json");
+          expect(headers.get("x-api-key")).toBe(session.apiKey);
+          expect(headers.get("x-subject-id")).toBe(session.subjectId);
+          return Response.json({ id, ackedAt });
+        }) satisfies Fetcher;
+        const result = await createApi(session, fetcher)[ack]("brn/a", id, acked);
+        expect(result.id).toBe(id);
+        expect(result.ackedAt).toBe(ackedAt);
+      },
+    );
+
+    test("ack failures preserve the ApiError status and safe message", async () => {
+      const fetcher = (async () =>
+        Response.json(
+          {
+            body: { message: "Not found", error: "NotFoundError", statusCode: 404 },
+          },
+          { status: 404 },
+        )) satisfies Fetcher;
+      await expect(createApi(session, fetcher)[ack]("brn_test", id, true)).rejects.toMatchObject({
+        status: 404,
+        code: "NotFoundError",
+        message: "Not found",
+        kind: "permanent",
+      });
+    });
+  });
+
   test.each(["getGraph", "getScore", "getProfile"] as const)(
     "%s reads its encoded brain path",
     async (method) => {
