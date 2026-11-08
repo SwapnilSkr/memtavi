@@ -123,6 +123,51 @@ export interface SearchParams {
   minSimilarity?: number;
 }
 
+export type GraphNode = Pick<
+  Page,
+  "id" | "slug" | "title" | "pageType" | "bucket" | "status" | "pinned"
+>;
+
+export interface GraphEdge {
+  connectionId: string;
+  pageAId: string;
+  pageBId: string;
+  similarity: number;
+  strength: "weak" | "medium" | "strong";
+  source: "auto" | "manual";
+}
+
+export interface Graph {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+
+export interface Score {
+  brainId: string;
+  computedAt: string;
+  freshness: number;
+  readiness: number;
+  strain: number;
+  factors: Record<string, unknown>;
+}
+
+export interface ProfileFields {
+  whoTheyAre: string;
+  whatTheyDo: string;
+  focus: string;
+  goals: string;
+  currentProjects: string;
+  stuckOn: string;
+  vaultOrganization: string;
+  directives: Record<string, unknown>;
+}
+
+export interface Profile extends ProfileFields {
+  brainId: string;
+}
+
+export type ProfileUpdate = Partial<ProfileFields>;
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -207,6 +252,21 @@ export function createApi(session: Session, fetcher: Fetcher = fetch) {
     },
     getBrain(brainId: string) {
       return request<Brain>(`/brains/${encodeURIComponent(brainId)}`);
+    },
+    getGraph(brainId: string) {
+      return request<Graph>(`/brains/${encodeURIComponent(brainId)}/graph`);
+    },
+    getScore(brainId: string) {
+      return request<Score>(`/brains/${encodeURIComponent(brainId)}/score`);
+    },
+    getProfile(brainId: string) {
+      return request<Profile>(`/brains/${encodeURIComponent(brainId)}/profile`);
+    },
+    updateProfile(brainId: string, body: ProfileUpdate) {
+      return request<Profile>(`/brains/${encodeURIComponent(brainId)}/profile`, {
+        method: "PATCH",
+        body,
+      });
     },
     createBrain(body: BrainCreate) {
       return request<Brain>("/brains", { body });

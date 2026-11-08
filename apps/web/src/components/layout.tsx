@@ -45,6 +45,9 @@ export function Layout({ onDisconnect }: { onDisconnect: () => void }) {
               <NavLink to={`${base}/capture`}>Capture</NavLink>
               <NavLink to={`${base}/pages`}>Pages</NavLink>
               <NavLink to={`${base}/search`}>Search</NavLink>
+              <NavLink to={`${base}/graph`}>Graph</NavLink>
+              <NavLink to={`${base}/score`}>Score</NavLink>
+              <NavLink to={`${base}/profile`}>Profile</NavLink>
             </>
           ) : null}
         </nav>

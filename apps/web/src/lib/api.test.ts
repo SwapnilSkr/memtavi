@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { ApiError, type CaptureInput, createApi, type Fetcher, type PageUpdate } from "./api";
+import {
+  ApiError,
+  type CaptureInput,
+  createApi,
+  type Fetcher,
+  type PageUpdate,
+  type ProfileUpdate,
+} from "./api";
 
 const session = {
   baseUrl: "",
@@ -8,6 +15,70 @@ const session = {
 };
 
 describe("API client", () => {
+  test.each(["getGraph", "getScore", "getProfile"] as const)(
+    "%s reads its encoded brain path",
+    async (method) => {
+      const resource = { getGraph: "graph", getScore: "score", getProfile: "profile" }[method];
+      const fetcher = (async (input, init) => {
+        expect(input).toBe(`/v1/brains/brn%2Fa/${resource}`);
+        expect(init.method).toBe("GET");
+        expect(init.body).toBeUndefined();
+        const headers = new Headers(init.headers);
+        expect(headers.has("Content-Type")).toBe(false);
+        expect(headers.get("x-api-key")).toBe(session.apiKey);
+        expect(headers.get("x-subject-id")).toBe(session.subjectId);
+        return Response.json({});
+      }) satisfies Fetcher;
+      await createApi(session, fetcher)[method]("brn/a");
+    },
+  );
+
+  test.each<ProfileUpdate>([
+    { focus: "One priority" },
+    {
+      whoTheyAre: "",
+      whatTheyDo: "Research",
+      focus: "",
+      goals: "Ship",
+      currentProjects: "Inspector",
+      stuckOn: "",
+      vaultOrganization: "Topics",
+      directives: { nested: { style: "brief" } },
+    },
+  ])("profile updates PATCH only the supplied JSON fields: %j", async (body) => {
+    const fetcher = (async (input, init) => {
+      expect(input).toBe("/v1/brains/brn%2Fa/profile");
+      expect(init.method).toBe("PATCH");
+      expect(JSON.parse(String(init.body))).toEqual(body);
+      const headers = new Headers(init.headers);
+      expect(headers.get("Content-Type")).toBe("application/json");
+      expect(headers.get("x-api-key")).toBe(session.apiKey);
+      expect(headers.get("x-subject-id")).toBe(session.subjectId);
+      return Response.json({ brainId: "brn/a", ...body });
+    }) satisfies Fetcher;
+    expect((await createApi(session, fetcher).updateProfile("brn/a", body)).brainId).toBe("brn/a");
+  });
+
+  test("a missing score retains its 404 status for the screen empty state", async () => {
+    const fetcher = (async () =>
+      Response.json(
+        { body: { message: "Not found", error: "NotFoundError", statusCode: 404 } },
+        { status: 404 },
+      )) satisfies Fetcher;
+    await expect(createApi(session, fetcher).getScore("brn_test")).rejects.toMatchObject({
+      status: 404,
+      kind: "permanent",
+    });
+  });
+
+  test("profile PATCH errors retain their safe message", async () => {
+    const fetcher = (async () =>
+      Response.json({ message: "Invalid directives" }, { status: 400 })) satisfies Fetcher;
+    await expect(
+      createApi(session, fetcher).updateProfile("brn_test", { directives: {} }),
+    ).rejects.toMatchObject({ status: 400, message: "Invalid directives" });
+  });
+
   test("adds both session headers to reads without a JSON body", async () => {
     const fetcher = (async (input, init) => {
       expect(input).toBe("/v1/brains?limit=50&offset=0");

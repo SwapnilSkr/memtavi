@@ -39,7 +39,9 @@ function PageContent({
           .filter(
             (query) =>
               query.queryKey[1] === brainId &&
-              (query.queryKey[0] === "pages" || query.queryKey[0] === "search"),
+              (query.queryKey[0] === "pages" ||
+                query.queryKey[0] === "search" ||
+                query.queryKey[0] === "graph"),
           )
           .map((query) => queryClient.invalidateQueries({ queryKey: query.queryKey, exact: true })),
       );
