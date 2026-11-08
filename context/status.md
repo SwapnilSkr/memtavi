@@ -48,6 +48,8 @@ Last updated 2026-11-06. One line per open item; detail lives in the linked node
 - **Phase 2 graph shipped**: `GET /graph` returns live nodes and only edges whose both endpoints are live; `GET /connections` is similarity-ordered and paginated; `PATCH /connections/{id}` acks idempotently. 144 integration tests.
 - **Phase 2 score/profile shipped**: `GET /score` returns the newest snapshot or 404; `GET /profile` returns an empty profile for a new brain; `PATCH /profile` upserts only supplied fields with a tenant guard. 152 integration tests.
 - **Inspector shell shipped**: `apps/web` Vite + React + Tailwind, typed API client with error envelope, `sessionStorage` session, routes for setup, brains, pages, page detail (safe markdown) and search. `typecheck:web` and `build:web` run in CI; 22 web tests.
-- **Next: `p3-web-capture`** — capture form with source-status polling, page edit and contested resolve through the API. Extend the client with an explicit HTTP method before PATCH.
+- **Inspector capture/edit shipped**: note/URL capture, 1.5 s source polling until a terminal status, page edit with a changed-field diff and 409 reload, contested resolve. 39 web tests; UI makes no provider calls.
+- **Phase 2 gate closed**: capture → read → correct is possible entirely in the inspector, against the live API.
+- **Next: hardening and Phase 3** — CSP for the inspector, best-effort page embedding, then the graph/health screens and export/permanent delete.
 - **Evidence anchor fix shipped**: the first live run exposed that models return exact quotes with wrong character offsets, so every fact was dropped. `extractFacts` now re-anchors a verbatim quote and drops only text that is absent. Without it, zero pages compiled.
 - **Phase 1 complete**: capture, storage, worker, LLM, compiler core, compiler wire, eval harness and the first live measurement are recorded.
