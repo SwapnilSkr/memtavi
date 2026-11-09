@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import type { ExtractedFact } from "@memtavi/core/compile/schemas";
 import { chatCostUsd, embeddingCostUsd } from "@memtavi/llm/cost";
 import { createFakeProvider } from "@memtavi/llm/fake";
@@ -7,6 +7,7 @@ import { newId } from "@memtavi/shared/ids";
 import { createFakeStore } from "@memtavi/storage/fake";
 import { contentHash, sourceKey } from "@memtavi/storage/keys";
 import { createWorker } from "@memtavi/worker";
+import { assertBudget } from "@memtavi/worker/budget";
 import {
   CANDIDATES_SQL,
   compileCapture,
@@ -210,6 +211,33 @@ describe("capture.compile", () => {
     );
     return result.rows[0];
   }
+
+  async function resetSpend() {
+    await owner.query("DELETE FROM usage_ledger WHERE tenant_id = $1", [tenantId]);
+  }
+
+  async function seedSpend(costUsd: number, monthsAgo = 0) {
+    await owner.query(
+      `INSERT INTO usage_ledger
+       (tenant_id, brain_id, job_id, provider, model, kind, input_tokens, output_tokens, cost_usd, created_at)
+       VALUES ($1, $2, $3, 'openrouter', 'fake-chat', 'chat', 1, 1, $4,
+         date_trunc('month', now()) - make_interval(months => $5) + interval '1 day')`,
+      [tenantId, brainId, jobId, costUsd, monthsAgo],
+    );
+  }
+
+  async function seedCap(monthlyUsd: number, hardStop = true) {
+    await owner.query(
+      `INSERT INTO budget_caps (tenant_id, monthly_usd, hard_stop) VALUES ($1, $2, $3)
+       ON CONFLICT (tenant_id) DO UPDATE SET
+         monthly_usd = EXCLUDED.monthly_usd, hard_stop = EXCLUDED.hard_stop`,
+      [tenantId, monthlyUsd, hardStop],
+    );
+  }
+
+  afterEach(async () => {
+    await owner.query("DELETE FROM budget_caps WHERE tenant_id = $1", [tenantId]);
+  });
 
   beforeAll(async () => {
     if (!ownerUrl || !appUrl) throw new Error("Both test database URLs are required");
@@ -1417,5 +1445,98 @@ describe("capture.compile", () => {
       ]);
       expect(plan.rows.map((row) => row["QUERY PLAN"]).join("\n")).toContain("Limit");
     });
+  });
+
+  test("a capped tenant fails permanently before any provider call", async () => {
+    await capture();
+    await resetSpend();
+    await seedSpend(0.02);
+    await seedCap(0.01);
+    await worker().runOnce();
+    expect(provider.calls).toHaveLength(0);
+    expect(
+      (await owner.query("SELECT status FROM ingest_sources WHERE id = $1", [sourceId])).rows[0]
+        ?.status,
+    ).toBe("failed");
+    const job = (await owner.query("SELECT status, last_error FROM jobs WHERE id = $1", [jobId]))
+      .rows[0];
+    expect(job?.status).toBe("dead");
+    expect(job?.last_error).toBe("Monthly budget cap reached: spent $0.02000000 of $0.01000000");
+  });
+
+  test("a breach mid-compile stops before the next embedding call", async () => {
+    await capture();
+    await resetSpend();
+    await seedSpend(0.009999);
+    await seedCap(0.01);
+    await worker().runOnce();
+    expect(provider.calls.filter((call) => call.kind === "chat")).toHaveLength(1);
+    expect(provider.calls.filter((call) => call.kind === "embed")).toHaveLength(0);
+    expect((await counts())?.pages).toBe(0);
+    expect(
+      (await owner.query("SELECT status FROM jobs WHERE id = $1", [jobId])).rows[0]?.status,
+    ).toBe("dead");
+  });
+
+  test("spend below the cap lets the compile proceed", async () => {
+    await capture();
+    await resetSpend();
+    await seedSpend(0.005);
+    await seedCap(1);
+    await worker().runOnce();
+    expect((await counts())?.pages).toBe(1);
+    expect(provider.calls.some((call) => call.kind === "chat")).toBe(true);
+  });
+
+  test("a soft cap never blocks spending", async () => {
+    await capture();
+    await resetSpend();
+    await seedSpend(0.02);
+    await seedCap(0.01, false);
+    await worker().runOnce();
+    expect((await counts())?.pages).toBe(1);
+    expect(provider.calls.some((call) => call.kind === "chat")).toBe(true);
+  });
+
+  test("a tenant without a cap row compiles without a limit", async () => {
+    await capture();
+    await resetSpend();
+    await seedSpend(5);
+    await worker().runOnce();
+    expect((await counts())?.pages).toBe(1);
+  });
+
+  test("usage from two months ago does not count against the current month", async () => {
+    await capture();
+    await resetSpend();
+    await seedSpend(5, 2);
+    await seedCap(1);
+    await worker().runOnce();
+    expect((await counts())?.pages).toBe(1);
+    expect(provider.calls.some((call) => call.kind === "chat")).toBe(true);
+  });
+
+  test("a successful check refreshes current_period_spend from the monthly sum", async () => {
+    await capture();
+    await resetSpend();
+    await seedSpend(0.25);
+    await seedCap(20);
+    await worker().runOnce();
+    const spend = (
+      await owner.query<{ spend: string }>(
+        `SELECT COALESCE(SUM(cost_usd), 0) AS spend FROM usage_ledger
+         WHERE tenant_id = $1 AND created_at >= date_trunc('month', now())`,
+        [tenantId],
+      )
+    ).rows[0]?.spend;
+    await withTenant(tenantId, (client) => assertBudget(client, tenantId));
+    const row = (
+      await owner.query<{ current_period_spend: string }>(
+        "SELECT current_period_spend FROM budget_caps WHERE tenant_id = $1",
+        [tenantId],
+      )
+    ).rows[0];
+    expect(Number(row?.current_period_spend)).toBeCloseTo(Number(spend), 8);
+    expect(Number(row?.current_period_spend)).toBeGreaterThan(0.25);
   });
 });

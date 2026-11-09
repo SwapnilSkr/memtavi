@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/worker.ts",
+    "./budget": "./src/budget.ts",
     "./ingest": "./src/ingest.ts",
     "./compile": "./src/compile.ts",
     "./webhook": "./src/webhook.ts",

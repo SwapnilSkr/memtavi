@@ -10,6 +10,7 @@ import { type ChatResult, type EmbeddingResult, ProviderError } from "@memtavi/l
 import { newId } from "@memtavi/shared/ids";
 import { chunkKey, contentHash } from "@memtavi/storage/keys";
 import { StorageError } from "@memtavi/storage/types";
+import { assertBudget } from "./budget";
 import { type JobContext, JobError, type RoutingEvent } from "./types";
 
 export const PAGE_BODY_MAX_CHARS = 6000;
@@ -104,6 +105,7 @@ async function compileSource({
     throw new JobError("permanent", "Invalid job payload");
   }
   const scope = [job.tenantId, job.brainId, sourceId];
+  await assertBudget(client, job.tenantId);
   await client.query(
     "SELECT id FROM brains WHERE tenant_id = $1 AND id = $2 FOR NO KEY UPDATE",
     scope.slice(0, 2),
@@ -186,6 +188,7 @@ async function compileSource({
   }
 
   async function embed(texts: readonly string[]): Promise<EmbeddingResult> {
+    await assertBudget(client, job.tenantId);
     const result = await embeddingProvider.embed(texts);
     await ledger(result);
     if (
@@ -205,6 +208,7 @@ async function compileSource({
 
   const facts: ExtractedFact[] = [];
   for (let start = 0; start < chunks.length; start += 8) {
+    await assertBudget(client, job.tenantId);
     const extraction = await extractFacts(
       {
         chat: async (request) => {
@@ -506,6 +510,7 @@ async function compileSource({
       }
       continue;
     }
+    await assertBudget(client, job.tenantId);
     const response = await chatProvider.chat({
       model: chatModel,
       temperature: 0,

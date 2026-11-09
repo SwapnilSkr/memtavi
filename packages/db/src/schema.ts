@@ -739,9 +739,11 @@ export const usageLedger = pgTable(
     inputTokens: integer("input_tokens").notNull().default(0),
     outputTokens: integer("output_tokens").notNull().default(0),
     costUsd: numeric("cost_usd", { precision: 18, scale: 8 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index("usage_ledger_tenant_brain_idx").on(table.tenantId, table.brainId),
+    index("usage_ledger_tenant_created_idx").on(table.tenantId, table.createdAt.desc()),
     foreignKey({
       columns: [table.tenantId, table.brainId, table.jobId],
       foreignColumns: [jobs.tenantId, jobs.brainId, jobs.id],
