@@ -9,6 +9,7 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-06** — Webhook delivery shipped: SSRF-safe POST, HMAC signatures, delivery records, retries and one delivery per matching webhook per change event. 175 integration, 517 unit.
 - **2026-11-06** — Webhook registration shipped: encrypted write-once secrets, validated events, client and CLI commands. 167 integration, 509 unit tests.
 - **2026-11-06** — Generated API reference: `docs/API.md` from the OpenAPI spec with a CI stale check.
 - **2026-11-06** — Shared client and CLI shipped: `@memtavi/client` with all 20 operations, MCP rebased onto it, and `memtavi` CLI with 19 commands, `--json`, brain resolution and 0/1/2 exit codes. 106 package tests.
