@@ -26,7 +26,7 @@ Last updated 2026-11-06.
 
 ## Now
 
-- **Guardrails shipped**: fixed-window rate limiting per API key (300/min default), 429 with `Retry-After` and `RateLimit-*` headers, plus JSON request logs with no keys, queries or bodies. 185 integration, 522 unit.
-- **Next**: the 10k-page search benchmark (`bench:search`), then backup/restore rehearsal.
+- **10k benchmark shipped**: FTS p95 5–9 ms, exact-vector p95 43–46 ms, measured as `memtavi_app` with RLS. Finding: RLS blocks the FTS GIN index (`ts_match_vq` is not leakproof), so FTS seq-scans at 10k; it will dominate at 100k+ until a leakproof path exists. 522 unit tests.
+- **Next**: backup/restore rehearsal, then the contract diff and endpoint isolation matrix.
 
 Full list: [backlog](./backlog.md).
