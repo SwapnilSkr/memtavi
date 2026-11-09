@@ -19,6 +19,8 @@
     "spec:lint": "bun packages/spec/lint.mjs",
     "spec:docs": "bun packages/spec/docs.mjs",
     "spec:docs:check": "bun packages/spec/docs.mjs --check",
+    "spec:compat": "bun packages/spec/compat.mjs",
+    "spec:baseline": "bun packages/spec/compat.mjs --update",
     "lint": "biome check .",
     "format": "biome format --write .",
     "test:unit": "bun test packages tests/eval",

@@ -1,0 +1,2507 @@
+openapi: 3.1.0
+
+info:
+  title: Memtavi API
+  version: 1.0.0
+  description: |
+    Memtavi turns captured material into a compiled, linked memory for one subject.
+
+    Every path in this document is prefixed with `/v1`, so `servers` names the host root
+    rather than an API version root. Requests authenticate with two headers, `x-api-key`
+    (tenant-scoped and role-bearing) and `x-subject-id` (the end-user UUID that determines
+    which brains are visible).
+
+    A resource owned by another tenant is reported as `404`, never `403`, so the API never
+    reveals that the resource exists.
+  contact:
+    name: Memtavi
+    url: https://api.memtavi.com
+
+servers:
+  - url: https://api.memtavi.com
+
+security:
+  - apiKey: []
+    subjectId: []
+
+tags:
+  - name: Brains
+    description: Memory stores, one per subject or project.
+  - name: Captures
+    description: Raw material submitted for compilation.
+  - name: Sources
+    description: Ingest sources and their compilation status.
+  - name: Pages
+    description: Compiled knowledge pages.
+  - name: Search
+    description: Search, index and graph reads over a brain.
+  - name: Connections
+    description: Semantic links between pages.
+  - name: Changes
+    description: The change feed for a brain.
+  - name: Score
+    description: Brain health metrics.
+  - name: Profile
+    description: The subject profile that steers compilation.
+  - name: Export
+    description: Whole-brain export.
+  - name: Webhooks
+    description: Event delivery registrations.
+  - name: Tenant
+    description: The caller's tenant.
+  - name: Members
+    description: People with access to the tenant.
+  - name: API Keys
+    description: Tenant-scoped credentials.
+
+paths:
+  /v1/brains:
+    get:
+      operationId: listBrains
+      tags:
+        - Brains
+      summary: List brains
+      description: Lists the brains visible to the subject in `x-subject-id`.
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Brains visible to the subject.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                  - total
+                  - limit
+                  - offset
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Brain"
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+    post:
+      operationId: createBrain
+      tags:
+        - Brains
+      summary: Create a brain
+      description: Creates a brain for the subject in `x-subject-id`. Requires developer or higher.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BrainCreate"
+      responses:
+        "201":
+          description: The brain was created.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Brain"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/brains/{brainId}:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+    get:
+      operationId: getBrain
+      tags:
+        - Brains
+      summary: Get a brain
+      responses:
+        "200":
+          description: The brain.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Brain"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+    patch:
+      operationId: updateBrain
+      tags:
+        - Brains
+      summary: Update a brain
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BrainUpdate"
+      responses:
+        "200":
+          description: The updated brain.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Brain"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+    delete:
+      operationId: deleteBrain
+      tags:
+        - Brains
+      summary: Delete a brain
+      description: Accepts an asynchronous deletion of the brain and everything under it.
+      responses:
+        "202":
+          description: Deletion accepted for asynchronous processing.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeletionReceipt"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/brains/{brainId}/captures:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+    post:
+      operationId: createCapture
+      tags:
+        - Captures
+      summary: Capture material
+      description: |
+        Submits one capture for compilation. Supply exactly one of `content` or `fetchUrl`;
+        supplying both returns `400`. The capture is queued, not compiled in the request.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Capture"
+      responses:
+        "200":
+          description: A source with the same `originRef` already exists and is returned.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestSource"
+        "201":
+          description: The capture was accepted and queued.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestSource"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/brains/{brainId}/sources:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+    get:
+      operationId: listIngestSources
+      tags:
+        - Sources
+      summary: List ingest sources
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Ingest sources for the brain.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                  - total
+                  - limit
+                  - offset
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/IngestSource"
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/brains/{brainId}/sources/{sourceId}:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+      - $ref: "#/components/parameters/SourceId"
+    get:
+      operationId: getIngestSource
+      tags:
+        - Sources
+      summary: Get an ingest source
+      responses:
+        "200":
+          description: The ingest source.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestSource"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+    delete:
+      operationId: deleteIngestSource
+      tags:
+        - Sources
+      summary: Delete an ingest source
+      description: Deletes the source. Pages derived from it stay in place.
+      responses:
+        "202":
+          description: Deletion accepted for asynchronous processing.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeletionReceipt"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/brains/{brainId}/sources/{sourceId}/content:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+      - $ref: "#/components/parameters/SourceId"
+    get:
+      operationId: getSourceContent
+      tags:
+        - Sources
+      summary: Get a short-lived URL for a source body
+      description: |
+        Returns a signed URL that expires after 300 seconds. `url` and `expiresAt` are
+        `null` when the configured object store cannot sign. A source without a stored
+        body returns `404`.
+      responses:
+        "200":
+          description: A short-lived URL for the stored source body.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceContentUrl"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/brains/{brainId}/pages:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+    get:
+      operationId: listPages
+      tags:
+        - Pages
+      summary: List pages
+      description: Lists pages without bumping `lastReferencedAt`.
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Pages in the brain.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                  - total
+                  - limit
+                  - offset
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Page"
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/brains/{brainId}/pages/{slug}:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+      - $ref: "#/components/parameters/Slug"
+    get:
+      operationId: getPage
+      tags:
+        - Pages
+      summary: Get a page by slug
+      description: |
+        Reads the page and bumps `lastReferencedAt`. It is a consumption signal, not a
+        list hydrator, so list endpoints do not bump it.
+      responses:
+        "200":
+          description: The page.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Page"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+    patch:
+      operationId: updatePage
+      tags:
+        - Pages
+      summary: Update a page
+      description: |
+        Applies a user edit and records a new page version. Sending a `version` that is not
+        the current version returns `409`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PageUpdate"
+      responses:
+        "200":
+          description: The updated page.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Page"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+    delete:
+      operationId: deletePage
+      tags:
+        - Pages
+      summary: Delete a page permanently
+      description: |
+        Permanently deletes the page. `permanent=true` is a required confirmation, not a
+        soft-delete flag.
+      parameters:
+        - $ref: "#/components/parameters/Permanent"
+      responses:
+        "202":
+          description: Deletion accepted for asynchronous processing.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeletionReceipt"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/brains/{brainId}/search:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+    get:
+      operationId: searchBrain
+      tags:
+        - Search
+      summary: Search a brain
+      description: |
+        Keyword matches bypass `minSimilarity`; semantic-only matches do not. `similarity`
+        carries the vector score only, so results can appear out of similarity order.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: The search phrase.
+          schema:
+            type: string
+            minLength: 1
+        - $ref: "#/components/parameters/SearchLimit"
+        - name: minSimilarity
+          in: query
+          required: false
+          description: Lowest vector similarity to return for semantic-only matches.
+          schema:
+            type: number
+            minimum: 0
+            maximum: 1
+      responses:
+        "200":
+          description: Ranked search hits.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                  - total
+                  - limit
+                  - offset
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SearchHit"
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/brains/{brainId}/index:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+    get:
+      operationId: getIndex
+      tags:
+        - Search
+      summary: Get the brain index
+      description: Returns the compact index of pages in the brain.
+      parameters:
+        - $ref: "#/components/parameters/IndexLimit"
+      responses:
+        "200":
+          description: Index entries for the brain.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                  - total
+                  - limit
+                  - offset
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/IndexEntry"
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/brains/{brainId}/graph:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+    get:
+      operationId: getGraph
+      tags:
+        - Search
+      summary: Get the brain graph
+      description: Returns the page nodes and connection edges of the brain.
+      responses:
+        "200":
+          description: The graph.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Graph"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/brains/{brainId}/connections:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+    get:
+      operationId: listConnections
+      tags:
+        - Connections
+      summary: List connections
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Connections in the brain.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                  - total
+                  - limit
+                  - offset
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Connection"
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/brains/{brainId}/connections/{connectionId}:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+      - $ref: "#/components/parameters/ConnectionId"
+    patch:
+      operationId: ackConnection
+      tags:
+        - Connections
+      summary: Acknowledge a connection
+      description: Marks the connection as seen. Acknowledging is idempotent.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AckRequest"
+      responses:
+        "200":
+          description: The acknowledged connection.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Connection"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/brains/{brainId}/changes:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+    get:
+      operationId: listChanges
+      tags:
+        - Changes
+      summary: List change events
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Change events for the brain, newest first.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                  - total
+                  - limit
+                  - offset
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ChangeEvent"
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/brains/{brainId}/changes/{changeId}:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+      - $ref: "#/components/parameters/ChangeId"
+    patch:
+      operationId: ackChange
+      tags:
+        - Changes
+      summary: Acknowledge a change event
+      description: Marks the change event as seen. Acknowledging is idempotent.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AckRequest"
+      responses:
+        "200":
+          description: The acknowledged change event.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeEvent"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/brains/{brainId}/score:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+    get:
+      operationId: getScore
+      tags:
+        - Score
+      summary: Get the brain score
+      description: Returns the latest score snapshot for the brain.
+      responses:
+        "200":
+          description: The latest score snapshot.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Score"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/brains/{brainId}/profile:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+    get:
+      operationId: getProfile
+      tags:
+        - Profile
+      summary: Get the subject profile
+      responses:
+        "200":
+          description: The profile attached to the brain.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+    patch:
+      operationId: updateProfile
+      tags:
+        - Profile
+      summary: Update the subject profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileUpdate"
+      responses:
+        "200":
+          description: The updated profile.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/brains/{brainId}/export:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+    get:
+      operationId: exportBrain
+      tags:
+        - Export
+      summary: Export a brain
+      description: Returns the brain and its pages, versions, sources and connections.
+      responses:
+        "200":
+          description: The exported brain.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - brain
+                  - pages
+                  - versions
+                  - sources
+                  - connections
+                properties:
+                  brain:
+                    $ref: "#/components/schemas/Brain"
+                  pages:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Page"
+                  versions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PageVersion"
+                  sources:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/IngestSource"
+                  connections:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Connection"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/webhooks:
+    get:
+      operationId: listWebhooks
+      tags:
+        - Webhooks
+      summary: List webhooks
+      description: Lists webhooks registered for the subject in `x-subject-id`.
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Webhooks for the subject.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                  - total
+                  - limit
+                  - offset
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Webhook"
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+    post:
+      operationId: createWebhook
+      tags:
+        - Webhooks
+      summary: Create a webhook
+      description: >-
+        Registers a webhook for the subject in `x-subject-id` and returns its signing secret
+        exactly once.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookCreate"
+      responses:
+        "201":
+          description: >-
+            The webhook was created. The response carries the plaintext `secret` once; it is
+            never returned again.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Webhook"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/webhooks/{webhookId}:
+    parameters:
+      - $ref: "#/components/parameters/WebhookId"
+    delete:
+      operationId: deleteWebhook
+      tags:
+        - Webhooks
+      summary: Delete a webhook
+      responses:
+        "204":
+          description: The webhook was deleted.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/tenant:
+    security: [{apiKey: []}]
+    get:
+      operationId: getTenant
+      tags:
+        - Tenant
+      summary: Get the current tenant
+      description: Requires owner.
+      responses:
+        "200":
+          description: The tenant that owns the API key.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tenant"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/members:
+    security: [{apiKey: []}]
+    get:
+      operationId: listMembers
+      tags:
+        - Members
+      summary: List members
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Members of the tenant.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                  - total
+                  - limit
+                  - offset
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Member"
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/Error401"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/api-keys:
+    security: [{apiKey: []}]
+    get:
+      operationId: listApiKeys
+      tags:
+        - API Keys
+      summary: List API keys
+      description: Requires admin or higher. Never returns plaintext keys or hashes.
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: API keys for the tenant, without their secrets.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                  - total
+                  - limit
+                  - offset
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ApiKey"
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+    post:
+      operationId: createApiKey
+      tags:
+        - API Keys
+      summary: Create an API key
+      description: Requires admin or higher. The role defaults to viewer and cannot exceed the caller's role. The plaintext key is returned once in the `key` field of this response.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApiKeyCreate"
+      responses:
+        "201":
+          description: The new API key and its plaintext value.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKey"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/api-keys/{keyId}:
+    security: [{apiKey: []}]
+    parameters:
+      - $ref: "#/components/parameters/KeyId"
+    delete:
+      operationId: deleteApiKey
+      tags:
+        - API Keys
+      summary: Revoke an API key
+      description: Requires admin or higher. Revocation takes effect on the next request.
+      responses:
+        "204":
+          description: The API key was revoked.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: Tenant-scoped API key carrying a role.
+    subjectId:
+      type: apiKey
+      in: header
+      name: x-subject-id
+      description: End-user UUID. Determines which brains are visible.
+
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of items to return.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    SearchLimit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of search hits to return.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    IndexLimit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of index entries to return.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 40
+    Offset:
+      name: offset
+      in: query
+      required: false
+      description: Number of items to skip before collecting the page.
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: |
+        Client-generated key. A replay within 24 hours returns the original response
+        byte-for-byte.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 200
+    Permanent:
+      name: permanent
+      in: query
+      required: true
+      description: Confirmation that the page is deleted permanently. Must be `true`.
+      schema:
+        type: boolean
+        const: true
+    BrainId:
+      name: brainId
+      in: path
+      required: true
+      description: "Prefixed brain id, `brn_` followed by 32 lowercase hex characters."
+      schema:
+        type: string
+        pattern: "^brn_[0-9a-f]{32}$"
+    SourceId:
+      name: sourceId
+      in: path
+      required: true
+      description: "Prefixed ingest source id, `src_` followed by 32 lowercase hex characters."
+      schema:
+        type: string
+        pattern: "^src_[0-9a-f]{32}$"
+    ConnectionId:
+      name: connectionId
+      in: path
+      required: true
+      description: "Prefixed connection id, `cnn_` followed by 32 lowercase hex characters."
+      schema:
+        type: string
+        pattern: "^cnn_[0-9a-f]{32}$"
+    ChangeId:
+      name: changeId
+      in: path
+      required: true
+      description: "Prefixed change event id, `chg_` followed by 32 lowercase hex characters."
+      schema:
+        type: string
+        pattern: "^chg_[0-9a-f]{32}$"
+    Slug:
+      name: slug
+      in: path
+      required: true
+      description: The page slug within the brain.
+      schema:
+        type: string
+        minLength: 1
+    WebhookId:
+      name: webhookId
+      in: path
+      required: true
+      description: Webhook UUID.
+      schema:
+        type: string
+        format: uuid
+    KeyId:
+      name: keyId
+      in: path
+      required: true
+      description: API key UUID.
+      schema:
+        type: string
+        format: uuid
+
+  headers:
+    RequestId:
+      description: Correlation identifier for the request.
+      schema:
+        type: string
+    RetryAfter:
+      description: Seconds to wait before retrying.
+      schema:
+        type: integer
+        minimum: 0
+
+  responses:
+    Error400:
+      description: Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id.
+      headers:
+        x-request-id:
+          $ref: "#/components/headers/RequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Error401:
+      description: Missing, unknown, expired or revoked API key.
+      headers:
+        x-request-id:
+          $ref: "#/components/headers/RequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Error403:
+      description: The key role does not permit this operation or granting a higher role.
+      headers:
+        x-request-id:
+          $ref: "#/components/headers/RequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Error404:
+      description: Not found, or owned by another tenant. Cross-tenant access is 404, never 403.
+      headers:
+        x-request-id:
+          $ref: "#/components/headers/RequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Error409:
+      description: Conflict with the current state, such as a page version conflict or a duplicate slug.
+      headers:
+        x-request-id:
+          $ref: "#/components/headers/RequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Error422:
+      description: The request is well formed but semantically invalid.
+      headers:
+        x-request-id:
+          $ref: "#/components/headers/RequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Error429:
+      description: Rate limited. Retry after the number of seconds in `Retry-After`.
+      headers:
+        x-request-id:
+          $ref: "#/components/headers/RequestId"
+        Retry-After:
+          $ref: "#/components/headers/RetryAfter"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Error500:
+      description: Unexpected server error. Never used for a provider's error.
+      headers:
+        x-request-id:
+          $ref: "#/components/headers/RequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+
+  schemas:
+    ErrorEnvelope:
+      type: object
+      description: The one error shape used by every error response.
+      required:
+        - statusCode
+        - timestamp
+        - path
+        - message
+        - body
+      example:
+        statusCode: 404
+        timestamp: "2026-11-06T10:00:00.000Z"
+        path: /v1/brains/brn_1
+        message: Not found
+        body:
+          message: Not found
+          error: NotFoundError
+          statusCode: 404
+      properties:
+        statusCode:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+        path:
+          type: string
+        message:
+          type: string
+        body:
+          type: object
+          required:
+            - message
+            - error
+            - statusCode
+          properties:
+            message:
+              type: string
+            error:
+              type: string
+            statusCode:
+              type: integer
+
+    PageType:
+      type: string
+      enum:
+        - source
+        - topic
+        - entity
+        - project
+        - decision
+        - brief
+
+    Bucket:
+      type: string
+      enum:
+        - inbox
+        - notes
+        - ideas
+        - projects
+
+    BucketSource:
+      type: string
+      enum:
+        - auto
+        - user
+
+    PageStatus:
+      type: string
+      enum:
+        - active
+        - stale
+        - contested
+        - deprecated
+        - archived
+
+    DeletionState:
+      type: string
+      enum:
+        - active
+        - deleting
+        - deleted
+
+    SourceStatus:
+      type: string
+      enum:
+        - pending
+        - compiling
+        - completed
+        - failed
+
+    CaptureKind:
+      type: string
+      enum:
+        - note
+        - url
+        - file
+        - transcript
+        - chat_turn
+        - integration
+
+    ConnectionStrength:
+      type: string
+      enum:
+        - weak
+        - medium
+        - strong
+
+    ConnectionSource:
+      type: string
+      enum:
+        - auto
+        - manual
+
+    ChangeAction:
+      type: string
+      enum:
+        - created
+        - updated
+        - renamed
+        - merged
+        - split
+        - archived
+        - restored
+        - recovered
+        - routed
+
+    ChangeActor:
+      type: string
+      enum:
+        - compiler
+        - user
+
+    MemberRole:
+      type: string
+      enum:
+        - owner
+        - admin
+        - developer
+        - viewer
+
+    TargetType:
+      type: string
+      enum:
+        - brain
+        - source
+        - page
+
+    Brain:
+      type: object
+      description: A subject's memory store.
+      required:
+        - id
+        - subjectId
+        - projectId
+        - name
+        - slug
+        - description
+        - briefSettings
+        - deletionState
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          description: "Prefixed brain id, `brn_...`."
+        subjectId:
+          type: string
+          format: uuid
+        projectId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+        briefSettings:
+          type: object
+          additionalProperties: true
+        deletionState:
+          $ref: "#/components/schemas/DeletionState"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    BrainCreate:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        slug:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        projectId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        briefSettings:
+          type: object
+          additionalProperties: true
+
+    BrainUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+        projectId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        briefSettings:
+          type: object
+          additionalProperties: true
+
+    Page:
+      type: object
+      description: One compiled knowledge page.
+      required:
+        - id
+        - subjectId
+        - brainId
+        - slug
+        - title
+        - summary
+        - body
+        - pageType
+        - bucket
+        - bucketSource
+        - status
+        - pinned
+        - archived
+        - version
+        - entities
+        - backlinks
+        - contentHash
+        - embeddingModel
+        - lastCompiledAt
+        - lastReferencedAt
+        - userEditedAt
+        - deletionState
+      properties:
+        id:
+          type: string
+          description: "Prefixed page id, `pg_...`."
+        subjectId:
+          type: string
+          format: uuid
+        brainId:
+          type: string
+        slug:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+        body:
+          type: string
+        pageType:
+          $ref: "#/components/schemas/PageType"
+        bucket:
+          $ref: "#/components/schemas/Bucket"
+        bucketSource:
+          $ref: "#/components/schemas/BucketSource"
+        status:
+          $ref: "#/components/schemas/PageStatus"
+        pinned:
+          type: boolean
+        archived:
+          type: boolean
+        version:
+          type: integer
+          minimum: 1
+        entities:
+          type: array
+          items:
+            type: string
+        backlinks:
+          type: array
+          items:
+            type: string
+        contentHash:
+          type: string
+        embeddingModel:
+          type:
+            - string
+            - "null"
+        lastCompiledAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        lastReferencedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        userEditedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        deletionState:
+          $ref: "#/components/schemas/DeletionState"
+
+    PageUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        summary:
+          type: string
+        body:
+          type: string
+        bucket:
+          $ref: "#/components/schemas/Bucket"
+        pinned:
+          type: boolean
+        archived:
+          type: boolean
+        status:
+          $ref: "#/components/schemas/PageStatus"
+        version:
+          type: integer
+          minimum: 1
+          description: The version the client last read. A mismatch returns `409`.
+
+    PageVersion:
+      type: object
+      required:
+        - id
+        - pageId
+        - version
+        - title
+        - summary
+        - body
+        - actor
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        pageId:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        title:
+          type: string
+        summary:
+          type: string
+        body:
+          type: string
+        ingestSourceId:
+          type:
+            - string
+            - "null"
+        actor:
+          $ref: "#/components/schemas/ChangeActor"
+        createdAt:
+          type: string
+          format: date-time
+
+    Capture:
+      type: object
+      description: |
+        One unit of raw material. Supply exactly one of `content` or `fetchUrl`.
+      required:
+        - kind
+      properties:
+        kind:
+          $ref: "#/components/schemas/CaptureKind"
+        content:
+          type:
+            - string
+            - "null"
+          maxLength: 50000
+        fetchUrl:
+          type:
+            - string
+            - "null"
+          format: uri
+        originRef:
+          type:
+            - string
+            - "null"
+        label:
+          type:
+            - string
+            - "null"
+        bucket:
+          $ref: "#/components/schemas/Bucket"
+        metadata:
+          type: object
+          additionalProperties: true
+
+    IngestSource:
+      type: object
+      description: A stored capture and its compilation status.
+      required:
+        - id
+        - brainId
+        - kind
+        - contentPreview
+        - contentUrl
+        - contentHash
+        - originRef
+        - label
+        - bucket
+        - metadata
+        - status
+        - attempts
+        - lastError
+        - affectedPageIds
+        - originalBytes
+        - createdAt
+        - compiledAt
+        - deletedAt
+      properties:
+        id:
+          type: string
+          description: "Prefixed source id, `src_...`."
+        brainId:
+          type: string
+        kind:
+          $ref: "#/components/schemas/CaptureKind"
+        contentPreview:
+          type: string
+        contentUrl:
+          type:
+            - string
+            - "null"
+        contentHash:
+          type: string
+        originRef:
+          type:
+            - string
+            - "null"
+        label:
+          type:
+            - string
+            - "null"
+        bucket:
+          $ref: "#/components/schemas/Bucket"
+        metadata:
+          type: object
+          additionalProperties: true
+        status:
+          $ref: "#/components/schemas/SourceStatus"
+        attempts:
+          type: integer
+          minimum: 0
+        lastError:
+          type:
+            - string
+            - "null"
+        affectedPageIds:
+          type: array
+          items:
+            type: string
+        originalBytes:
+          type: integer
+          minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+        compiledAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        deletedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+
+    SourceContentUrl:
+      type: object
+      description: A short-lived signed URL for the stored body of an ingest source.
+      required:
+        - url
+        - expiresAt
+      properties:
+        url:
+          type:
+            - string
+            - "null"
+        expiresAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+
+    Connection:
+      type: object
+      description: A semantic link between two pages, stored in canonical page order.
+      required:
+        - id
+        - brainId
+        - pageAId
+        - pageBId
+        - similarity
+        - strength
+        - reasoning
+        - source
+        - ackedAt
+      properties:
+        id:
+          type: string
+          description: "Prefixed connection id, `cnn_...`."
+        brainId:
+          type: string
+        pageAId:
+          type: string
+        pageBId:
+          type: string
+        similarity:
+          type: number
+        strength:
+          $ref: "#/components/schemas/ConnectionStrength"
+        reasoning:
+          type: string
+        source:
+          $ref: "#/components/schemas/ConnectionSource"
+        ackedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+
+    ChangeEvent:
+      type: object
+      required:
+        - id
+        - brainId
+        - pageId
+        - action
+        - changeSummary
+        - fromVersion
+        - toVersion
+        - ingestSourceId
+        - contradictions
+        - ackedAt
+        - createdAt
+      properties:
+        id:
+          type: string
+          description: "Prefixed change id, `chg_...`."
+        brainId:
+          type: string
+        pageId:
+          type: string
+        action:
+          $ref: "#/components/schemas/ChangeAction"
+        changeSummary:
+          type: string
+        fromVersion:
+          type:
+            - integer
+            - "null"
+        toVersion:
+          type: integer
+        ingestSourceId:
+          type:
+            - string
+            - "null"
+        contradictions:
+          type: array
+          items: {}
+        ackedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    Profile:
+      type: object
+      description: The subject profile that steers compilation.
+      required:
+        - brainId
+        - whoTheyAre
+        - whatTheyDo
+        - focus
+        - goals
+        - currentProjects
+        - stuckOn
+        - vaultOrganization
+        - directives
+      properties:
+        brainId:
+          type: string
+        whoTheyAre:
+          type: string
+        whatTheyDo:
+          type: string
+        focus:
+          type: string
+        goals:
+          type: string
+        currentProjects:
+          type: string
+        stuckOn:
+          type: string
+        vaultOrganization:
+          type: string
+        directives:
+          type: object
+          additionalProperties: true
+
+    ProfileUpdate:
+      type: object
+      properties:
+        whoTheyAre:
+          type: string
+        whatTheyDo:
+          type: string
+        focus:
+          type: string
+        goals:
+          type: string
+        currentProjects:
+          type: string
+        stuckOn:
+          type: string
+        vaultOrganization:
+          type: string
+        directives:
+          type: object
+          additionalProperties: true
+
+    Score:
+      type: object
+      description: The latest health snapshot for a brain.
+      required:
+        - brainId
+        - computedAt
+        - freshness
+        - readiness
+        - strain
+        - factors
+      properties:
+        brainId:
+          type: string
+        computedAt:
+          type: string
+          format: date-time
+        freshness:
+          type: number
+        readiness:
+          type: number
+        strain:
+          type: number
+        factors:
+          type: object
+          additionalProperties: true
+
+    SearchHit:
+      type: object
+      required:
+        - pageId
+        - slug
+        - title
+        - summary
+        - similarity
+      properties:
+        pageId:
+          type: string
+        slug:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+        pageType:
+          $ref: "#/components/schemas/PageType"
+        similarity:
+          type:
+            - number
+            - "null"
+          description: Vector score only. Keyword-only matches carry `null`.
+        updatedAt:
+          type: string
+          format: date-time
+
+    Graph:
+      type: object
+      required:
+        - nodes
+        - edges
+      properties:
+        nodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/GraphNode"
+        edges:
+          type: array
+          items:
+            $ref: "#/components/schemas/GraphEdge"
+
+    GraphNode:
+      type: object
+      required:
+        - id
+        - slug
+        - title
+        - pageType
+        - bucket
+        - status
+        - pinned
+      properties:
+        id:
+          type: string
+        slug:
+          type: string
+        title:
+          type: string
+        pageType:
+          $ref: "#/components/schemas/PageType"
+        bucket:
+          $ref: "#/components/schemas/Bucket"
+        status:
+          $ref: "#/components/schemas/PageStatus"
+        pinned:
+          type: boolean
+
+    GraphEdge:
+      type: object
+      required:
+        - connectionId
+        - pageAId
+        - pageBId
+        - similarity
+        - strength
+        - source
+      properties:
+        connectionId:
+          type: string
+        pageAId:
+          type: string
+        pageBId:
+          type: string
+        similarity:
+          type: number
+        strength:
+          $ref: "#/components/schemas/ConnectionStrength"
+        source:
+          $ref: "#/components/schemas/ConnectionSource"
+
+    IndexEntry:
+      type: object
+      description: A compact page entry in the brain index.
+      required:
+        - slug
+        - title
+        - summary
+        - pageType
+        - pinned
+      properties:
+        slug:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+        pageType:
+          $ref: "#/components/schemas/PageType"
+        pinned:
+          type: boolean
+        updatedAt:
+          type: string
+          format: date-time
+
+    ApiKey:
+      type: object
+      required:
+        - id
+        - name
+        - prefix
+        - role
+        - scopes
+        - lastUsedAt
+        - expiresAt
+        - revokedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        prefix:
+          type: string
+        role:
+          $ref: "#/components/schemas/MemberRole"
+        scopes:
+          type: array
+          items:
+            type: string
+        lastUsedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        expiresAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        revokedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        key:
+          type: string
+          description: Plaintext key, present only in the creation response.
+
+    ApiKeyCreate:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        role:
+          $ref: "#/components/schemas/MemberRole"
+        scopes:
+          type: array
+          items:
+            type: string
+        expiresAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+
+    Member:
+      type: object
+      required:
+        - id
+        - email
+        - name
+        - image
+        - role
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        image:
+          type:
+            - string
+            - "null"
+          format: uri
+        role:
+          $ref: "#/components/schemas/MemberRole"
+        createdAt:
+          type: string
+          format: date-time
+
+    Webhook:
+      type: object
+      required:
+        - id
+        - subjectId
+        - url
+        - events
+        - active
+      properties:
+        id:
+          type: string
+          format: uuid
+        subjectId:
+          type: string
+          format: uuid
+        url:
+          type: string
+          format: uri
+        events:
+          type: array
+          items:
+            type: string
+        active:
+          type: boolean
+        secret:
+          type: string
+          description: >-
+            The plaintext signing secret. Returned only by the create response and never shown
+            again; list and delete responses omit it.
+
+    WebhookCreate:
+      type: object
+      required:
+        - url
+        - events
+      properties:
+        url:
+          type: string
+          format: uri
+          maxLength: 2048
+          description: >-
+            An `http` or `https` URL with no embedded credentials, at most 2,048 characters.
+        events:
+          type: array
+          minItems: 1
+          maxItems: 20
+          uniqueItems: true
+          description: One to twenty distinct change actions.
+          items:
+            type: string
+            enum:
+              - created
+              - updated
+              - renamed
+              - merged
+              - split
+              - archived
+              - restored
+              - recovered
+              - routed
+
+    Tenant:
+      type: object
+      required:
+        - id
+        - name
+        - slug
+        - plan
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        plan:
+          type: string
+
+    DeletionReceipt:
+      type: object
+      required:
+        - id
+        - targetType
+        - state
+      properties:
+        id:
+          type: string
+        targetType:
+          $ref: "#/components/schemas/TargetType"
+        state:
+          type: string
+
+    AckRequest:
+      type: object
+      required:
+        - acked
+      properties:
+        acked:
+          type: boolean
+          default: true

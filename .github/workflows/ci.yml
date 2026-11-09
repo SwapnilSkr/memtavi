@@ -36,6 +36,8 @@ jobs:
         run: bun run spec:lint
       - name: Spec docs
         run: bun run spec:docs:check
+      - name: Spec compat
+        run: bun run spec:compat
       - name: Web typecheck
         run: bun run typecheck:web
       - name: Web build
