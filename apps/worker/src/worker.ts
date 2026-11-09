@@ -1,6 +1,7 @@
 import type { withTenant } from "@memtavi/db/client";
 import {
   fetchDocument as defaultFetchDocument,
+  postJson as defaultPostJson,
   FetchError,
   type FetchedDocument,
   type FetchFailureCode,
@@ -9,7 +10,14 @@ import type { ObjectStore } from "@memtavi/storage/types";
 import type { PoolClient } from "pg";
 import { compileCapture } from "./compile";
 import { ingestCapture } from "./ingest";
-import { type ClaimedJob, type CompilerConfig, JobError, type JobHandler } from "./types";
+import {
+  type ClaimedJob,
+  type CompilerConfig,
+  JobError,
+  type JobHandler,
+  type PostJson,
+} from "./types";
+import { deliverWebhook } from "./webhook";
 
 const CLAIM_SQL = `
   UPDATE jobs
@@ -71,6 +79,8 @@ export interface WorkerConfig {
   compiler?: CompilerConfig;
   handlers?: Record<string, JobHandler>;
   fetchDocument?: (url: string) => Promise<FetchedDocument>;
+  postJson?: PostJson;
+  webhookSecretKey?: string;
   concurrency?: number;
   pollIntervalMs?: number;
   random?: () => number;
@@ -120,11 +130,13 @@ export function createWorker(config: WorkerConfig): Worker {
   const handlers = config.handlers ?? {
     "capture.ingest": ingestCapture,
     "capture.compile": compileCapture,
+    "webhook.deliver": deliverWebhook,
   };
   const types = Object.keys(handlers);
   if (types.length === 0) throw new Error("At least one job handler is required");
 
   const fetchDocument = config.fetchDocument ?? defaultFetchDocument;
+  const postJson = config.postJson ?? defaultPostJson;
   const store = config.store;
   const concurrency = Math.max(1, Math.trunc(config.concurrency ?? DEFAULT_CONCURRENCY));
   const pollIntervalMs = Math.max(1, config.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS);
@@ -161,6 +173,11 @@ export function createWorker(config: WorkerConfig): Worker {
           client,
           store,
           fetchDocument,
+          withTenant,
+          postJson,
+          ...(config.webhookSecretKey === undefined
+            ? {}
+            : { webhookSecretKey: config.webhookSecretKey }),
           compiler: config.compiler,
           recordUsage: async (usage) => {
             await withTenant(job.tenantId, (usageClient) =>

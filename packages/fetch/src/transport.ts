@@ -4,10 +4,14 @@ import type { LookupFunction } from "node:net";
 import { pipeline, Readable } from "node:stream";
 import { createBrotliDecompress, createGunzip, createInflate } from "node:zlib";
 
-export type FetchImpl = (
-  input: string,
-  init: RequestOptions & { lookup: LookupFunction; servername?: string; autoSelectFamily: false },
-) => Promise<Response>;
+export interface FetchRequestInit extends RequestOptions {
+  lookup: LookupFunction;
+  servername?: string;
+  autoSelectFamily: false;
+  body?: string;
+}
+
+export type FetchImpl = (input: string, init: FetchRequestInit) => Promise<Response>;
 
 type Request = (
   input: string,
@@ -18,9 +22,10 @@ type Request = (
 export function createFetchTransport(requestImpl?: Request): FetchImpl {
   return (input, init) =>
     new Promise((resolve, reject) => {
+      const { body, ...options } = init;
       const request =
         requestImpl ?? (new URL(input).protocol === "https:" ? httpsRequest : httpRequest);
-      const outgoing = request(input, init, (incoming) => {
+      const outgoing = request(input, options, (incoming) => {
         try {
           const headers = new Headers();
           for (let index = 0; index < incoming.rawHeaders.length; index += 2) {
@@ -54,6 +59,6 @@ export function createFetchTransport(requestImpl?: Request): FetchImpl {
         }
       });
       outgoing.on("error", reject);
-      outgoing.end();
+      outgoing.end(body);
     });
 }

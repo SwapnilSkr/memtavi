@@ -46,6 +46,18 @@ export const CANDIDATES_SQL = `
   LIMIT 5
 `;
 
+export const WEBHOOK_ENQUEUE_SQL = `
+  INSERT INTO jobs (tenant_id, brain_id, type, payload, idempotency_key, max_attempts)
+  SELECT $1, $2, 'webhook.deliver',
+    jsonb_build_object('webhookId', w.id, 'eventId', $3::text),
+    'webhook:' || $3::text || ':' || w.id::text,
+    5
+  FROM webhooks w
+  WHERE w.tenant_id = $1 AND w.subject_id = $4 AND w.active = true
+    AND $5::text = ANY(w.events)
+  ON CONFLICT (tenant_id, idempotency_key) DO NOTHING
+`;
+
 export const ENTITY_PAGES_SQL = `
   SELECT p.id,
     cardinality(ARRAY(SELECT unnest(p.entities) INTERSECT SELECT unnest($1::text[]))) AS overlap
@@ -229,27 +241,37 @@ async function compileSource({
          VALUES ($1, $2, $3, $4, $5, $6, $7, 'compiler')`,
         [job.tenantId, page.id, page.version, page.title, page.summary, page.body, sourceId],
       );
+      const eventId = newId("change");
+      const action = splitFrom ? "split" : previousVersion === null ? "created" : "updated";
+      const changeSummary = splitFrom
+        ? `Split from ${splitFrom.title} (${splitFrom.id})`
+        : previousVersion === null
+          ? pageFacts[0]?.claim
+          : `${pageFacts[0]?.claim} (${pageFacts.length} facts)`;
       await client.query(
         `INSERT INTO change_events
          (id, tenant_id, brain_id, page_id, action, change_summary, from_version, to_version, ingest_source_id, contradictions)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
         [
-          newId("change"),
+          eventId,
           job.tenantId,
           job.brainId,
           page.id,
-          splitFrom ? "split" : previousVersion === null ? "created" : "updated",
-          splitFrom
-            ? `Split from ${splitFrom.title} (${splitFrom.id})`
-            : previousVersion === null
-              ? pageFacts[0]?.claim
-              : `${pageFacts[0]?.claim} (${pageFacts.length} facts)`,
+          action,
+          changeSummary,
           previousVersion,
           page.version,
           sourceId,
           JSON.stringify(contradictions),
         ],
       );
+      await client.query(WEBHOOK_ENQUEUE_SQL, [
+        job.tenantId,
+        job.brainId,
+        eventId,
+        subjectId,
+        action,
+      ]);
     }
     await client.query(
       `INSERT INTO page_sources (tenant_id, page_id, ingest_source_id, chunk_uuids)

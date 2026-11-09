@@ -1,8 +1,15 @@
+import type { withTenant } from "@memtavi/db/client";
 import type { FetchedDocument } from "@memtavi/fetch";
 import type { ChatPrices, EmbeddingPrices } from "@memtavi/llm/cost";
 import type { ChatProvider, EmbeddingProvider } from "@memtavi/llm/provider";
 import type { ObjectStore } from "@memtavi/storage/types";
 import type { PoolClient } from "pg";
+
+export type PostJson = (
+  url: string,
+  body: string,
+  headers: Record<string, string>,
+) => Promise<FetchedDocument>;
 
 export interface ClaimedJob {
   id: string;
@@ -19,6 +26,9 @@ export interface JobContext {
   client: PoolClient;
   store: ObjectStore;
   fetchDocument: (url: string) => Promise<FetchedDocument>;
+  withTenant?: typeof withTenant;
+  postJson?: PostJson;
+  webhookSecretKey?: string;
   compiler?: CompilerConfig | undefined;
   recordUsage?: (usage: CompilerUsage) => Promise<void>;
   onRouting?: ((event: RoutingEvent) => void) | undefined;

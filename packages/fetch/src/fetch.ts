@@ -39,6 +39,13 @@ export interface FetchDocumentOptions {
   maxRedirects?: number;
 }
 
+export interface PostJsonOptions {
+  lookup?: Lookup;
+  fetchImpl?: FetchImpl;
+  maxBytes?: number;
+  timeoutMs?: number;
+}
+
 export interface FetchedDocument {
   status: number;
   finalUrl: string;
@@ -47,6 +54,7 @@ export interface FetchedDocument {
 }
 
 const DEFAULT_MAX_BYTES = 10 * 1024 * 1024;
+const DEFAULT_POST_MAX_BYTES = 64 * 1024;
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_MAX_REDIRECTS = 5;
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
@@ -167,6 +175,50 @@ async function readBody(
   return new TextDecoder().decode(bytes);
 }
 
+interface RequestSpec {
+  method: "GET" | "POST";
+  headers: Record<string, string>;
+  body?: string;
+}
+
+interface Runtime {
+  lookup: Lookup;
+  fetchImpl: FetchImpl;
+  controller: AbortController;
+}
+
+async function sendOnce(target: URL, spec: RequestSpec, runtime: Runtime): Promise<Response> {
+  const address = await withinDeadline(
+    resolvePublic(target.hostname, runtime.lookup),
+    runtime.controller.signal,
+  );
+  const pinnedLookup: LookupFunction = (_hostname, lookupOptions, callback) => {
+    if (lookupOptions.all) callback(null, [address]);
+    else callback(null, address.address, address.family);
+  };
+
+  try {
+    return await withinDeadline(
+      runtime.fetchImpl(target.toString(), {
+        method: spec.method,
+        signal: runtime.controller.signal,
+        lookup: pinnedLookup,
+        family: address.family,
+        autoSelectFamily: false,
+        agent: false,
+        ...(target.protocol === "https:" && isIP(bareHost(target.hostname)) === 0
+          ? { servername: bareHost(target.hostname) }
+          : {}),
+        headers: spec.headers,
+        ...(spec.body === undefined ? {} : { body: spec.body }),
+      }),
+      runtime.controller.signal,
+    );
+  } catch (error) {
+    throw translate(runtime.controller, error);
+  }
+}
+
 export async function fetchDocument(
   rawUrl: string,
   options: FetchDocumentOptions = {},
@@ -183,38 +235,17 @@ export async function fetchDocument(
 
   try {
     for (let hop = 0; hop <= maxRedirects; hop += 1) {
-      const address = await withinDeadline(
-        resolvePublic(current.hostname, lookup),
-        controller.signal,
+      const response = await sendOnce(
+        current,
+        {
+          method: "GET",
+          headers: {
+            accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8",
+            "accept-encoding": "gzip, deflate, br",
+          },
+        },
+        { lookup, fetchImpl, controller },
       );
-      const pinnedLookup: LookupFunction = (_hostname, lookupOptions, callback) => {
-        if (lookupOptions.all) callback(null, [address]);
-        else callback(null, address.address, address.family);
-      };
-
-      let response: Response;
-      try {
-        response = await withinDeadline(
-          fetchImpl(current.toString(), {
-            method: "GET",
-            signal: controller.signal,
-            lookup: pinnedLookup,
-            family: address.family,
-            autoSelectFamily: false,
-            agent: false,
-            ...(current.protocol === "https:" && isIP(bareHost(current.hostname)) === 0
-              ? { servername: bareHost(current.hostname) }
-              : {}),
-            headers: {
-              accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8",
-              "accept-encoding": "gzip, deflate, br",
-            },
-          }),
-          controller.signal,
-        );
-      } catch (error) {
-        throw translate(controller, error);
-      }
 
       const location = response.headers.get("location");
       if (REDIRECT_STATUSES.has(response.status) && location !== null) {
@@ -249,4 +280,41 @@ export async function fetchDocument(
   }
 
   throw new FetchError("too_many_redirects", false, "Too many redirects");
+}
+
+export async function postJson(
+  rawUrl: string,
+  body: string,
+  headers: Record<string, string> = {},
+  options: PostJsonOptions = {},
+): Promise<FetchedDocument> {
+  const lookup = options.lookup ?? defaultLookup;
+  const fetchImpl = options.fetchImpl ?? defaultTransport;
+  const maxBytes = options.maxBytes ?? DEFAULT_POST_MAX_BYTES;
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+
+  const target = parseTarget(rawUrl);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await sendOnce(
+      target,
+      {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body,
+      },
+      { lookup, fetchImpl, controller },
+    );
+    const text = await withinDeadline(readBody(response, maxBytes, controller), controller.signal);
+    return {
+      status: response.status,
+      finalUrl: target.toString(),
+      contentType: response.headers.get("content-type"),
+      text,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
 }

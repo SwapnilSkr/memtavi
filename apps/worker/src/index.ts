@@ -47,12 +47,15 @@ const { buildStoreFromEnv } = await import("@memtavi/storage/config");
 const { pool, withTenant } = await import("@memtavi/db/client");
 const store = await buildStoreFromEnv(process.env);
 
+const webhookSecretKey = process.env.WEBHOOK_SECRET_KEY?.trim();
+
 const worker = createWorker({
   withTenant,
   tenantIds,
   concurrency,
   pollIntervalMs,
   store,
+  ...(webhookSecretKey === undefined || webhookSecretKey === "" ? {} : { webhookSecretKey }),
   compiler: {
     chatProvider: createOpenRouterChat({ apiKey: chatKey }),
     embeddingProvider: createOpenAIImbeddings({
