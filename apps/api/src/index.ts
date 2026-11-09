@@ -23,6 +23,9 @@ const app = createApp({
   withTenant,
   store,
   ...(embeddings === undefined ? {} : { embeddings }),
+  ...(process.env.WEBHOOK_SECRET_KEY === undefined
+    ? {}
+    : { webhookSecretKey: process.env.WEBHOOK_SECRET_KEY }),
 }).listen(port);
 
 async function shutdown() {

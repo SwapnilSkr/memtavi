@@ -7,6 +7,7 @@ import {
   type CaptureRequest,
   type ChangeEvent,
   type Connection,
+  type CreatedWebhook,
   type DeletionReceipt,
   type Graph,
   type IndexEntry,
@@ -20,6 +21,8 @@ import {
   type Score,
   type SearchHit,
   type SearchQuery,
+  type Webhook,
+  type WebhookCreate,
 } from "./client";
 
 const EPOCH = "2026-01-01T00:00:00.000Z";
@@ -52,6 +55,8 @@ export interface FakeClientOptions {
   exported?: BrainExport;
   created?: BrainInput;
   deletion?: DeletionReceipt;
+  webhooks?: Webhook[];
+  createdWebhook?: CreatedWebhook;
   failures?: Partial<Record<keyof ApiClient, unknown>>;
 }
 
@@ -350,6 +355,37 @@ export function createFakeClient(options: FakeClientOptions = {}): FakeClient {
           connections: [],
         }
       );
+    },
+
+    async listWebhooks(query?: PageQuery) {
+      record("listWebhooks", [query]);
+      fail("listWebhooks");
+      const webhooks = options.webhooks ?? [];
+      return listed(
+        webhooks.slice(query?.offset ?? 0, (query?.offset ?? 0) + (query?.limit ?? 50)),
+        query?.limit ?? 50,
+        query?.offset ?? 0,
+      );
+    },
+
+    async createWebhook(body: WebhookCreate) {
+      record("createWebhook", [body]);
+      fail("createWebhook");
+      return (
+        options.createdWebhook ?? {
+          id: "whk_1",
+          subjectId: "sub_1",
+          url: body.url,
+          events: body.events,
+          active: true,
+          secret: "whsec_test_secret",
+        }
+      );
+    },
+
+    async deleteWebhook(webhookId: string) {
+      record("deleteWebhook", [webhookId]);
+      fail("deleteWebhook");
     },
   };
 }

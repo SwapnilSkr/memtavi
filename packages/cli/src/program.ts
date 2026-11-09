@@ -1,6 +1,7 @@
 import {
   type ApiClient,
   ApiError,
+  type ChangeAction,
   type ChangeEvent,
   type Connection,
   type IngestSource,
@@ -9,6 +10,7 @@ import {
   type Profile,
   type ProfileUpdate,
   type Score,
+  type Webhook,
 } from "@memtavi/client/client";
 import { ConfigError } from "@memtavi/client/config";
 import { Command, CommanderError, InvalidArgumentError } from "commander";
@@ -120,6 +122,19 @@ function changeRows(changes: ChangeEvent[]): string[][] {
     change.ackedAt ?? "-",
     change.createdAt,
   ]);
+}
+
+function webhookRows(webhooks: Webhook[]): string[][] {
+  return webhooks.map((webhook) => [
+    webhook.id,
+    webhook.events.join(","),
+    webhook.active ? "active" : "inactive",
+    webhook.url,
+  ]);
+}
+
+function collectEvent(value: string, previous: string[]): string[] {
+  return [...previous, value];
 }
 
 function parseCount(value: string): number {
@@ -492,6 +507,60 @@ export function buildProgram(deps: CliDeps): Command {
       }
       await deps.writeFile(options.out, `${json}\n`);
       deps.err(`wrote ${options.out}`);
+    });
+
+  program
+    .command("webhooks")
+    .description("List the webhooks registered for the subject")
+    .action(async (_options: unknown, command: Command) => {
+      const result = await deps.client.listWebhooks();
+      emit(command, result, (listed) =>
+        table(["ID", "EVENTS", "STATUS", "URL"], webhookRows(listed.items)),
+      );
+    });
+
+  const webhook = program.command("webhook").description("Register or remove a webhook");
+
+  webhook
+    .command("create")
+    .description("Register a webhook and print its signing secret once")
+    .requiredOption("--url <url>", "the http or https endpoint to deliver to")
+    .option(
+      "--event <name>",
+      "a change action to subscribe to; repeat for several",
+      collectEvent,
+      [],
+    )
+    .action(async (options: { url: string; event: string[] }, command: Command) => {
+      if (options.event.length === 0) {
+        throw new UsageError("webhook create requires at least one --event.");
+      }
+      const created = await deps.client.createWebhook({
+        url: options.url,
+        events: options.event as ChangeAction[],
+      });
+      if (globals(command).json) {
+        deps.out(JSON.stringify(created, null, 2));
+        return;
+      }
+      deps.out(
+        [
+          `webhook: ${created.id}`,
+          `events: ${created.events.join(", ")}`,
+          `url: ${created.url}`,
+          `secret: ${created.secret}`,
+          "",
+          "Store this secret now. It is shown once and cannot be retrieved again.",
+        ].join("\n"),
+      );
+    });
+
+  webhook
+    .command("delete <id>")
+    .description("Delete a webhook")
+    .action(async (id: string, _options: unknown, command: Command) => {
+      await deps.client.deleteWebhook(id);
+      emit(command, { id, deleted: true }, () => `deleted ${id}`);
     });
 
   for (const child of program.commands) addGlobals(child);

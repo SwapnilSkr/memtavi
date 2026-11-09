@@ -513,3 +513,65 @@ describe("graph, changes, score and profile", () => {
     expect(recorded[0]?.url).toBe("https://api.example.com/v1/brains/brn_1/export");
   });
 });
+
+describe("webhooks", () => {
+  const webhook = {
+    id: "whk_1",
+    subjectId: "sub_1",
+    url: "https://example.com/hooks",
+    events: ["created", "updated"],
+    active: true,
+  };
+  const createdWebhook = { ...webhook, secret: "whsec_abc" };
+
+  test("lists webhooks with limit and offset", async () => {
+    const { fetchImpl, recorded } = recordingFetch(
+      jsonResponse({ items: [webhook], total: 1, limit: 10, offset: 5 }),
+    );
+    const result = await createClient({ ...base, fetch: fetchImpl }).listWebhooks({
+      limit: 10,
+      offset: 5,
+    });
+
+    expect(result.items[0]?.id).toBe("whk_1");
+    expect(result.items[0]?.secret).toBeUndefined();
+    expect(recorded[0]?.url).toBe("https://api.example.com/v1/webhooks?limit=10&offset=5");
+    expect(recorded[0]?.init.method).toBe("GET");
+  });
+
+  test("creates a webhook and accepts the one-time secret", async () => {
+    const { fetchImpl, recorded } = recordingFetch(jsonResponse(createdWebhook, 201));
+    const result = await createClient({ ...base, fetch: fetchImpl }).createWebhook({
+      url: "https://example.com/hooks",
+      events: ["created", "updated"],
+    });
+
+    expect(result.secret).toBe("whsec_abc");
+    expect(recorded[0]?.url).toBe("https://api.example.com/v1/webhooks");
+    expect(recorded[0]?.init.method).toBe("POST");
+    expect(JSON.parse(String(recorded[0]?.init.body))).toEqual({
+      url: "https://example.com/hooks",
+      events: ["created", "updated"],
+    });
+  });
+
+  test("rejects a create response without a secret", async () => {
+    const { fetchImpl } = recordingFetch(jsonResponse(webhook, 201));
+    const error = await createClient({ ...base, fetch: fetchImpl })
+      .createWebhook({ url: "https://example.com/hooks", events: ["created"] })
+      .catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({ status: 0 });
+    expect((error as Error).message).toMatch(/unexpected response shape/);
+  });
+
+  test("deletes a webhook by id with no body", async () => {
+    const { fetchImpl, recorded } = recordingFetch(new Response(null, { status: 204 }));
+    const result = await createClient({ ...base, fetch: fetchImpl }).deleteWebhook("whk_1");
+
+    expect(result).toBeUndefined();
+    expect(recorded[0]?.url).toBe("https://api.example.com/v1/webhooks/whk_1");
+    expect(recorded[0]?.init.method).toBe("DELETE");
+    expect(recorded[0]?.init.body).toBeUndefined();
+  });
+});

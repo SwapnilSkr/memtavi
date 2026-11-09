@@ -12,6 +12,7 @@ import { pageRoutes } from "./routes/pages";
 import { profileRoutes } from "./routes/profile";
 import { scoreRoutes } from "./routes/score";
 import { tenantRoutes } from "./routes/tenant";
+import { webhookRoutes } from "./routes/webhooks";
 
 export function createApp(config: AppConfig) {
   const securityDenials = { 401: 0, 403: 0, 404: 0 };
@@ -28,5 +29,6 @@ export function createApp(config: AppConfig) {
     .use(scoreRoutes(config))
     .use(profileRoutes(config))
     .use(apiKeyRoutes(config))
+    .use(webhookRoutes(config))
     .use(tenantRoutes(config));
 }

@@ -989,6 +989,7 @@ Lists webhooks registered for the subject in `x-subject-id`.
 | Status | Description | Schema |
 | --- | --- | --- |
 | 200 | Webhooks for the subject. | `object { items: Webhook[], total: integer, limit: integer, offset: integer }` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
 | 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
@@ -998,6 +999,8 @@ Lists webhooks registered for the subject in `x-subject-id`.
 `createWebhook` · Tags: Webhooks
 
 Create a webhook
+
+Registers a webhook for the subject in `x-subject-id` and returns its signing secret exactly once.
 
 **Security:** `x-api-key` + `x-subject-id`
 
@@ -1009,7 +1012,7 @@ Create a webhook
 
 | Status | Description | Schema |
 | --- | --- | --- |
-| 201 | The webhook was created. | `Webhook` |
+| 201 | The webhook was created. The response carries the plaintext `secret` once; it is never returned again. | `Webhook` |
 | 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 409 | Conflict with the current state, such as a page version conflict or a duplicate slug. | `ErrorEnvelope` |
@@ -1036,6 +1039,7 @@ Delete a webhook
 | Status | Description | Schema |
 | --- | --- | --- |
 | 204 | The webhook was deleted. | — |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
@@ -1522,6 +1526,7 @@ Required: `id`, `subjectId`, `url`, `events`, `active`
 | `url` | `string (uri)` | yes |  |
 | `events` | `string[]` | yes |  |
 | `active` | `boolean` | yes |  |
+| `secret` | `string` | no | The plaintext signing secret. Returned only by the create response and never shown again; list and delete responses omit it. |
 
 ### WebhookCreate
 
@@ -1529,5 +1534,5 @@ Required: `url`, `events`
 
 | Property | Type | Required | Notes |
 | --- | --- | --- | --- |
-| `url` | `string (uri)` | yes |  |
-| `events` | `string[]` | yes | At least 1 item. |
+| `url` | `string (uri)` | yes | An `http` or `https` URL with no embedded credentials, at most 2,048 characters. Maximum length 2048. |
+| `events` | `string[]` | yes | One to twenty distinct change actions. At least 1 item. |

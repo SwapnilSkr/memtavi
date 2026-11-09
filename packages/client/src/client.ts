@@ -266,6 +266,24 @@ export interface BrainExport {
   connections: Connection[];
 }
 
+export interface Webhook {
+  id: string;
+  subjectId: string;
+  url: string;
+  events: ChangeAction[];
+  active: boolean;
+  secret?: string | undefined;
+}
+
+export interface WebhookCreate {
+  url: string;
+  events: ChangeAction[];
+}
+
+export interface CreatedWebhook extends Webhook {
+  secret: string;
+}
+
 export interface ApiClient {
   listBrains(query?: PageQuery): Promise<PageList<Brain>>;
   createBrain(body: BrainCreate): Promise<Brain>;
@@ -291,6 +309,9 @@ export interface ApiClient {
   getProfile(brainId: string): Promise<Profile>;
   updateProfile(brainId: string, body: ProfileUpdate): Promise<Profile>;
   exportBrain(brainId: string): Promise<BrainExport>;
+  listWebhooks(query?: PageQuery): Promise<PageList<Webhook>>;
+  createWebhook(body: WebhookCreate): Promise<CreatedWebhook>;
+  deleteWebhook(webhookId: string): Promise<void>;
 }
 
 export type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
@@ -524,6 +545,17 @@ const brainExportSchema = z.object({
   sources: z.array(sourceSchema),
   connections: z.array(connectionSchema),
 });
+
+const webhookSchema = z.object({
+  id: z.string(),
+  subjectId: z.string(),
+  url: z.string(),
+  events: z.array(changeActionSchema),
+  active: z.boolean(),
+  secret: z.string().optional(),
+});
+
+const createdWebhookSchema = webhookSchema.extend({ secret: z.string() });
 
 const errorEnvelopeSchema = z.object({
   statusCode: z.number().optional(),
@@ -847,6 +879,23 @@ export function createClient(options: ClientOptions): ApiClient {
     async exportBrain(brainId) {
       const payload = await request(`${brainPath(brainId)}/export`);
       return parseOrThrow(brainExportSchema, payload, "GET /v1/brains/{brainId}/export");
+    },
+
+    async listWebhooks(query) {
+      const payload = await request("/v1/webhooks", { query: pageQuery(query) });
+      return parseOrThrow(paginated(webhookSchema), payload, "GET /v1/webhooks");
+    },
+
+    async createWebhook(body) {
+      const payload = await request("/v1/webhooks", {
+        method: "POST",
+        body: { url: body.url, events: body.events },
+      });
+      return parseOrThrow(createdWebhookSchema, payload, "POST /v1/webhooks");
+    },
+
+    async deleteWebhook(webhookId) {
+      await request(`/v1/webhooks/${encodeURIComponent(webhookId)}`, { method: "DELETE" });
     },
   };
 }

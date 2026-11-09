@@ -9,4 +9,5 @@ export interface AppConfig {
   store: ObjectStore;
   now?: () => Date;
   embeddings?: EmbeddingProvider;
+  webhookSecretKey?: string;
 }

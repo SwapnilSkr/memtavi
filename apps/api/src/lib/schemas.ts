@@ -94,3 +94,8 @@ export const apiKeyCreate = t.Object({
   scopes: t.Optional(t.Array(t.String())),
   expiresAt: t.Optional(t.Union([t.String({ format: "date-time" }), t.Null()])),
 });
+
+export const webhookCreate = t.Object({
+  url: t.String({ minLength: 1, maxLength: 2048 }),
+  events: t.Array(t.String(), { minItems: 1, maxItems: 20 }),
+});

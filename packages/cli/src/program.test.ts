@@ -359,6 +359,93 @@ describe("brain resolution", () => {
   });
 });
 
+describe("webhooks", () => {
+  const hook = {
+    id: "whk_1",
+    subjectId: "sub_1",
+    url: "https://example.com/hooks",
+    events: ["created" as const, "updated" as const],
+    active: true,
+  };
+
+  test("lists webhooks for the subject without resolving a brain", async () => {
+    const client = createFakeClient({ webhooks: [hook] });
+    const h = harness(client);
+    const code = await runCli(["webhooks"], h.deps);
+
+    expect(code).toBe(0);
+    expect(h.out[0]).toContain("whk_1");
+    expect(h.out[0]).toContain("created,updated");
+    expect(client.calls.map((entry) => entry.method)).toEqual(["listWebhooks"]);
+  });
+
+  test("creates a webhook with repeatable events and prints the secret once", async () => {
+    const client = createFakeClient({
+      createdWebhook: { ...hook, secret: "whsec_once" },
+    });
+    const h = harness(client);
+    const code = await runCli(
+      [
+        "webhook",
+        "create",
+        "--url",
+        "https://example.com/hooks",
+        "--event",
+        "created",
+        "--event",
+        "updated",
+      ],
+      h.deps,
+    );
+
+    expect(code).toBe(0);
+    expect(call(client, "createWebhook")).toEqual({
+      method: "createWebhook",
+      args: [{ url: "https://example.com/hooks", events: ["created", "updated"] }],
+    });
+    expect(h.out[0]).toContain("secret: whsec_once");
+    expect(h.out[0]).toContain("shown once");
+    expect(h.out[0]).toContain("cannot be retrieved again");
+  });
+
+  test("includes the secret in --json output", async () => {
+    const client = createFakeClient({
+      createdWebhook: { ...hook, secret: "whsec_once" },
+    });
+    const h = harness(client);
+    const code = await runCli(
+      ["--json", "webhook", "create", "--url", "https://example.com/hooks", "--event", "created"],
+      h.deps,
+    );
+
+    expect(code).toBe(0);
+    expect(jsonOut(h)).toMatchObject({ id: "whk_1", secret: "whsec_once" });
+  });
+
+  test("requires at least one event", async () => {
+    const client = createFakeClient();
+    const h = harness(client);
+    const code = await runCli(["webhook", "create", "--url", "https://example.com/hooks"], h.deps);
+
+    expect(code).toBe(2);
+    expect(h.err.join("\n")).toContain("--event");
+    expect(client.calls).toEqual([]);
+  });
+
+  test("deletes a webhook by id", async () => {
+    const client = createFakeClient();
+    const h = harness(client);
+    const code = await runCli(["webhook", "delete", "whk_1"], h.deps);
+
+    expect(code).toBe(0);
+    expect(call(client, "deleteWebhook")).toEqual({
+      method: "deleteWebhook",
+      args: ["whk_1"],
+    });
+    expect(h.out[0]).toBe("deleted whk_1");
+  });
+});
+
 describe("exit codes", () => {
   test("returns 1 and the API message for an API failure", async () => {
     const client = createFakeClient({
