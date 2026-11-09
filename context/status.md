@@ -26,7 +26,7 @@ Last updated 2026-11-06.
 
 ## Now
 
-- **10k benchmark shipped**: FTS p95 5–9 ms, exact-vector p95 43–46 ms, measured as `memtavi_app` with RLS. Finding: RLS blocks the FTS GIN index (`ts_match_vq` is not leakproof), so FTS seq-scans at 10k; it will dominate at 100k+ until a leakproof path exists. 522 unit tests.
-- **Next**: backup/restore rehearsal, then the contract diff and endpoint isolation matrix.
+- **Backup/restore rehearsal passes**: custom dump, restore into a scratch DB, 0 mismatches across 30 tables, 9 migrations, 27 RLS tables/policies and 106 grants; tenant isolation passes as `memtavi_app`. RTO 0.38 s on the schema-only 108 KiB test DB; a production-sized rerun is still pending.
+- **Next**: contract diff (`tests/contract` is empty), then the endpoint isolation matrix and provider-failure drills.
 
 Full list: [backlog](./backlog.md).

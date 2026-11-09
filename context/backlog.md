@@ -15,7 +15,7 @@ Ordered by product value per unit of risk. Remove items as they land.
 - **Rate limiting**: per-key limits with `429` and `Retry-After`; the plan's defaults are 300/min API and 120/min MCP.
 - **Structured logging + OTel**: request and job ids, tenant, route, duration; never bodies, prompts or keys.
 - **10k benchmark**: seed 10k pages, measure FTS and vector p50/p95, wire `bench:search`.
-- **Backup/restore rehearsal**: dump and restore the test database, record the actual commands and timing.
+- ~~Backup/restore rehearsal~~ (schema-only pass, 0.38 s RTO); still run it against the 10k-page shape for a real production RTO.
 - **Contract diff**: `tests/contract` is empty; add `spec:compat` against a frozen spec copy.
 - **Isolation endpoint matrix**: every route with a foreign brain/page/source/change/connection id and a foreign subject.
 - **Provider failure drills**: rate limit, timeout, malformed output; assert retries and no partial pages.
