@@ -17,6 +17,8 @@
     "start:worker": "bun run --cwd apps/worker start",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "spec:lint": "bun packages/spec/lint.mjs",
+    "spec:docs": "bun packages/spec/docs.mjs",
+    "spec:docs:check": "bun packages/spec/docs.mjs --check",
     "lint": "biome check .",
     "format": "biome format --write .",
     "test:unit": "bun test packages tests/eval",
