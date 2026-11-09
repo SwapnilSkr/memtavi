@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { ApiError } from "./client";
 import { createFakeClient } from "./fake-client";
-import { createTools, type ToolResult } from "./tools";
+import { composeNote, createTools, originRefFor, type ToolResult } from "./tools";
 
 function textOf(result: ToolResult): string {
   const first = result.content[0];
@@ -295,4 +295,169 @@ describe("error hygiene", () => {
     const result = await createTools(client, { brainId: "brn_1" }).index({});
     expect(textOf(result)).toBe("network error: Could not reach the Memtavi API.");
   });
+});
+
+const sourceId = `src_${"a".repeat(32)}`;
+const pendingSource = {
+  id: sourceId,
+  brainId: "brn_1",
+  status: "pending",
+  attempts: 0,
+  lastError: null,
+  affectedPageIds: [],
+};
+
+describe("remember", () => {
+  test("composes the note with claim, evidence and scope sections", () => {
+    expect(composeNote("Vector search works", "The eval passed", "search")).toBe(
+      "## Claim\n\nVector search works\n\n## Evidence\n\nThe eval passed\n\n## Scope\n\nsearch",
+    );
+  });
+
+  test("writes unspecified when the scope is absent", () => {
+    expect(composeNote("C", "E", undefined)).toContain("## Scope\n\nunspecified");
+  });
+
+  test("derives a stable originRef from claim, evidence and scope", () => {
+    const first = originRefFor("C", "E", "S");
+    expect(first).toMatch(/^mcp:[0-9a-f]{64}$/);
+    expect(originRefFor("C", "E", "S")).toBe(first);
+    expect(originRefFor("C", "E", undefined)).not.toBe(first);
+    expect(originRefFor("C", "E", "T")).not.toBe(first);
+    expect(originRefFor("C", "F", "S")).not.toBe(first);
+  });
+
+  test("sends kind note, the composed markdown, the scope label and the originRef", async () => {
+    const client = createFakeClient({ capture: pendingSource });
+    const result = await createTools(client, { brainId: "brn_1" }).remember({
+      claim: "Vector search works",
+      evidence: "The eval passed",
+      scope: "search",
+    });
+
+    expect(client.calls[0]).toEqual({
+      method: "createCapture",
+      args: [
+        "brn_1",
+        {
+          kind: "note",
+          content: composeNote("Vector search works", "The eval passed", "search"),
+          label: "search",
+          originRef: originRefFor("Vector search works", "The eval passed", "search"),
+        },
+      ],
+    });
+    expect(parse(result)).toMatchObject({
+      sourceId,
+      brainId: "brn_1",
+      status: "pending",
+    });
+  });
+
+  test("omits the label and says compilation is asynchronous", async () => {
+    const client = createFakeClient({ capture: pendingSource });
+    const result = await createTools(client, { brainId: "brn_1" }).remember({
+      claim: "C",
+      evidence: "E",
+    });
+    const body = client.calls[0]?.args[1] as Record<string, unknown>;
+    const rendered = parse(result) as { note: string };
+
+    expect("label" in body).toBe(false);
+    expect(body.originRef).toBe(originRefFor("C", "E", undefined));
+    expect(rendered.note).toMatch(/asynchronous/);
+    expect(rendered.note).toContain("source_status");
+  });
+
+  test("reuses the same originRef on a retried call", async () => {
+    const client = createFakeClient({ capture: pendingSource });
+    const tools = createTools(client, { brainId: "brn_1" });
+
+    await tools.remember({ claim: "C", evidence: "E", scope: "S" });
+    await tools.remember({ claim: "C", evidence: "E", scope: "S" });
+
+    const first = client.calls[0]?.args[1] as { originRef: string };
+    const second = client.calls[1]?.args[1] as { originRef: string };
+    expect(second.originRef).toBe(first.originRef);
+  });
+
+  const invalid: [string, { claim: string; evidence: string; scope?: string }, RegExp][] = [
+    ["an empty claim", { claim: "   ", evidence: "E" }, /claim must not be empty/],
+    ["an empty evidence", { claim: "C", evidence: "" }, /evidence must not be empty/],
+    ["an oversize claim", { claim: "x".repeat(5001), evidence: "E" }, /claim must be at most/],
+    [
+      "an oversize evidence",
+      { claim: "C", evidence: "x".repeat(5001) },
+      /evidence must be at most/,
+    ],
+    ["an oversize scope", { claim: "C", evidence: "E", scope: "x".repeat(201) }, /scope must be/],
+  ];
+
+  for (const [name, args, pattern] of invalid) {
+    test(`rejects ${name} before any request`, async () => {
+      const client = createFakeClient({ capture: pendingSource });
+      const result = await createTools(client, { brainId: "brn_1" }).remember(args);
+
+      expect(result.isError).toBe(true);
+      expect(textOf(result)).toMatch(pattern);
+      expect(client.calls).toEqual([]);
+    });
+  }
+
+  test("maps a capture failure to isError", async () => {
+    const client = createFakeClient({
+      failures: { createCapture: new ApiError(429, "Rate limit exceeded") },
+    });
+    const result = await createTools(client, { brainId: "brn_1" }).remember({
+      claim: "C",
+      evidence: "E",
+    });
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toBe("HTTP 429: Rate limit exceeded");
+  });
+});
+
+describe("source_status", () => {
+  const completedSource = {
+    id: sourceId,
+    brainId: "brn_1",
+    status: "completed",
+    attempts: 2,
+    lastError: null,
+    affectedPageIds: ["pg_1", "pg_2"],
+  };
+
+  test("returns status, attempts, lastError and affectedPageIds", async () => {
+    const client = createFakeClient({ sources: { [sourceId]: completedSource } });
+    const result = await createTools(client, { brainId: "brn_1" }).sourceStatus({ sourceId });
+
+    expect(client.calls[0]).toEqual({ method: "getSource", args: ["brn_1", sourceId] });
+    expect(parse(result)).toEqual({
+      sourceId,
+      status: "completed",
+      attempts: 2,
+      lastError: null,
+      affectedPageIds: ["pg_1", "pg_2"],
+    });
+  });
+
+  test("maps a missing source to a 404 isError", async () => {
+    const client = createFakeClient({ sources: {} });
+    const result = await createTools(client, { brainId: "brn_1" }).sourceStatus({ sourceId });
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toBe("HTTP 404: Not found");
+  });
+
+  for (const malformed of ["pg_1", "src_short", `src_${"Z".repeat(32)}`, ""]) {
+    test(`rejects the malformed id "${malformed}" before any request`, async () => {
+      const client = createFakeClient({});
+      const result = await createTools(client, { brainId: "brn_1" }).sourceStatus({
+        sourceId: malformed,
+      });
+
+      expect(result.isError).toBe(true);
+      expect(textOf(result)).toMatch(/src_ followed by 32 lowercase hex characters/);
+      expect(client.calls).toEqual([]);
+    });
+  }
 });

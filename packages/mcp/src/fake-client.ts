@@ -1,7 +1,9 @@
 import type {
   ApiClient,
   BrainSummary,
+  CaptureRequest,
   IndexEntry,
+  IngestSource,
   Page,
   PageList,
   SearchHit,
@@ -14,6 +16,8 @@ export interface FakeClientOptions {
   index?: IndexEntry[];
   hits?: SearchHit[];
   pages?: Record<string, Page>;
+  capture?: IngestSource;
+  sources?: Record<string, IngestSource>;
   failures?: Partial<Record<keyof ApiClient, unknown>>;
 }
 
@@ -71,6 +75,23 @@ export function createFakeClient(options: FakeClientOptions = {}): FakeClient {
         throw new ApiError(404, "Not found", { code: "NotFoundError" });
       }
       return page;
+    },
+    async createCapture(brainId: string, body: CaptureRequest) {
+      record("createCapture", [brainId, body]);
+      fail("createCapture");
+      if (options.capture === undefined) {
+        throw new ApiError(500, "No fake capture configured");
+      }
+      return options.capture;
+    },
+    async getSource(brainId: string, sourceId: string) {
+      record("getSource", [brainId, sourceId]);
+      fail("getSource");
+      const source = options.sources?.[sourceId];
+      if (source === undefined) {
+        throw new ApiError(404, "Not found", { code: "NotFoundError" });
+      }
+      return source;
     },
   };
 }

@@ -36,6 +36,18 @@ const LIST_DESCRIPTION = [
   "Use it to discover the brainId other tools accept when more than one brain is available.",
 ].join(" ");
 
+const REMEMBER_DESCRIPTION = [
+  "Store one intent-level note in a brain: a claim, the evidence behind it, and an optional scope.",
+  "Use it only when the user asks you to remember something or a durable decision is made.",
+  "Never pass a transcript, a chat log, a whole document or secrets; compress them to one claim and its evidence.",
+  "Compilation is asynchronous, so poll `source_status` with the returned sourceId until it completes.",
+].join(" ");
+
+const SOURCE_STATUS_DESCRIPTION = [
+  "Read an ingest source by id: status, attempts, lastError and affectedPageIds.",
+  "Use it after `remember` because compilation is asynchronous; pending and compiling mean the pages are not ready yet.",
+].join(" ");
+
 export function createServer(tools: Tools): McpServer {
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION });
 
@@ -101,6 +113,53 @@ export function createServer(tools: Tools): McpServer {
       annotations: { readOnlyHint: true },
     },
     (args) => tools.read(args),
+  );
+
+  server.registerTool(
+    "remember",
+    {
+      description: REMEMBER_DESCRIPTION,
+      inputSchema: {
+        claim: z
+          .string()
+          .min(1)
+          .max(5000)
+          .describe("The single statement to remember, 1-5000 characters. Required."),
+        evidence: z
+          .string()
+          .min(1)
+          .max(5000)
+          .describe(
+            "Why the claim is true: sources, observations or reasoning, 1-5000 characters. Required.",
+          ),
+        scope: z
+          .string()
+          .max(200)
+          .optional()
+          .describe("Where the claim applies, at most 200 characters. Omit when it is general."),
+        brainId: brainIdArg,
+      },
+      annotations: { readOnlyHint: false, idempotentHint: true },
+    },
+    (args) => tools.remember(args),
+  );
+
+  server.registerTool(
+    "source_status",
+    {
+      description: SOURCE_STATUS_DESCRIPTION,
+      inputSchema: {
+        sourceId: z
+          .string()
+          .min(1)
+          .describe(
+            "The ingest source id, src_ followed by 32 lowercase hex characters. Required.",
+          ),
+        brainId: brainIdArg,
+      },
+      annotations: { readOnlyHint: true },
+    },
+    (args) => tools.sourceStatus(args),
   );
 
   return server;

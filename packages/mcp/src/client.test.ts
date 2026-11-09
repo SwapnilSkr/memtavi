@@ -169,4 +169,75 @@ describe("createClient", () => {
     expect(error).toMatchObject({ status: 0 });
     expect((error as Error).message).not.toContain("mtv_live_secret");
   });
+
+  test("posts a capture as JSON and accepts the created source", async () => {
+    const source = {
+      id: "src_1",
+      brainId: "brn_1",
+      status: "pending",
+      attempts: 0,
+      lastError: null,
+      affectedPageIds: [],
+    };
+    const { fetchImpl, recorded } = recordingFetch(jsonResponse(source, 201));
+    const result = await createClient({ ...base, fetch: fetchImpl }).createCapture("brn_1", {
+      kind: "note",
+      content: "## Claim\n\nC",
+      label: "search",
+      originRef: "mcp:abc",
+    });
+
+    expect(result.id).toBe("src_1");
+    expect(result.status).toBe("pending");
+    expect(recorded[0]?.url).toBe("https://api.example.com/v1/brains/brn_1/captures");
+    const init = recorded[0]?.init;
+    expect(init?.method).toBe("POST");
+    const headers = init?.headers as Record<string, string>;
+    expect(headers["content-type"]).toBe("application/json");
+    expect(headers["x-api-key"]).toBe("mtv_live_secret");
+    expect(JSON.parse(String(init?.body))).toEqual({
+      kind: "note",
+      content: "## Claim\n\nC",
+      label: "search",
+      originRef: "mcp:abc",
+    });
+  });
+
+  test("omits absent optional capture fields from the body", async () => {
+    const source = {
+      id: "src_1",
+      brainId: "brn_1",
+      status: "pending",
+      attempts: 0,
+      lastError: null,
+      affectedPageIds: [],
+    };
+    const { fetchImpl, recorded } = recordingFetch(jsonResponse(source, 201));
+    await createClient({ ...base, fetch: fetchImpl }).createCapture("brn_1", {
+      kind: "note",
+      content: "note",
+    });
+
+    expect(JSON.parse(String(recorded[0]?.init.body))).toEqual({
+      kind: "note",
+      content: "note",
+    });
+  });
+
+  test("reads one source by id", async () => {
+    const source = {
+      id: "src_1",
+      brainId: "brn_1",
+      status: "failed",
+      attempts: 3,
+      lastError: "prompt too long",
+      affectedPageIds: [],
+    };
+    const { fetchImpl, recorded } = recordingFetch(jsonResponse(source));
+    const result = await createClient({ ...base, fetch: fetchImpl }).getSource("brn_1", "src_1");
+
+    expect(result).toMatchObject({ status: "failed", attempts: 3, lastError: "prompt too long" });
+    expect(recorded[0]?.url).toBe("https://api.example.com/v1/brains/brn_1/sources/src_1");
+    expect(recorded[0]?.init.method).toBe("GET");
+  });
 });

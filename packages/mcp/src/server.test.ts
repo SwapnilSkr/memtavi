@@ -30,7 +30,7 @@ async function connected(client = createFakeClient({ index: [], pages: {} })) {
 }
 
 describe("server", () => {
-  test("registers exactly the four read-only tools", async () => {
+  test("registers exactly the six tools with the right annotations", async () => {
     const { mcp, close } = await connected();
     try {
       const result = await mcp.listTools();
@@ -39,8 +39,17 @@ describe("server", () => {
         "index",
         "search",
         "read",
+        "remember",
+        "source_status",
       ]);
-      expect(result.tools.every((tool) => tool.annotations?.readOnlyHint === true)).toBe(true);
+      const byName = new Map(result.tools.map((tool) => [tool.name, tool]));
+      for (const name of ["list_brains", "index", "search", "read", "source_status"]) {
+        expect(byName.get(name)?.annotations?.readOnlyHint).toBe(true);
+      }
+      expect(byName.get("remember")?.annotations).toMatchObject({
+        readOnlyHint: false,
+        idempotentHint: true,
+      });
     } finally {
       await close();
     }
@@ -54,6 +63,10 @@ describe("server", () => {
       expect(byName.get("index")).toMatch(/orient/i);
       expect(byName.get("search")).toMatch(/before starting a task/i);
       expect(byName.get("read")).toMatch(/only the pages/i);
+      expect(byName.get("remember")).toMatch(/only when the user asks/i);
+      expect(byName.get("remember")).toMatch(/transcript/i);
+      expect(byName.get("remember")).toMatch(/secrets/i);
+      expect(byName.get("source_status")).toMatch(/asynchronous/i);
     } finally {
       await close();
     }
@@ -66,6 +79,30 @@ describe("server", () => {
       const body = JSON.parse(textOf(result.content)) as { brains: { id: string }[] };
       expect(body.brains[0]?.id).toBe("brn_1");
       expect(result.isError).toBeUndefined();
+    } finally {
+      await close();
+    }
+  });
+
+  test("calls remember over the transport and returns the async note", async () => {
+    const source = {
+      id: `src_${"a".repeat(32)}`,
+      brainId: "brn_1",
+      status: "pending",
+      attempts: 0,
+      lastError: null,
+      affectedPageIds: [],
+    };
+    const { mcp, close } = await connected(createFakeClient({ capture: source }));
+    try {
+      const result = await mcp.callTool({
+        name: "remember",
+        arguments: { claim: "C", evidence: "E", scope: "S" },
+      });
+      const body = JSON.parse(textOf(result.content)) as { sourceId: string; note: string };
+      expect(result.isError).toBeUndefined();
+      expect(body.sourceId).toBe(source.id);
+      expect(body.note).toContain("source_status");
     } finally {
       await close();
     }

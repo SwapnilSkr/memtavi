@@ -1,9 +1,11 @@
 # @memtavi/mcp
 
-A read-only [MCP](https://modelcontextprotocol.io) server that lets an agent read a Memtavi brain
-over stdio. It speaks only to the HTTP API, so tenancy and row-level security stay in one place.
+An [MCP](https://modelcontextprotocol.io) server that lets an agent read a Memtavi brain and record
+one intent-level note, over stdio. It speaks only to the HTTP API, so tenancy and row-level security
+stay in one place.
 
-Writes are not available yet. This slice exposes reads only.
+The write surface is deliberately narrow: `remember` captures a claim plus its evidence. There is no
+tool for transcripts, page edits or arbitrary content.
 
 ## Install
 
@@ -53,9 +55,35 @@ The server exits non-zero with a message on stderr when `MEMTAVI_API_KEY` or
 | `index` | `brainId?`, `limit?` (1–200, default 40) | Compact entries: `slug`, `title`, `summary`, `pageType`, `pinned` |
 | `search` | `q` (required), `brainId?`, `limit?` (1–50, default 10), `minSimilarity?` (0–1) | Ranked hits: `slug`, `title`, `summary`, `similarity` |
 | `read` | `slug` (required), `brainId?` | `title`, `summary`, `version`, `status`, and the markdown `body` |
+| `remember` | `claim` (1–5000), `evidence` (1–5000), `scope?` (≤200), `brainId?` | `sourceId`, `brainId`, `status`, plus a note that compilation is asynchronous |
+| `source_status` | `sourceId` (required, `src_...`), `brainId?` | `status`, `attempts`, `lastError`, `affectedPageIds` |
 
-Suggested use: orient with `index`, search before starting a task, then read only the pages the
-task needs.
+Suggested use: orient with `index`, search before starting a task, read only the pages the task
+needs, and remember only durable outcomes.
+
+### Remembering: when to use it, when not to
+
+`remember` is the only write tool. Use it only when the user asks you to remember something or a
+durable decision is made. Compress what happened into one claim and the evidence behind it; an
+optional scope (a page, feature, repo or environment) says where the claim applies.
+
+Do not use it for:
+
+- transcripts, chat logs or whole documents — summarise them to one claim and its evidence
+- secrets, credentials, tokens or personal data
+- page edits or corrections — there is no page write path yet
+
+The tool rejects empty or oversized fields before it calls the API. It builds the note with
+`## Claim`, `## Evidence` and `## Scope` (or `unspecified`), sets `kind: "note"`, and labels the
+capture with the scope when one is given.
+
+### Compilation is asynchronous
+
+`remember` only queues a capture; it does not wait for pages. The response carries a `sourceId` and a
+`status` that is usually `pending`. Poll `source_status` with that id until `status` is `completed`
+or `failed`; `attempts`, `lastError` and `affectedPageIds` describe the outcome. A retried
+`remember` with the same claim, evidence and scope sends the same `originRef`, so the API returns
+the existing source instead of queuing duplicate work.
 
 ### Brain resolution
 

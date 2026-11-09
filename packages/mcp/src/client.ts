@@ -49,11 +49,29 @@ export interface SearchQuery {
   minSimilarity?: number | undefined;
 }
 
+export interface IngestSource {
+  id: string;
+  brainId: string;
+  status: string;
+  attempts: number;
+  lastError: string | null;
+  affectedPageIds: string[];
+}
+
+export interface CaptureRequest {
+  kind: "note";
+  content: string;
+  label?: string | undefined;
+  originRef?: string | undefined;
+}
+
 export interface ApiClient {
   listBrains(): Promise<PageList<BrainSummary>>;
   getIndex(brainId: string, limit?: number | undefined): Promise<PageList<IndexEntry>>;
   search(brainId: string, query: SearchQuery): Promise<PageList<SearchHit>>;
   getPage(brainId: string, slug: string): Promise<Page>;
+  createCapture(brainId: string, body: CaptureRequest): Promise<IngestSource>;
+  getSource(brainId: string, sourceId: string): Promise<IngestSource>;
 }
 
 export type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
@@ -123,6 +141,15 @@ const pageSchema = z.object({
   pageType: z.string(),
   status: z.string(),
   version: z.number(),
+});
+
+const sourceSchema = z.object({
+  id: z.string(),
+  brainId: z.string(),
+  status: z.string(),
+  attempts: z.number(),
+  lastError: z.string().nullable(),
+  affectedPageIds: z.array(z.string()),
 });
 
 const errorEnvelopeSchema = z.object({
@@ -203,18 +230,24 @@ export function createClient(options: ClientOptions): ApiClient {
 
   async function request(
     path: string,
-    query?: Record<string, string | undefined>,
+    requestOptions: {
+      query?: Record<string, string | undefined> | undefined;
+      body?: unknown;
+    } = {},
   ): Promise<unknown> {
-    const url = joinUrl(base, path, query);
+    const url = joinUrl(base, path, requestOptions.query);
+    const hasBody = requestOptions.body !== undefined;
     let response: Response;
     try {
       response = await fetchImpl(url, {
-        method: "GET",
+        method: hasBody ? "POST" : "GET",
         headers: {
           accept: "application/json",
+          ...(hasBody ? { "content-type": "application/json" } : {}),
           "x-api-key": options.apiKey,
           "x-subject-id": options.subjectId,
         },
+        ...(hasBody ? { body: JSON.stringify(requestOptions.body) } : {}),
       });
     } catch {
       throw new ApiError(0, "Could not reach the Memtavi API. Check MEMTAVI_API_URL.");
@@ -242,20 +275,21 @@ export function createClient(options: ClientOptions): ApiClient {
     },
 
     async getIndex(brainId, limit) {
-      const payload = await request(
-        `/v1/brains/${encodeURIComponent(brainId)}/index`,
-        limit === undefined ? undefined : { limit: String(limit) },
-      );
+      const payload = await request(`/v1/brains/${encodeURIComponent(brainId)}/index`, {
+        query: limit === undefined ? undefined : { limit: String(limit) },
+      });
       return parseOrThrow(paginated(indexEntrySchema), payload, "GET /v1/brains/{brainId}/index");
     },
 
     async search(brainId, query) {
       const payload = await request(`/v1/brains/${encodeURIComponent(brainId)}/search`, {
-        q: query.q,
-        ...(query.limit === undefined ? {} : { limit: String(query.limit) }),
-        ...(query.minSimilarity === undefined
-          ? {}
-          : { minSimilarity: String(query.minSimilarity) }),
+        query: {
+          q: query.q,
+          ...(query.limit === undefined ? {} : { limit: String(query.limit) }),
+          ...(query.minSimilarity === undefined
+            ? {}
+            : { minSimilarity: String(query.minSimilarity) }),
+        },
       });
       return parseOrThrow(paginated(searchHitSchema), payload, "GET /v1/brains/{brainId}/search");
     },
@@ -265,6 +299,25 @@ export function createClient(options: ClientOptions): ApiClient {
         `/v1/brains/${encodeURIComponent(brainId)}/pages/${encodeURIComponent(slug)}`,
       );
       return parseOrThrow(pageSchema, payload, "GET /v1/brains/{brainId}/pages/{slug}");
+    },
+
+    async createCapture(brainId, body) {
+      const payload = await request(`/v1/brains/${encodeURIComponent(brainId)}/captures`, {
+        body: {
+          kind: body.kind,
+          content: body.content,
+          ...(body.label === undefined ? {} : { label: body.label }),
+          ...(body.originRef === undefined ? {} : { originRef: body.originRef }),
+        },
+      });
+      return parseOrThrow(sourceSchema, payload, "POST /v1/brains/{brainId}/captures");
+    },
+
+    async getSource(brainId, sourceId) {
+      const payload = await request(
+        `/v1/brains/${encodeURIComponent(brainId)}/sources/${encodeURIComponent(sourceId)}`,
+      );
+      return parseOrThrow(sourceSchema, payload, "GET /v1/brains/{brainId}/sources/{sourceId}");
     },
   };
 }
