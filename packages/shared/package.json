@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./ids": "./src/ids.ts",
+    "./logging": "./src/logging.ts",
     "./webhooks": "./src/webhooks.ts"
   }
 }

@@ -1,12 +1,12 @@
 import { Elysia } from "elysia";
-import type { AppConfig } from "../lib/config";
+import type { RouteConfig } from "../lib/config";
 import { getScore } from "../lib/score";
 import { auth } from "../middleware/auth";
 import { scope, subjectId } from "../middleware/scope";
 
-export function scoreRoutes(config: AppConfig) {
+export function scoreRoutes(config: RouteConfig) {
   return new Elysia()
-    .use(auth(config.ownerPool))
+    .use(auth(config))
     .get("/v1/brains/:brainId/score", ({ auth, request, params }) => {
       const subject = subjectId(request);
       return scope(config, auth, subject, (client) =>

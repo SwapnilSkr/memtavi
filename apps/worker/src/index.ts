@@ -1,6 +1,7 @@
 import { DEFAULT_CHAT_PRICES } from "@memtavi/llm/cost";
 import { createOpenAIImbeddings } from "@memtavi/llm/openai-embeddings";
 import { createOpenRouterChat } from "@memtavi/llm/openrouter";
+import { createLogger } from "@memtavi/shared/logging";
 import { createWorker } from "./worker";
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -48,6 +49,7 @@ const { pool, withTenant } = await import("@memtavi/db/client");
 const store = await buildStoreFromEnv(process.env);
 
 const webhookSecretKey = process.env.WEBHOOK_SECRET_KEY?.trim();
+const logger = createLogger();
 
 const worker = createWorker({
   withTenant,
@@ -79,7 +81,7 @@ const worker = createWorker({
     },
   },
   log: (event) => {
-    process.stdout.write(`${JSON.stringify(event)}\n`);
+    logger.info(event, typeof event.event === "string" ? event.event : "worker");
   },
 });
 

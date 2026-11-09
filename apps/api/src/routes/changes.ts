@@ -1,13 +1,13 @@
 import { Elysia } from "elysia";
 import { ackChange, listChanges } from "../lib/changes";
-import type { AppConfig } from "../lib/config";
+import type { RouteConfig } from "../lib/config";
 import { changeAck, pagination } from "../lib/schemas";
 import { auth } from "../middleware/auth";
 import { scope, subjectId } from "../middleware/scope";
 
-export function changeRoutes(config: AppConfig) {
+export function changeRoutes(config: RouteConfig) {
   return new Elysia()
-    .use(auth(config.ownerPool))
+    .use(auth(config))
     .get(
       "/v1/brains/:brainId/changes",
       ({ auth, request, params, query }) => {

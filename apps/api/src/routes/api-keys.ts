@@ -1,14 +1,14 @@
 import { Elysia } from "elysia";
 import { createApiKey, listApiKeys, revokeApiKey } from "../lib/api-keys";
-import type { AppConfig } from "../lib/config";
+import type { RouteConfig } from "../lib/config";
 import { requireRole } from "../lib/roles";
 import { apiKeyCreate, pagination } from "../lib/schemas";
 import { auth } from "../middleware/auth";
 import { scope, subjectId } from "../middleware/scope";
 
-export function apiKeyRoutes(config: AppConfig) {
+export function apiKeyRoutes(config: RouteConfig) {
   return new Elysia()
-    .use(auth(config.ownerPool))
+    .use(auth(config))
     .get(
       "/v1/api-keys",
       ({ auth, request, query }) => {

@@ -10,6 +10,12 @@ export class DomainError extends Error {
   }
 }
 
+export class RateLimitError extends DomainError {
+  constructor(readonly retryAfterSeconds: number) {
+    super("RateLimitError", 429, "Rate limit exceeded");
+  }
+}
+
 export function errors(now: () => Date, denials: Record<401 | 403 | 404, number>) {
   return new Elysia({ name: "errors" }).onError(
     { as: "global" },
@@ -23,6 +29,9 @@ export function errors(now: () => Date, denials: Record<401 | 403 | 404, number>
               ? new DomainError("BadRequestError", 400, "Invalid request")
               : new DomainError("InternalServerError", 500, "Internal server error");
       set.status = failure.status;
+      if (failure instanceof RateLimitError) {
+        set.headers["Retry-After"] = String(failure.retryAfterSeconds);
+      }
       if (failure.status === 401 || failure.status === 403 || failure.status === 404) {
         denials[failure.status] += 1;
       }

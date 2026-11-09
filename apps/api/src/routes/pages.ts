@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import type { AppConfig } from "../lib/config";
+import type { RouteConfig } from "../lib/config";
 import {
   deletePagePermanently,
   getIndex,
@@ -12,9 +12,9 @@ import { searchPages } from "../lib/search";
 import { auth } from "../middleware/auth";
 import { scope, subjectId } from "../middleware/scope";
 
-export function pageRoutes(config: AppConfig) {
+export function pageRoutes(config: RouteConfig) {
   return new Elysia()
-    .use(auth(config.ownerPool))
+    .use(auth(config))
     .get(
       "/v1/brains/:brainId/pages",
       ({ auth, request, params, query }) => {

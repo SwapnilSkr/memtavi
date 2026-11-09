@@ -1,13 +1,13 @@
 import { Elysia } from "elysia";
-import type { AppConfig } from "../lib/config";
+import type { RouteConfig } from "../lib/config";
 import { ackConnection, getGraph, listConnections } from "../lib/graph";
 import { connectionAck, pagination } from "../lib/schemas";
 import { auth } from "../middleware/auth";
 import { scope, subjectId } from "../middleware/scope";
 
-export function graphRoutes(config: AppConfig) {
+export function graphRoutes(config: RouteConfig) {
   return new Elysia()
-    .use(auth(config.ownerPool))
+    .use(auth(config))
     .get("/v1/brains/:brainId/graph", ({ auth, request, params }) => {
       const subject = subjectId(request);
       return scope(config, auth, subject, (client) =>

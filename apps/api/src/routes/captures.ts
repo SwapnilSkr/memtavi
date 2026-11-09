@@ -6,7 +6,7 @@ import {
   getSourceContent,
   listSources,
 } from "../lib/captures";
-import type { AppConfig } from "../lib/config";
+import type { RouteConfig } from "../lib/config";
 import { captureCreate, pagination } from "../lib/schemas";
 import { auth } from "../middleware/auth";
 import { DomainError } from "../middleware/errors";
@@ -21,9 +21,9 @@ function idempotencyKey(request: Request): string | null {
   return value;
 }
 
-export function captureRoutes(config: AppConfig) {
+export function captureRoutes(config: RouteConfig) {
   return new Elysia()
-    .use(auth(config.ownerPool))
+    .use(auth(config))
     .post(
       "/v1/brains/:brainId/captures",
       async ({ auth, request, params, body, set }) => {

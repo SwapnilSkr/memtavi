@@ -1,14 +1,14 @@
 import { Elysia } from "elysia";
 import { createBrain, getBrain, listBrains } from "../lib/brains";
-import type { AppConfig } from "../lib/config";
+import type { RouteConfig } from "../lib/config";
 import { requireRole } from "../lib/roles";
 import { brainCreate, pagination } from "../lib/schemas";
 import { auth } from "../middleware/auth";
 import { scope, subjectId } from "../middleware/scope";
 
-export function brainRoutes(config: AppConfig) {
+export function brainRoutes(config: RouteConfig) {
   return new Elysia()
-    .use(auth(config.ownerPool))
+    .use(auth(config))
     .get(
       "/v1/brains",
       ({ auth, request, query }) => {
