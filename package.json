@@ -22,6 +22,7 @@
     "lint": "biome check .",
     "format": "biome format --write .",
     "test:unit": "bun test packages tests/eval",
+    "bench:search": "bun tests/bench/search.ts",
     "eval:smoke": "bun tests/eval/src/smoke.ts",
     "test:integration": "bun test tests/integration --pass-with-no-tests",
     "test:isolation": "bun test tests/isolation --pass-with-no-tests",
