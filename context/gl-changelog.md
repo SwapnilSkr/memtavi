@@ -9,6 +9,7 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-06** — Fern login completed; generator config fixed and unavailable CLI/MCP groups removed. Generation is blocked by the generator runtime's npm `EACCES`, so no partial SDK artifacts were kept.
 - **2026-11-06** — Webhook delivery shipped: SSRF-safe POST, HMAC signatures, delivery records, retries and one delivery per matching webhook per change event. 175 integration, 517 unit.
 - **2026-11-06** — Webhook registration shipped: encrypted write-once secrets, validated events, client and CLI commands. 167 integration, 509 unit tests.
 - **2026-11-06** — Generated API reference: `docs/API.md` from the OpenAPI spec with a CI stale check.
