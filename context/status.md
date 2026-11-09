@@ -1,67 +1,32 @@
 ---
 id: status
 when: resuming work, deciding what to do next
-holds: The short list of work in flight, each pointing at its node
-links: agents-lanes, gl-changelog
+holds: What is complete, what is blocked, and the next slice
+links: backlog, gl-changelog
 ---
 
 # Status
 
-Last updated 2026-11-06. One line per open item; detail lives in the linked node.
+Last updated 2026-11-06.
 
-- **Orchestration scaffolded** (2026-11-06): `AGENTS.md`, 14 context nodes, `tools/` guard, four lanes plus the `fe` router. `agy` defaults to Gemini 3.8 Flash with quota-gated, account-checked Argon/Claude fallbacks; heavy FE diverts to grok once Codex's 5-hour usage passes 70%, read from Codex's own rollout snapshots. Node budgets enforced by `tools/context_map.py --check`.
-- **`p0-workspaces` approved** (2026-11-06): Bun workspace, strict tsconfig, Biome, `@memtavi/shared` prefix IDs, five suite scripts green. Database is Homebrew PostgreSQL 18 on 5434 with brew-managed pgvector 0.8.7 (native arm64), role `memtavi`, databases `memtavi_dev` and `memtavi_test`. The EDB server on 5432 is untouched. No Docker, no MinIO. Review: `.agents/reviews/p0-workspaces-r1.md`.
-- **`p0-db` approved** (2026-11-06): 28 application tables, 6 migrations, 26 RLS policies, 64 isolation tests green. Child tables carry `tenant_id`; `users`/`tenants` are closed to the runtime role; arrays, slug uniqueness, weighted FTS and subject scope are correct. Review: `.agents/reviews/p0-db-r2.md`.
-- **`p0-spec` approved** (2026-11-06): OpenAPI 3.1 with 23 paths, 32 operations, 40 schemas; fixed error envelope, offset pagination, idempotency, 429 `Retry-After`, 404-for-other-tenant, and tenant routes split from subject routes in the security scheme. `spec:lint` enforces the rules. Fern declares all four generators. Review: `.agents/reviews/p0-spec-r2.md`.
-- **`p0-auth` approved** (2026-11-06): API keys (`mtv_live_`, SHA-256, shown once), role ladder enforced on creation and revocation, subject validation, tenant-scoped transactions, error envelope, request id, and brains create/list/get. 34 integration tests; the Phase 0 gate (tenant A creates, tenant B gets 404) is proven. Review: `.agents/reviews/p0-auth-r2.md`.
-- **Phase 0 complete** (2026-11-06): `p0-workspaces`, `p0-db`, `p0-spec`, `p0-auth` and `p0-ci` are approved. CI runs `static` and `test` on every push and PR: typecheck, lint, spec lint, migrations on two databases, unit, isolation and integration against `pgvector/pgvector:pg18`. Both runs on `main` are green. Repo: `github.com/SwapnilSkr/memtavi`.
-- **`p1-capture` approved** (2026-11-06): capture and source endpoints with content/URL XOR, 50k cap, `originRef` and `Idempotency-Key` dedupe, one `capture.ingest` job per source, soft delete, and newest-first listing backed by a new `created_at` column and index. 53 integration tests. Review: `.agents/reviews/p1-capture-r2.md`.
-- **`p1-worker` approved** (2026-11-06): job claim with `SKIP LOCKED` and leases, backoff and dead-lettering, plus the SSRF fetcher that resolves once and pins the connection to the validated address. 103 unit and 64 integration tests. Review: `.agents/reviews/p1-worker-r2.md`.
-- **`p1-llm` approved** (2026-11-06): chat and embedding interfaces, OpenRouter and OpenAI adapters with transient/permanent classification, a deterministic fake, and cost accounting at the plan's prices. 156 unit tests. Review: `.agents/reviews/p1-llm-r1.md`.
-- **`p1-compiler-core` approved** (2026-11-06): Zod fact/patch contracts matching the plan, extraction with evidence-span enforcement, MWS banding, PFS place/review/new, patch contested/append/rewrite rules, versioned prompts, and a deterministic golden corpus. 239 unit tests. Review: `.agents/reviews/p1-compiler-core-r2.md`.
-- **Storage infrastructure live** (2026-11-06): `memtavi-storage-dev` CloudFormation stack in `ap-south-1` — private bucket `memtavi-media-dev-209479287671`, CloudFront `E22V6MKMFVBZ8C` with OAC and signed URLs, SSM-held signing key, IAM policies, lifecycle. Unsigned requests return 403; signed return 200.
-- **`p1-storage` approved**: `@memtavi/storage` with `s3`, `local` and `fake` drivers, content-addressed key builders and signed URLs. 307 unit tests. Review: `.agents/reviews/p1-storage-r1.md`.
-- **Open AWS follow-ups** (2026-11-06, none blocking Phase 1):
-  - **TLS 1.2**: the default `*.cloudfront.net` certificate forces a TLSv1 minimum. Set `CertificateArn` (ACM, us-east-1) and `AliasDomain` on the stack to switch to `sni-only` + `TLSv1.2_2021`. Needs a domain.
-  - **Retention**: `sources/` and `chunks/` have no lifecycle expiration by design; ship the citation-aware `storage-retention` job before launch. Do not add a blind lifecycle rule — it would delete evidence pages cite.
-  - **Budget guard**: create an AWS Budget at $5/month with an email alert. Not created yet.
-  - **Dev CORS**: add `http://localhost:5173` to `AllowedOrigin` before inspector work, or signed media fetches from the browser will fail.
-  - **Cache header**: set `Cache-Control: public, max-age=31536000, immutable` on put in `packages/storage`; keys never change.
-  - **Task roles**: attach `memtavi-storage-worker-dev` and `memtavi-storage-api-dev` to ECS/EC2 roles. The local CLI is authenticated as root and must never back an app process.
-- **`p1-storage-db` approved**: migration `0008` adds `body_ref`/`body_bytes`, nullable chunk text, the `memory_mode` enum, `memory_settings` with RLS and a grant, and the three budget caps. 72 isolation tests. Review: `.agents/reviews/p1-storage-db-r1.md`.
-- **`p1-storage-wire` approved**: capture writes inline bodies to the object store and keeps a 4,000-character preview; the worker stores fetched text the same way; `contentPreview`, `contentUrl` and the content endpoint are on the wire; spec and API moved together. 69 integration tests. Review: `.agents/reviews/p1-storage-wire-r1.md`.
-- **`p1-compiler-wire` approved**: `capture.compile` chunks into the store, extracts with evidence enforcement, gates on MWS, routes with PFS over pgvector candidates, patches or creates pages, writes immutable versions, change events, embeddings and usage, and marks the source completed. 315 unit and 84 integration tests. Review: `.agents/reviews/p1-compiler-wire-r1.md`.
-- **`p1-eval` approved**: `tests/eval` compiles a labelled conversation set through the real compiler, answers from a summaries-only index plus three FTS pages, and reports exact match, F1, injected tokens, accuracy per 1k tokens, latency and cost. Fake mode is a labelled plumbing check; live mode requires keys and `EVAL_BUDGET_USD` and refuses non-test databases. Review: `.agents/reviews/p1-eval-r1.md`.
-- **Live result after date ingestion** (conv-26, 20 questions): **15% exact, 20.4% F1**, 1,518 injected tokens per question, p50 1.1 s, $0.81 inflated estimate. Temporal exact went from 0/12 to 2/12. Compiler built 22 pages, 64 versions, 59 routing reviews, 19/19 sources completed.
-- **Routing measured** (117 facts): 34 place, 64 review, 19 new. Best score median 0.563; 64 of 81 facts above 0.45 have a gap below 0.15. The review band is behaving as coded — the candidate set is full of near-duplicate pages because the first 19 facts each created a page. **Page granularity is the bug, not the 0.15 threshold.**
-- **Single-run accuracy is noisy**: 15% then 10% on identical inputs (19 vs 22 pages, 64 vs 59 reviews). Report a mean across at least three runs before claiming a threshold effect.
-- **Entity consolidation measured** (3 runs): reviews fell from 59–64 to 3–5 and pages from 19–22 to 3–4, but exact match averaged **5.0%** (F1 0.169) against roughly 12.5% before, and the old-default estimate rose from $0.66 to **$1.58 per run**. Three or four entity pages are too coarse.
-- **Pre-correction cost figures are inflated ~20×** on input: every number recorded before the pricing fix used $8/M, not the model's $0.40/M. Treat them as relative only.
-- **Cost model was wrong and is fixed**: `DEFAULT_CHAT_PRICES` is $8/M input, but `gpt-4.1-mini` is $0.40/M (OpenRouter). Reported costs were inflated ~20×; actual spend across all eval runs is well under a dollar, not $7.50. The eval and the worker ledger now read input/output rates from env (`OPENROUTER_*_USD_PER_M`, `EVAL_CHAT_*_USD_PER_M`), set to 0.40 / 1.60.
-- **Batching shipped**: all facts route first, then one patch call per page. A run is now **$0.097**, with 18/19 sources, 7 pages, 38 versions, 10 reviews; accuracy 5.0% / F1 0.138. Cost is fixed; quality is not.
-- **Budget policy**: hard cap **$0.20** per live run, one run per change until a run is reliably under $0.20, no three-run loops without a stated reason.
-- **Page split shipped and measured** (one run, $0.20 cap): 13 pages, 39 versions, 37 reviews, **19/19 sources completed** (the retry recovered the transient loss). Accuracy **15.0% exact / 0.205 F1**, 1,025 injected tokens/question, p50 860 ms, **$0.083**. Two splits fired at the 6,000-character cap.
-- **Cost is under control**: a complete run is about 8 cents. The earlier `$7.50` was an estimate at a wrong $8/M default; real spend across the whole eval history is well under a dollar.
-- **Phase 2 read path shipped**: `GET /pages` (full pages, no reference bump), `GET /pages/{slug}` (bumps `lastReferencedAt`), `GET /index` (compact entries), and hybrid `GET /search` (weighted FTS + pgvector with RRF, `minSimilarity`, `similarity: null` for keyword-only). 130 integration tests; spec lint clean.
-- **Phase 2 changes shipped**: `GET /changes` (newest first), idempotent `PATCH /changes/{id}` ack/clear, and `PATCH /pages/{slug}` with version-conflict 409, a `user` page version, an `updated` change event, `userEditedAt`, and contested resolution via `status: active`. 139 integration tests.
-- **Known reliability gap**: page update calls the embedder before writing, so a provider outage blocks edits. Make the embed best-effort when the file is next touched.
-- **Phase 2 graph shipped**: `GET /graph` returns live nodes and only edges whose both endpoints are live; `GET /connections` is similarity-ordered and paginated; `PATCH /connections/{id}` acks idempotently. 144 integration tests.
-- **Phase 2 score/profile shipped**: `GET /score` returns the newest snapshot or 404; `GET /profile` returns an empty profile for a new brain; `PATCH /profile` upserts only supplied fields with a tenant guard. 152 integration tests.
-- **Inspector shell shipped**: `apps/web` Vite + React + Tailwind, typed API client with error envelope, `sessionStorage` session, routes for setup, brains, pages, page detail (safe markdown) and search. `typecheck:web` and `build:web` run in CI; 22 web tests.
-- **Inspector capture/edit shipped**: note/URL capture, 1.5 s source polling until a terminal status, page edit with a changed-field diff and 409 reload, contested resolve. 39 web tests; UI makes no provider calls.
-- **Phase 2 gate closed**: capture → read → correct is possible entirely in the inspector, against the live API.
-- **Hardening shipped**: strict CSP in the production build and preview headers, with a dev-only inline allowance for Vite's refresh preamble; page updates now write first and refresh the embedding best-effort inside a savepoint. 51 web, 153 integration tests.
-- **Inspector graph/score/profile shipped**: deterministic SVG graph with clickable nodes, score meters and factors with a 404 empty state, and a profile form with validated directives JSON. 79 web tests.
-- **Export and permanent delete shipped**: `GET /export` returns the brain bundle (pages, versions, preview-only sources, connections) and `DELETE /pages/{slug}?permanent=true` records a `deletion_ops` row and cascades the page. The inspector downloads the JSON and requires a two-step delete confirmation. 88 web, 158 integration tests.
-- **Inspector connections/changes shipped**: ackable connection list with resolved page titles, and a newest-first change feed with version transitions, contradictions, relative time and ack. 113 web tests.
-- **MCP read-only server shipped**: `@memtavi/mcp` over stdio with `list_brains`, `index`, `search`, `read`; API-key auth, brain resolution (arg → env → single brain), stderr-only diagnostics, 46 package tests. No write tool by design.
-- **MCP write surface shipped**: `remember(claim, evidence, scope)` composes a claim/evidence note, uses a deterministic `originRef` for idempotency, and returns the source plus an async note; `source_status` reports compile progress. Six tools total, no transcript tool. 68 package tests.
-- **Phase 4 MCP gate**: an agent with only an API key can remember → search → read. `memory_settings.mode` is still unenforced because no endpoint exposes it.
-- **Shared client and CLI shipped**: `@memtavi/client` covers all 20 API operations; `@memtavi/cli` exposes 19 commands with human and `--json` output, the same brain resolution as MCP, and 0/1/2 exit codes. MCP was rebased onto the shared client with no test change. 106 package tests.
-- **Phase 4 gate met**: an agent with only an API key connects via MCP and completes remember → search → read, and the CLI drives every operation.
-- **Webhook registration shipped**: list/create/delete with AES-256-GCM-encrypted secrets, a write-once `secret` in the create response, event validation against the change-action set, and CLI commands. 167 integration, 509 unit tests.
-- **Webhook delivery shipped**: rebinding-safe POST, HMAC-signed payloads, delivery rows with delivered/failed/dead states, retries, and one idempotent delivery per matching active webhook per change event. 175 integration, 517 unit tests.
-- **Fern status (updated)**: GitHub login works and generators were upgraded to TS `3.108.9` / Python `4.64.1`; `fern check` passes. Colima with both `$HOME` and `/private/var/folders` mounted got local generation running, but the legacy generator emits **source only** — no `package.json`/`tsconfig`/`pyproject.toml` — so it is still not a compilable SDK. Colima was uninstalled and its 3.5 GB VM deleted; the 1.1 GB `Docker.raw` remains untouched. Fern is **not closed**.
-- **Phase 4 remaining**: OAuth connector blocked on human login; Fern SDK packaging blocked by the generator's missing manifests (or the remote npm `EACCES`). MCP, CLI, docs and webhooks are complete.
-- **Evidence anchor fix shipped**: the first live run exposed that models return exact quotes with wrong character offsets, so every fact was dropped. `extractFacts` now re-anchors a verbatim quote and drops only text that is absent. Without it, zero pages compiled.
-- **Phase 1 complete**: capture, storage, worker, LLM, compiler core, compiler wire, eval harness and the first live measurement are recorded.
+## Complete
+
+- **Phase 1**: capture, storage, worker, LLM, compiler core and wire, eval harness.
+- **Phase 2/3**: full read path, changes, graph, score/profile, inspector capture → read → correct, connections/changes screens, export, permanent delete, webhooks, MCP and CLI.
+- **Storage**: private S3 + CloudFront OAC with signed URLs; bodies in S3, knowledge in Postgres.
+- **Compiler**: chunk → extract → MWS → PFS → patch/split → versions/embeddings; batched patches; entity pages; evidence re-anchor.
+- **Surfaces**: MCP (6 tools), shared client (20 ops), CLI (incl. webhooks), inspector (9 screens), generated API docs.
+- **Tests**: 517 unit, 175 integration, 72 isolation, 113 web. CI green.
+
+## Blocked or deferred
+
+- **OAuth connector**: needs a human login route (sessions/OIDC); not faked.
+- **Fern SDKs**: generator emits source without manifests; hand-written surfaces stand.
+- **Deployment**: API and worker are not hosted; custom domain/TLS, CloudFront logs and a budget alarm are pending.
+
+## Next
+
+- `p5-budget` — enforce monthly caps from `usage_ledger` before provider calls.
+- Then rate limiting, structured logging/OTel, the 10k-page benchmark, backup/restore.
+
+Full list: [backlog](./backlog.md).
