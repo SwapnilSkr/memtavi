@@ -59,6 +59,7 @@ Last updated 2026-11-06. One line per open item; detail lives in the linked node
 - **Phase 4 MCP gate**: an agent with only an API key can remember → search → read. `memory_settings.mode` is still unenforced because no endpoint exposes it.
 - **Shared client and CLI shipped**: `@memtavi/client` covers all 20 API operations; `@memtavi/cli` exposes 19 commands with human and `--json` output, the same brain resolution as MCP, and 0/1/2 exit codes. MCP was rebased onto the shared client with no test change. 106 package tests.
 - **Phase 4 gate met**: an agent with only an API key connects via MCP and completes remember → search → read, and the CLI drives every operation.
-- **Next: OAuth connector and Fern SDK generation** are the remaining Phase 4 items; then Phase 5 covers webhooks, connections CRS and scale work.
+- **Webhook registration shipped**: list/create/delete with AES-256-GCM-encrypted secrets, a write-once `secret` in the create response, event validation against the change-action set, and CLI commands. 167 integration, 509 unit tests.
+- **Next: webhook delivery** — a rebinding-safe POST transport, signed `webhook.deliver` jobs enqueued from the compiler, delivery rows and retries.
 - **Evidence anchor fix shipped**: the first live run exposed that models return exact quotes with wrong character offsets, so every fact was dropped. `extractFacts` now re-anchors a verbatim quote and drops only text that is absent. Without it, zero pages compiled.
 - **Phase 1 complete**: capture, storage, worker, LLM, compiler core, compiler wire, eval harness and the first live measurement are recorded.
