@@ -8,16 +8,14 @@ groups:
   typescript-sdk:
     generators:
       - name: fernapi/fern-typescript-sdk
-        version: 3.0.0
-        config: {}
+        version: 3.108.9
         output:
           location: local-file-system
           path: ../packages/spec/generated/typescript-sdk
   python-sdk:
     generators:
       - name: fernapi/fern-python-sdk
-        version: 4.0.0
-        config: {}
+        version: 4.64.1
         output:
           location: local-file-system
           path: ../packages/spec/generated/python-sdk
