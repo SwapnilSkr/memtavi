@@ -9,6 +9,7 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-06** — Guardrails: per-key rate limiting with 429/`Retry-After` and rate headers, Redis-free fixed windows, JSON request logs with no secrets, worker logger. 185 integration, 522 unit.
 - **2026-11-06** — Budget caps enforced: `usage_ledger.created_at`, monthly spend check before every provider call, seeded `$20` hard cap, zero calls on breach. 182 integration tests.
 - **2026-11-06** — Fern: login completed, generators upgraded to TS 3.108.9 / Python 4.64.1, Colima local generation tested and the VM reclaimed. Local output is source-only (no package manifests), so the SDK item remains open.
 - **2026-11-06** — Fern login completed; generator config fixed and unavailable CLI/MCP groups removed. Generation is blocked by the generator runtime's npm `EACCES`, so no partial SDK artifacts were kept.

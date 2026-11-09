@@ -26,7 +26,7 @@ Last updated 2026-11-06.
 
 ## Now
 
-- **Budget enforcement shipped**: migration `0009` adds `usage_ledger.created_at`, seeds a `$20` hard cap per tenant, and the worker checks month-to-date spend before every provider call. A breach fails permanently with zero provider calls. 182 integration tests.
-- **Next**: rate limiting (429 + `Retry-After`), then structured logging/OTel, then the 10k-page benchmark.
+- **Guardrails shipped**: fixed-window rate limiting per API key (300/min default), 429 with `Retry-After` and `RateLimit-*` headers, plus JSON request logs with no keys, queries or bodies. 185 integration, 522 unit.
+- **Next**: the 10k-page search benchmark (`bench:search`), then backup/restore rehearsal.
 
 Full list: [backlog](./backlog.md).
