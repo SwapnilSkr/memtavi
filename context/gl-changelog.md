@@ -9,6 +9,7 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-06** — Contract compatibility diff: 3.1-aware baseline in `tests/contract`, `spec:compat` in CI, breaking changes fail with a JSON Pointer. 538 tests.
 - **2026-11-06** — Backup/restore rehearsal: custom dump and restore with zero mismatches, RLS smoke pass, 0.38 s RTO on a schema-only DB; production-sized rerun pending.
 - **2026-11-06** — 10k search benchmark: FTS p95 5–9 ms, vector p95 43–46 ms under RLS; documented in `docs/benchmarks.md`. Finding: the FTS GIN index is unreachable under RLS because `ts_match_vq` is not leakproof.
 - **2026-11-06** — Guardrails: per-key rate limiting with 429/`Retry-After` and rate headers, Redis-free fixed windows, JSON request logs with no secrets, worker logger. 185 integration, 522 unit.

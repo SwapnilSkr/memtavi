@@ -26,7 +26,7 @@ Last updated 2026-11-06.
 
 ## Now
 
-- **Backup/restore rehearsal passes**: custom dump, restore into a scratch DB, 0 mismatches across 30 tables, 9 migrations, 27 RLS tables/policies and 106 grants; tenant isolation passes as `memtavi_app`. RTO 0.38 s on the schema-only 108 KiB test DB; a production-sized rerun is still pending.
-- **Next**: contract diff (`tests/contract` is empty), then the endpoint isolation matrix and provider-failure drills.
+- **Contract diff shipped**: a 3.1-aware baseline diff (`spec:compat`) fails CI on removed operations/params, type or enum narrowing, removed response fields, new required fields and new auth. Frozen baseline lives in `tests/contract`; intentional breaks use `spec:baseline`. 538 tests.
+- **Next**: the endpoint isolation matrix, then provider-failure drills and OTel.
 
 Full list: [backlog](./backlog.md).
