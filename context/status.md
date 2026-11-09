@@ -24,9 +24,9 @@ Last updated 2026-11-06.
 - **Fern SDKs**: generator emits source without manifests; hand-written surfaces stand.
 - **Deployment**: API and worker are not hosted; custom domain/TLS, CloudFront logs and a budget alarm are pending.
 
-## Next
+## Now
 
-- `p5-budget` — enforce monthly caps from `usage_ledger` before provider calls.
-- Then rate limiting, structured logging/OTel, the 10k-page benchmark, backup/restore.
+- **Budget enforcement shipped**: migration `0009` adds `usage_ledger.created_at`, seeds a `$20` hard cap per tenant, and the worker checks month-to-date spend before every provider call. A breach fails permanently with zero provider calls. 182 integration tests.
+- **Next**: rate limiting (429 + `Retry-After`), then structured logging/OTel, then the 10k-page benchmark.
 
 Full list: [backlog](./backlog.md).
