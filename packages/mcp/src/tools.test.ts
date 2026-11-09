@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { ApiError } from "./client";
-import { createFakeClient } from "./fake-client";
+import { ApiError } from "@memtavi/client/client";
+import { createFakeClient } from "@memtavi/client/testing";
 import { composeNote, createTools, originRefFor, type ToolResult } from "./tools";
 
 function textOf(result: ToolResult): string {

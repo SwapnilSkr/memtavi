@@ -1,0 +1,19 @@
+{
+  "name": "@memtavi/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "memtavi": "./src/index.ts"
+  },
+  "exports": {
+    "./program": "./src/program.ts"
+  },
+  "scripts": {
+    "start": "bun src/index.ts"
+  },
+  "dependencies": {
+    "@memtavi/client": "workspace:*",
+    "commander": "^14.0.0"
+  }
+}

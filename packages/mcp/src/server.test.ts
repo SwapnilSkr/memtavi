@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { ApiError } from "@memtavi/client/client";
+import { createFakeClient } from "@memtavi/client/testing";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { ApiError } from "./client";
-import { createFakeClient } from "./fake-client";
 import { createServer } from "./server";
 import { createTools } from "./tools";
 

@@ -1,0 +1,15 @@
+{
+  "name": "@memtavi/client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/client.ts",
+    "./client": "./src/client.ts",
+    "./config": "./src/config.ts",
+    "./testing": "./src/fake-client.ts"
+  },
+  "dependencies": {
+    "zod": "^4.1.12"
+  }
+}

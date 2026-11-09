@@ -61,6 +61,24 @@
         "@types/pg": "^8.15.5",
       },
     },
+    "packages/cli": {
+      "name": "@memtavi/cli",
+      "version": "0.0.0",
+      "bin": {
+        "memtavi": "./src/index.ts",
+      },
+      "dependencies": {
+        "@memtavi/client": "workspace:*",
+        "commander": "^14.0.0",
+      },
+    },
+    "packages/client": {
+      "name": "@memtavi/client",
+      "version": "0.0.0",
+      "dependencies": {
+        "zod": "^4.1.12",
+      },
+    },
     "packages/core": {
       "name": "@memtavi/core",
       "version": "0.0.0",
@@ -96,6 +114,7 @@
         "memtavi-mcp": "./src/index.ts",
       },
       "dependencies": {
+        "@memtavi/client": "workspace:*",
         "@modelcontextprotocol/sdk": "^1.32.2",
         "zod": "^4.1.12",
       },
@@ -289,6 +308,10 @@
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
     "@memtavi/api": ["@memtavi/api@workspace:apps/api"],
+
+    "@memtavi/cli": ["@memtavi/cli@workspace:packages/cli"],
+
+    "@memtavi/client": ["@memtavi/client@workspace:packages/client"],
 
     "@memtavi/core": ["@memtavi/core@workspace:packages/core"],
 
@@ -505,6 +528,8 @@
     "character-reference-invalid": ["character-reference-invalid@2.0.1", "", {}, "sha512-iBZ4F4wRbyORVsu0jPV7gXkOsGYjGHPmAyv+HiHG8gi5PtC9KI2j1+v8/tlibRvjoWX027ypmG/n0HtO5t7unw=="],
 
     "comma-separated-tokens": ["comma-separated-tokens@2.0.3", "", {}, "sha512-Fu4hJdvzeylCfQPp9SGWidpzrMs7tTrlu6Vb8XGaRGck8QSNZJJp538Wrb60Lax4fPwR64ViY468OIUTbRlGZg=="],
+
+    "commander": ["commander@14.0.3", "", {}, "sha512-H+y0Jo/T1RZ9qPP4Eh1pkcQcLRglraJaSLoyOtHxu6AapkjWVCy2Sit1QQ4x3Dng8qDlSsZEet7g5Pq06MvTgw=="],
 
     "content-disposition": ["content-disposition@2.0.1", "", {}, "sha512-e+H0ZXHSWYrENhQzw1LPuP4oF5MzVKmDU6d3hxlvaPEYLLg62MxtQNPRx4SYSuYJSBUgnQIG4HIN2tEtNv7Dog=="],
 

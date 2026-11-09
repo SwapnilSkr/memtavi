@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
+import { ApiError, createClient } from "@memtavi/client/client";
+import { ConfigError, loadConfig } from "@memtavi/client/config";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { ApiError, createClient } from "./client";
-import { ConfigError, loadConfig } from "./config";
 import { createServer } from "./server";
 import { createTools } from "./tools";
 

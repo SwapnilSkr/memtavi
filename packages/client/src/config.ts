@@ -1,4 +1,4 @@
-export interface McpConfig {
+export interface ClientConfig {
   apiUrl: string;
   apiKey: string;
   subjectId: string;
@@ -17,12 +17,12 @@ const DEFAULT_API_URL = "http://localhost:3000";
 function required(env: Record<string, string | undefined>, name: string): string {
   const value = env[name]?.trim() ?? "";
   if (value === "") {
-    throw new ConfigError(`${name} is required. Set it in the MCP server environment.`);
+    throw new ConfigError(`${name} is required. Set it in the environment.`);
   }
   return value;
 }
 
-export function loadConfig(env: Record<string, string | undefined>): McpConfig {
+export function loadConfig(env: Record<string, string | undefined>): ClientConfig {
   const rawUrl = env.MEMTAVI_API_URL?.trim();
   const apiUrl = (rawUrl === undefined || rawUrl === "" ? DEFAULT_API_URL : rawUrl).replace(
     /\/+$/,

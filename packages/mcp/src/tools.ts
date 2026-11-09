@@ -1,6 +1,11 @@
 import { createHash } from "node:crypto";
+import {
+  type ApiClient,
+  ApiError,
+  type BrainSummary,
+  type SearchQuery,
+} from "@memtavi/client/client";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { type ApiClient, ApiError, type BrainSummary, type SearchQuery } from "./client";
 
 export type ToolResult = CallToolResult;
 
