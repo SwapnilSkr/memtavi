@@ -161,7 +161,6 @@ describe.skipIf(!ownerUrl || !appUrl)("tenant isolation", () => {
       }
     } finally {
       await owner.end();
-      if (db) await db.pool.end();
       if (previousAppUrl === undefined) delete process.env.APP_DATABASE_URL;
       else process.env.APP_DATABASE_URL = previousAppUrl;
     }
