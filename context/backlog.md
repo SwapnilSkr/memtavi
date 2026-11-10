@@ -19,7 +19,6 @@ Ordered by product value per unit of risk. Remove items as they land.
 
 ## Product gaps
 
-- **Health score**: nothing writes `score_snapshots`, so `/score` is always 404. Compute freshness/readiness/strain after compiles and persist snapshots.
 - **Connection discovery + CRS**: `connections` is empty in practice; add the post-compile LLM-judged connection step with strength, reasoning and ack.
 - **Memory modes**: `memory_settings` exists but is unenforced. Wire `auto`/`ask`/`off` into capture and `remember`.
 - **Retention**: sources and chunks never expire; add the citation-aware 90-day body drop.

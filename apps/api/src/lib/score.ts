@@ -1,5 +1,5 @@
+import { insertScoreSnapshot } from "@memtavi/db/health";
 import type { PoolClient } from "pg";
-import { DomainError } from "../middleware/errors";
 import { requireBrain } from "./pages";
 
 const scoreColumns = `brain_id AS "brainId", computed_at AS "computedAt",
@@ -20,6 +20,6 @@ export async function getScore(
     [tenantId, brainId],
   );
   const score = result.rows[0];
-  if (!score) throw new DomainError("NotFoundError", 404, "Not found");
-  return score;
+  if (score) return score;
+  return insertScoreSnapshot(client, tenantId, brainId);
 }

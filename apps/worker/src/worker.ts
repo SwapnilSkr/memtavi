@@ -1,4 +1,5 @@
 import type { withTenant } from "@memtavi/db/client";
+import { enqueueScoreSnapshot } from "@memtavi/db/health";
 import {
   fetchDocument as defaultFetchDocument,
   postJson as defaultPostJson,
@@ -9,6 +10,7 @@ import {
 import type { ObjectStore } from "@memtavi/storage/types";
 import type { PoolClient } from "pg";
 import { compileCapture } from "./compile";
+import { snapshotScore } from "./health";
 import { ingestCapture } from "./ingest";
 import { purgeBrain } from "./purge";
 import {
@@ -35,7 +37,7 @@ const CLAIM_SQL = `
           (status = 'pending' AND available_at <= now())
           OR (status = 'running' AND lease_until <= now())
         )
-      ORDER BY available_at, id
+      ORDER BY (type = 'score.snapshot'), available_at, id
       FOR UPDATE SKIP LOCKED
       LIMIT 1
     )
@@ -131,6 +133,7 @@ export function createWorker(config: WorkerConfig): Worker {
   const handlers = config.handlers ?? {
     "capture.ingest": ingestCapture,
     "capture.compile": compileCapture,
+    "score.snapshot": snapshotScore,
     "webhook.deliver": deliverWebhook,
     "brain.purge": purgeBrain,
   };
@@ -233,6 +236,11 @@ export function createWorker(config: WorkerConfig): Worker {
           await withTenant(job.tenantId, (client) =>
             client.query(DEAD_SQL, [job.tenantId, job.id, failure.message]),
           );
+          if (job.type === "capture.compile") {
+            await withTenant(job.tenantId, (client) =>
+              enqueueScoreSnapshot(client, job.tenantId, job.brainId),
+            );
+          }
         } else {
           await withTenant(job.tenantId, (client) =>
             client.query(RETRY_SQL, [
