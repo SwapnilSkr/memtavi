@@ -339,6 +339,7 @@ Accepts an asynchronous deletion of the brain and everything under it.
 | Status | Description | Schema |
 | --- | --- | --- |
 | 202 | Deletion accepted for asynchronous processing. | `DeletionReceipt` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 403 | The key role does not permit this operation or granting a higher role. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |

@@ -105,11 +105,13 @@ async function compileSource({
     throw new JobError("permanent", "Invalid job payload");
   }
   const scope = [job.tenantId, job.brainId, sourceId];
-  await assertBudget(client, job.tenantId);
-  await client.query(
-    "SELECT id FROM brains WHERE tenant_id = $1 AND id = $2 FOR NO KEY UPDATE",
+  const brain = await client.query(
+    `SELECT id FROM brains WHERE tenant_id = $1 AND id = $2
+     AND deletion_state = 'active' FOR NO KEY UPDATE`,
     scope.slice(0, 2),
   );
+  if (!brain.rowCount) return;
+  await assertBudget(client, job.tenantId);
   const sources = await client.query<SourceRow>(
     `SELECT content, body_ref, subject_id, status, deleted_at FROM ingest_sources
      WHERE tenant_id = $1 AND brain_id = $2 AND id = $3 FOR UPDATE`,

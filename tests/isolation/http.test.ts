@@ -240,7 +240,7 @@ describe.skipIf(!hasTestDatabase)("the HTTP isolation matrix", () => {
   });
 
   test("operations without a route stay 404 and write nothing", async () => {
-    expect([...UNIMPLEMENTED].sort()).toEqual(["deleteBrain", "listMembers"]);
+    expect([...UNIMPLEMENTED].sort()).toEqual(["listMembers"]);
     const created = await harness.request("/v1/brains", {
       method: "POST",
       body: { name: "Drift brain", slug: `drift-${crypto.randomUUID()}` },
@@ -248,7 +248,6 @@ describe.skipIf(!hasTestDatabase)("the HTTP isolation matrix", () => {
     expect(created.status).toBe(201);
     const brain = (await created.json()) as { id: string };
     const probes: Array<{ method: string; path: string; body?: unknown }> = [
-      { method: "DELETE", path: `/v1/brains/${brain.id}` },
       { method: "GET", path: "/v1/members" },
     ];
     for (const probe of probes) {

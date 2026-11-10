@@ -22,7 +22,8 @@ export async function requireBrain(
   brainId: string,
 ): Promise<void> {
   const result = await client.query(
-    "SELECT id FROM brains WHERE tenant_id = $1 AND subject_id = $2 AND id = $3",
+    `SELECT id FROM brains WHERE tenant_id = $1 AND subject_id = $2 AND id = $3
+     AND deletion_state = 'active' FOR SHARE`,
     [tenantId, subjectId, brainId],
   );
   if (!result.rowCount) throw new DomainError("NotFoundError", 404, "Not found");

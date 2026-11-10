@@ -6,7 +6,7 @@ const CHILD_PARAMS = new Set(["sourceId", "slug", "connectionId", "changeId"]);
 const TENANT_SCOPED_PARAMS = new Set(["webhookId", "keyId"]);
 const SUBJECT_SCOPED_PARAMS = new Set(["webhookId"]);
 
-export const UNIMPLEMENTED = new Set(["deleteBrain", "listMembers"]);
+export const UNIMPLEMENTED = new Set(["listMembers"]);
 
 export const OWN_LIST = new Set([
   "listBrains",
@@ -105,12 +105,6 @@ export const EXEMPT: readonly Exemption[] = [
     kind: "foreign-id",
     reason:
       "The request carries no id and creates a new resource, so there is no foreign row to name. The four auth negatives still cover it.",
-  },
-  {
-    operationId: "deleteBrain",
-    kind: "all",
-    reason:
-      "No DELETE route is registered. tests/contract records the 404 drift. Isolation cannot be probed until the route lands.",
   },
   {
     operationId: "listMembers",

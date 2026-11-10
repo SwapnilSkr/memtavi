@@ -9,6 +9,8 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-11** — `DELETE /v1/brains/{brainId}` (`deleteBrain`): `202` receipt, brain hidden from every read and capture at once, `brain.purge` job deletes child rows then stored objects (crash-safe, idempotent), content-free tombstone keeps the `deletion_ops` record, slug reusable (partial unique index, migration 0010). Captures lock the brain, so none can land under a purge.
+
 - **2026-11-11** — `PATCH /v1/brains/{brainId}` (`updateBrain`): partial update, developer role, tenant-checked `projectId`, `null` clears it, empty body writes nothing. Contract and isolation suites cover it with no exemption.
 
 - **2026-11-11** — Spec statuses match the routes: `400` documented on 13 operations, `403` on `updateBrain`/`deleteBrain`/`listMembers`, 13 never-raised `422`/`409`/`404` removed (baseline updated; no client could receive them). `createWebhook` keeps its real `422`. SDKs regenerated.

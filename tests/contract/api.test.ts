@@ -37,7 +37,7 @@ const OPERATION_NOT_IMPLEMENTED = "Operation not implemented yet.";
 const RATE_LIMITED = "Rate limiting is out of scope for this brief.";
 const SERVER_ERROR = "A 5xx needs fault injection and is out of scope for this brief.";
 
-const UNIMPLEMENTED = new Set(["deleteBrain", "listMembers"]);
+const UNIMPLEMENTED = new Set(["listMembers"]);
 const UNKNOWN_BRAIN = `brn_${"0".repeat(32)}`;
 const UNKNOWN_UUID = "00000000-0000-4000-8000-000000000000";
 const INVALID_KEY = "mtv_invalid_contract_key";
@@ -66,16 +66,6 @@ const UNEXERCISED: readonly Unexercised[] = [
 ];
 
 const KNOWN_DRIFT: readonly KnownDrift[] = [
-  {
-    operationId: "deleteBrain",
-    method: "DELETE",
-    template: "/v1/brains/{brainId}",
-    status: 404,
-    documented: true,
-    reason: "No DELETE route is registered, so the documented 202 deletion never happens.",
-    path: (brainId) => `/v1/brains/${brainId}`,
-    options: { method: "DELETE" },
-  },
   {
     operationId: "listMembers",
     method: "GET",
@@ -181,6 +171,21 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
       201,
     )) as { id: string };
     brainId = created.id;
+
+    const doomed = await harness.request("/v1/brains", {
+      method: "POST",
+      body: { name: "Delete contract", slug: `delete-contract-${crypto.randomUUID()}` },
+    });
+    expect(doomed.status).toBe(201);
+    const deletionBrain = (await doomed.json()) as { id: string };
+    await callSuccess(
+      "deleteBrain",
+      "/v1/brains/{brainId}",
+      "DELETE",
+      `/v1/brains/${deletionBrain.id}`,
+      { method: "DELETE" },
+      202,
+    );
 
     await callSuccess("listBrains", "/v1/brains", "GET", "/v1/brains", {}, 200);
     await callSuccess("getBrain", "/v1/brains/{brainId}", "GET", `/v1/brains/${brainId}`, {}, 200);
@@ -516,6 +521,11 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
         operationId: "updateBrain",
         path: `/v1/brains/${brainId}`,
         options: { method: "PATCH", body: { name: "Forbidden rename" } },
+      },
+      {
+        operationId: "deleteBrain",
+        path: `/v1/brains/${brainId}`,
+        options: { method: "DELETE" },
       },
       { operationId: "getTenant", path: "/v1/tenant", options: {} },
       { operationId: "listApiKeys", path: "/v1/api-keys", options: {} },

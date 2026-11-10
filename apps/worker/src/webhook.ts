@@ -205,6 +205,13 @@ export async function deliverWebhook(context: JobContext): Promise<void> {
   if (withTenant === undefined)
     throw new JobError("permanent", "Webhook delivery is not configured");
 
+  const brain = await context.client.query(
+    `SELECT id FROM brains WHERE tenant_id = $1 AND id = $2
+     AND deletion_state = 'active' FOR SHARE`,
+    [job.tenantId, job.brainId],
+  );
+  if (!brain.rowCount) return;
+
   const webhookId = job.payload.webhookId;
   const eventId = job.payload.eventId;
   if (

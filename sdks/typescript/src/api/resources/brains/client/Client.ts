@@ -329,6 +329,7 @@ export class BrainsClient {
      * @param {MemtaviApi.DeleteBrainRequest} request
      * @param {BrainsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
+     * @throws {@link MemtaviApi.BadRequestError}
      * @throws {@link MemtaviApi.UnauthorizedError}
      * @throws {@link MemtaviApi.ForbiddenError}
      * @throws {@link MemtaviApi.NotFoundError}
@@ -383,6 +384,11 @@ export class BrainsClient {
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
+                case 400:
+                    throw new MemtaviApi.BadRequestError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
                 case 401:
                     throw new MemtaviApi.UnauthorizedError(
                         _response.error.body as MemtaviApi.ErrorEnvelope,

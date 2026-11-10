@@ -64,6 +64,13 @@
       "when": 1794223112144,
       "tag": "0009_budget_window",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794347904004,
+      "tag": "0010_brain_delete",
+      "breakpoints": true
     }
   ]
 }

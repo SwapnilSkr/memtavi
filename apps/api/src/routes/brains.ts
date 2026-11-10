@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { createBrain, getBrain, listBrains, updateBrain } from "../lib/brains";
+import { createBrain, deleteBrain, getBrain, listBrains, updateBrain } from "../lib/brains";
 import type { RouteConfig } from "../lib/config";
 import { requireRole } from "../lib/roles";
 import { brainCreate, brainUpdate, pagination } from "../lib/schemas";
@@ -37,6 +37,15 @@ export function brainRoutes(config: RouteConfig) {
       return scope(config, auth, subject, (client) =>
         getBrain(client, auth.tenantId, subject, params.brainId),
       );
+    })
+    .delete("/v1/brains/:brainId", async ({ auth, request, params, set }) => {
+      const subject = subjectId(request);
+      requireRole(auth.role, "admin");
+      const receipt = await scope(config, auth, subject, (client) =>
+        deleteBrain(client, auth.tenantId, subject, params.brainId),
+      );
+      set.status = 202;
+      return receipt;
     })
     .patch(
       "/v1/brains/:brainId",
