@@ -11,6 +11,21 @@ Still accurate. Moved here to keep the active changelog inside its node budget.
 
 Newest first. One line per shipped change.
 
+- **2026-11-06** — Contract compatibility diff: 3.1-aware baseline in `tests/contract`, `spec:compat` in CI, breaking changes fail with a JSON Pointer. 538 tests.
+- **2026-11-06** — Backup/restore rehearsal: custom dump and restore with zero mismatches, RLS smoke pass, 0.38 s RTO on a schema-only DB; production-sized rerun pending.
+- **2026-11-06** — 10k search benchmark: FTS p95 5–9 ms, vector p95 43–46 ms under RLS; documented in `docs/benchmarks.md`.
+- **2026-11-06** — Guardrails: per-key rate limiting with 429/`Retry-After` and rate headers, Redis-free fixed windows, JSON request logs with no secrets, worker logger.
+- **2026-11-06** — Budget caps enforced: `usage_ledger.created_at`, monthly spend check before every provider call, seeded `$20` hard cap, zero calls on breach.
+- **2026-11-06** — Fern login, generator config and upgrades (superseded by the 2026-11-11 SDK entry).
+- **2026-11-06** — Webhook delivery shipped: SSRF-safe POST, HMAC signatures, delivery records, retries and one delivery per matching webhook per change event.
+- **2026-11-06** — Webhook registration shipped: encrypted write-once secrets, validated events, client and CLI commands. 167 integration, 509 unit tests.
+- **2026-11-06** — Generated API reference: `docs/API.md` from the OpenAPI spec with a CI stale check.
+- **2026-11-06** — Shared client and CLI shipped: `@memtavi/client` with all 20 operations, MCP rebased onto it, and `memtavi` CLI with 19 commands, `--json`, brain…
+- **2026-11-06** — MCP write surface shipped: `remember` with deterministic idempotency and async semantics, plus `source_status`.
+- **2026-11-06** — MCP read-only server shipped: stdio server with `list_brains`, `index`, `search`, `read`, API-key auth, brain resolution and stderr-only diagnostics.
+- **2026-11-06** — Inspector connections/changes shipped: ackable connection list, change feed with version transitions and contradictions. 113 web tests.
+- **2026-11-06** — Export and permanent delete shipped: JSON brain bundle, `permanent=true` guard, `deletion_ops` audit, cascade delete, inspector download and…
+
 - **2026-11-06** — Inspector graph/score/profile shipped: deterministic graph, health meters with a 404 empty
 - **2026-11-06** — Hardening: strict CSP for production/preview with a dev-only refresh allowance, and best-e
 - **2026-11-06** — Inspector capture/edit shipped: note/URL capture with polling, page edit with 409 reload, 
