@@ -5,13 +5,15 @@
   "type": "module",
   "exports": {
     "./schema": "./src/schema.ts",
-    "./client": "./src/client.ts"
+    "./client": "./src/client.ts",
+    "./health": "./src/health.ts"
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun run src/migrate.ts"
   },
   "dependencies": {
+    "@memtavi/core": "workspace:*",
     "drizzle-orm": "^0.44.7",
     "pg": "^8.16.3"
   },

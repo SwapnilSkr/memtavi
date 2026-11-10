@@ -5,6 +5,7 @@ import { decideMws } from "@memtavi/core/compile/policies/mws";
 import { decidePfs } from "@memtavi/core/compile/policies/pfs";
 import { promptVersion } from "@memtavi/core/compile/prompts";
 import type { ExtractedFact, PatchResult } from "@memtavi/core/compile/schemas";
+import { enqueueScoreSnapshot } from "@memtavi/db/health";
 import { chatCostUsd, embeddingCostUsd } from "@memtavi/llm/cost";
 import { type ChatResult, type EmbeddingResult, ProviderError } from "@memtavi/llm/provider";
 import { newId } from "@memtavi/shared/ids";
@@ -600,4 +601,5 @@ async function compileSource({
     ],
   );
   for (const event of routing) onRouting?.(event);
+  await enqueueScoreSnapshot(client, job.tenantId, job.brainId);
 }

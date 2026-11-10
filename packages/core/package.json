@@ -10,7 +10,8 @@
     "./compile/policies/mws": "./src/compile/policies/mws.ts",
     "./compile/policies/pfs": "./src/compile/policies/pfs.ts",
     "./compile/patch": "./src/compile/patch.ts",
-    "./compile/prompts": "./src/compile/prompts.ts"
+    "./compile/prompts": "./src/compile/prompts.ts",
+    "./health/compute": "./src/health/compute.ts"
   },
   "dependencies": {
     "@memtavi/llm": "workspace:*",

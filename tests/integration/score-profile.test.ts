@@ -294,7 +294,7 @@ describe.skipIf(!ownerUrl || !appUrl)("score and profile over the wire", () => {
     ]);
   });
 
-  test("score breaks a computed_at tie by id and 404s when no snapshot exists", async () => {
+  test("score breaks a computed_at tie by id and computes a snapshot when none exists", async () => {
     const tie = await request(`/v1/brains/${tieBrain}/score`);
     expect(tie.status).toBe(200);
     const tieBody = (await tie.json()) as ScoreBody;
@@ -303,8 +303,25 @@ describe.skipIf(!ownerUrl || !appUrl)("score and profile over the wire", () => {
     expect(tieBody.factors).toEqual({ note: "earlier id" });
 
     const missing = await request(`/v1/brains/${emptyBrain}/score`);
-    expect(missing.status).toBe(404);
-    matchesContract(missing, await missing.json(), "/v1/brains/{brainId}/score", "get");
+    expect(missing.status).toBe(200);
+    const missingBody = (await missing.json()) as ScoreBody;
+    matchesContract(missing, missingBody, "/v1/brains/{brainId}/score", "get");
+    expect(missingBody).toMatchObject({
+      brainId: emptyBrain,
+      freshness: 0,
+      readiness: 0,
+      strain: 0,
+    });
+    expect(Object.keys(missingBody.factors).sort()).toEqual(["freshness", "readiness", "strain"]);
+    const stored = await owner.query<{ total: number }>(
+      "SELECT count(*)::int AS total FROM score_snapshots WHERE brain_id = $1",
+      [emptyBrain],
+    );
+    expect(stored.rows[0]?.total).toBe(1);
+
+    const again = await request(`/v1/brains/${emptyBrain}/score`);
+    expect(again.status).toBe(200);
+    expect(((await again.json()) as ScoreBody).computedAt).toBe(missingBody.computedAt);
 
     const absent = await request(`/v1/brains/${newId("brain")}/score`);
     expect(absent.status).toBe(404);
@@ -447,11 +464,14 @@ describe.skipIf(!ownerUrl || !appUrl)("score and profile over the wire", () => {
       matchesContract(response, await response.json(), contractPath, method);
     }
 
-    const foreignScore = await request(`/v1/brains/${foreignBrain}/score`, {
+    const ownScore = await request(`/v1/brains/${foreignBrain}/score`, {
       key: keys.get("foreign") ?? "",
       subject: subjectC,
     });
-    expect(foreignScore.status).toBe(404);
+    expect(ownScore.status).toBe(200);
+    const ownScoreBody = (await ownScore.json()) as ScoreBody;
+    matchesContract(ownScore, ownScoreBody, "/v1/brains/{brainId}/score", "get");
+    expect(ownScoreBody.brainId).toBe(foreignBrain);
 
     for (const path of [
       `/v1/brains/${foreignBrain}/profile`,
