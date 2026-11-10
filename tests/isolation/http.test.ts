@@ -86,6 +86,7 @@ const OWN_PROBES: Record<string, (world: World) => string[]> = {
   listWebhooks: (world) => [world.own.webhookId],
   listApiKeys: (world) => [world.keys.nonOwnerKeyId],
   getTenant: (world) => [world.own.tenantId],
+  listMembers: (world) => [world.members.own],
   exportBrain: (world) => [world.own.pageSlug, world.own.sourceId, world.own.connectionId],
 };
 
@@ -239,32 +240,8 @@ describe.skipIf(!hasTestDatabase)("the HTTP isolation matrix", () => {
     expect(failures).toEqual([]);
   });
 
-  test("operations without a route stay 404 and write nothing", async () => {
-    expect([...UNIMPLEMENTED].sort()).toEqual(["listMembers"]);
-    const created = await harness.request("/v1/brains", {
-      method: "POST",
-      body: { name: "Drift brain", slug: `drift-${crypto.randomUUID()}` },
-    });
-    expect(created.status).toBe(201);
-    const brain = (await created.json()) as { id: string };
-    const probes: Array<{ method: string; path: string; body?: unknown }> = [
-      { method: "GET", path: "/v1/members" },
-    ];
-    for (const probe of probes) {
-      const response = await harness.request(probe.path, {
-        method: probe.method,
-        ...(probe.body === undefined ? {} : { body: probe.body }),
-      });
-      const body = await bodyOf(response);
-      expect({ path: probe.path, status: response.status }).toEqual({
-        path: probe.path,
-        status: 404,
-      });
-      expectEnvelope(response, body, 404, "Not found", "NotFoundError");
-    }
-    expect(
-      (await harness.owner.query("SELECT id FROM brains WHERE id = $1", [brain.id])).rowCount,
-    ).toBe(1);
+  test("every spec operation has a route", () => {
+    expect([...UNIMPLEMENTED]).toEqual([]);
   });
 
   test("the snapshot discovers every tenant-scoped table and filters by the narrowest column", () => {

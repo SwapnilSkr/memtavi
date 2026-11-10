@@ -10,6 +10,7 @@ import { captureRoutes } from "./routes/captures";
 import { changeRoutes } from "./routes/changes";
 import { exportRoutes } from "./routes/export";
 import { graphRoutes } from "./routes/graph";
+import { memberRoutes } from "./routes/members";
 import { pageRoutes } from "./routes/pages";
 import { profileRoutes } from "./routes/profile";
 import { scoreRoutes } from "./routes/score";
@@ -40,5 +41,6 @@ export function createApp(config: AppConfig) {
     .use(profileRoutes(routeConfig))
     .use(apiKeyRoutes(routeConfig))
     .use(webhookRoutes(routeConfig))
+    .use(memberRoutes(routeConfig))
     .use(tenantRoutes(routeConfig));
 }

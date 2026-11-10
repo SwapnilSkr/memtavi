@@ -946,6 +946,7 @@ List members
 | Status | Description | Schema |
 | --- | --- | --- |
 | 200 | Members of the tenant. | `object { items: Member[], total: integer, limit: integer, offset: integer }` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 403 | The key role does not permit this operation or granting a higher role. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
