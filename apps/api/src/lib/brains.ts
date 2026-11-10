@@ -2,7 +2,7 @@ import { newId } from "@memtavi/shared/ids";
 import type { Static } from "elysia";
 import type { PoolClient } from "pg";
 import { DomainError } from "../middleware/errors";
-import type { brainCreate } from "./schemas";
+import type { brainCreate, brainUpdate } from "./schemas";
 
 const columns = `id, subject_id AS "subjectId", project_id AS "projectId", name, slug,
   description, brief_settings AS "briefSettings", deletion_state AS "deletionState",
@@ -69,6 +69,53 @@ export async function getBrain(
   );
   if (!result.rows[0]) throw new DomainError("NotFoundError", 404, "Not found");
   return result.rows[0];
+}
+
+export async function updateBrain(
+  client: PoolClient,
+  tenantId: string,
+  subjectId: string,
+  brainId: string,
+  body: Static<typeof brainUpdate>,
+) {
+  const found = await client.query(
+    `SELECT ${columns} FROM brains
+     WHERE tenant_id = $1 AND subject_id = $2 AND id = $3
+     FOR UPDATE`,
+    [tenantId, subjectId, brainId],
+  );
+  const brain = found.rows[0];
+  if (!brain) throw new DomainError("NotFoundError", 404, "Not found");
+
+  if (body.projectId !== undefined && body.projectId !== null) {
+    const project = await client.query("SELECT id FROM projects WHERE tenant_id = $1 AND id = $2", [
+      tenantId,
+      body.projectId,
+    ]);
+    if (!project.rowCount) throw new DomainError("BadRequestError", 400, "Invalid project id");
+  }
+
+  type Assignable = string | null | Record<string, unknown>;
+  const values: Assignable[] = [tenantId, subjectId, brainId];
+  const assignments: string[] = [];
+  function assign(column: string, value: Assignable) {
+    values.push(value);
+    assignments.push(`${column} = $${values.length}`);
+  }
+  if (body.name !== undefined) assign("name", body.name);
+  if (body.description !== undefined) assign("description", body.description);
+  if (body.projectId !== undefined) assign("project_id", body.projectId);
+  if (body.briefSettings !== undefined) assign("brief_settings", body.briefSettings);
+  if (assignments.length === 0) return brain;
+  assignments.push("updated_at = now()");
+
+  const updated = await client.query(
+    `UPDATE brains SET ${assignments.join(", ")}
+     WHERE tenant_id = $1 AND subject_id = $2 AND id = $3
+     RETURNING ${columns}`,
+    values,
+  );
+  return updated.rows[0];
 }
 
 export async function listBrains(

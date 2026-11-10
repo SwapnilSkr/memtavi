@@ -33,16 +33,11 @@ interface KnownDrift {
   options: RequestOptions;
 }
 
-const OPERATION_NOT_IMPLEMENTED = "No route is implemented for this operation.";
+const OPERATION_NOT_IMPLEMENTED = "Operation not implemented yet.";
 const RATE_LIMITED = "Rate limiting is out of scope for this brief.";
 const SERVER_ERROR = "A 5xx needs fault injection and is out of scope for this brief.";
-const VALIDATION_MAPS_TO_400 =
-  "The error middleware maps validation failures to 400, so 422 is never produced.";
-const NO_CONFLICT_SOURCE = "The handler has no code path that raises this conflict.";
-const TENANT_ALWAYS_PRESENT =
-  "Only an owner key reaches the handler and an owner key always carries its tenant.";
 
-const UNIMPLEMENTED = new Set(["updateBrain", "deleteBrain", "listMembers"]);
+const UNIMPLEMENTED = new Set(["deleteBrain", "listMembers"]);
 const UNKNOWN_BRAIN = `brn_${"0".repeat(32)}`;
 const UNKNOWN_UUID = "00000000-0000-4000-8000-000000000000";
 const INVALID_KEY = "mtv_invalid_contract_key";
@@ -60,13 +55,6 @@ const UNEXERCISED: readonly Unexercised[] = [
     .map((pair) => ({ ...pair, reason: SERVER_ERROR })),
   ...contract
     .documented()
-    .filter((pair) => pair.status === 422 && !UNIMPLEMENTED.has(pair.operationId))
-    .map((pair) => ({ ...pair, reason: VALIDATION_MAPS_TO_400 })),
-  { operationId: "createWebhook", status: 409, reason: NO_CONFLICT_SOURCE },
-  { operationId: "createApiKey", status: 409, reason: NO_CONFLICT_SOURCE },
-  { operationId: "getTenant", status: 404, reason: TENANT_ALWAYS_PRESENT },
-  ...contract
-    .documented()
     .filter(
       (pair) =>
         UNIMPLEMENTED.has(pair.operationId) &&
@@ -78,16 +66,6 @@ const UNEXERCISED: readonly Unexercised[] = [
 ];
 
 const KNOWN_DRIFT: readonly KnownDrift[] = [
-  {
-    operationId: "updateBrain",
-    method: "PATCH",
-    template: "/v1/brains/{brainId}",
-    status: 404,
-    documented: true,
-    reason: "No PATCH route is registered, so the documented 200 update never happens.",
-    path: (brainId) => `/v1/brains/${brainId}`,
-    options: { method: "PATCH", body: { name: "Renamed" } },
-  },
   {
     operationId: "deleteBrain",
     method: "DELETE",
@@ -206,6 +184,14 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
 
     await callSuccess("listBrains", "/v1/brains", "GET", "/v1/brains", {}, 200);
     await callSuccess("getBrain", "/v1/brains/{brainId}", "GET", `/v1/brains/${brainId}`, {}, 200);
+    await callSuccess(
+      "updateBrain",
+      "/v1/brains/{brainId}",
+      "PATCH",
+      `/v1/brains/${brainId}`,
+      { method: "PATCH", body: { name: "Contract renamed" } },
+      200,
+    );
 
     const alphaId = newId("page");
     const betaId = newId("page");
@@ -526,6 +512,11 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
         path: "/v1/brains",
         options: { method: "POST", body: { name: "Forbidden", slug: "forbidden-contract" } },
       },
+      {
+        operationId: "updateBrain",
+        path: `/v1/brains/${brainId}`,
+        options: { method: "PATCH", body: { name: "Forbidden rename" } },
+      },
       { operationId: "getTenant", path: "/v1/tenant", options: {} },
       { operationId: "listApiKeys", path: "/v1/api-keys", options: {} },
       {
@@ -550,7 +541,6 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
   test("every documented 404 validates for an unknown id", async () => {
     for (const pair of contract.documented()) {
       if (pair.status !== 404 || contract.validated(pair.operationId, 404)) continue;
-      if (pair.operationId === "getTenant") continue;
       const probe = probes.get(pair.operationId);
       if (!probe) continue;
       const path = unknownPath(probe);
@@ -629,6 +619,46 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
       method: "POST",
       path: "/v1/brains/{brainId}/captures",
     });
+  });
+
+  test("invalid webhook events answer 422 and the length bounds answer 400", async () => {
+    const cases: Array<{ label: string; events: string[]; status: number; message: string }> = [
+      {
+        label: "duplicate events",
+        events: ["created", "created"],
+        status: 422,
+        message: "Invalid webhook events",
+      },
+      {
+        label: "an unknown event",
+        events: ["created", "exploded"],
+        status: 422,
+        message: "Invalid webhook events",
+      },
+      { label: "no events", events: [], status: 400, message: "Invalid request" },
+      {
+        label: "more than twenty events",
+        events: Array.from({ length: 21 }, (_, index) => `event-${index}`),
+        status: 400,
+        message: "Invalid request",
+      },
+    ];
+    for (const entry of cases) {
+      const response = await harness.request("/v1/webhooks", {
+        method: "POST",
+        body: { url: "https://example.invalid/contract", events: entry.events },
+      });
+      const body = (await response.json()) as { message: string };
+      expect({ label: entry.label, status: response.status }).toEqual({
+        label: entry.label,
+        status: entry.status,
+      });
+      expect({ label: entry.label, message: body.message }).toEqual({
+        label: entry.label,
+        message: entry.message,
+      });
+      contract.expectContract(response, body, { method: "POST", path: "/v1/webhooks" });
+    }
   });
 
   test("known drift matches the behaviour recorded in KNOWN_DRIFT", async () => {

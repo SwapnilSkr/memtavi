@@ -240,15 +240,14 @@ describe.skipIf(!hasTestDatabase)("the HTTP isolation matrix", () => {
   });
 
   test("operations without a route stay 404 and write nothing", async () => {
-    expect([...UNIMPLEMENTED].sort()).toEqual(["deleteBrain", "listMembers", "updateBrain"]);
+    expect([...UNIMPLEMENTED].sort()).toEqual(["deleteBrain", "listMembers"]);
     const created = await harness.request("/v1/brains", {
       method: "POST",
       body: { name: "Drift brain", slug: `drift-${crypto.randomUUID()}` },
     });
     expect(created.status).toBe(201);
     const brain = (await created.json()) as { id: string };
-    const probes = [
-      { method: "PATCH", path: `/v1/brains/${brain.id}`, body: { name: "Renamed" } },
+    const probes: Array<{ method: string; path: string; body?: unknown }> = [
       { method: "DELETE", path: `/v1/brains/${brain.id}` },
       { method: "GET", path: "/v1/members" },
     ];
@@ -288,12 +287,9 @@ describe.skipIf(!hasTestDatabase)("the HTTP isolation matrix", () => {
     for (const exemption of EXEMPT) {
       expect(operations.some((entry) => entry.operationId === exemption.operationId)).toBe(true);
     }
-    expect([...undocumented400].sort()).toEqual(
-      operations
-        .filter((operation) => !UNIMPLEMENTED.has(operation.operationId))
-        .filter((operation) => !documented(contract, operation.operationId, 400))
-        .map((operation) => `${operation.operationId}:400`)
-        .sort(),
-    );
+  });
+
+  test("every malformed-subject 400 the matrix produced is documented", () => {
+    expect([...undocumented400].sort()).toEqual([]);
   });
 });

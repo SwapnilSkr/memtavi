@@ -23,6 +23,13 @@ export const brainCreate = t.Object({
   briefSettings: t.Optional(t.Record(t.String(), t.Unknown())),
 });
 
+export const brainUpdate = t.Object({
+  name: t.Optional(t.String({ minLength: 1, maxLength: 200 })),
+  description: t.Optional(t.String()),
+  projectId: t.Optional(t.Union([t.String({ format: "uuid" }), t.Null()])),
+  briefSettings: t.Optional(t.Record(t.String(), t.Unknown())),
+});
+
 export const captureCreate = t.Object({
   kind: t.Union([
     t.Literal("note"),

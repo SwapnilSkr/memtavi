@@ -1,8 +1,8 @@
 import { Elysia } from "elysia";
-import { createBrain, getBrain, listBrains } from "../lib/brains";
+import { createBrain, getBrain, listBrains, updateBrain } from "../lib/brains";
 import type { RouteConfig } from "../lib/config";
 import { requireRole } from "../lib/roles";
-import { brainCreate, pagination } from "../lib/schemas";
+import { brainCreate, brainUpdate, pagination } from "../lib/schemas";
 import { auth } from "../middleware/auth";
 import { scope, subjectId } from "../middleware/scope";
 
@@ -37,5 +37,16 @@ export function brainRoutes(config: RouteConfig) {
       return scope(config, auth, subject, (client) =>
         getBrain(client, auth.tenantId, subject, params.brainId),
       );
-    });
+    })
+    .patch(
+      "/v1/brains/:brainId",
+      ({ auth, request, params, body }) => {
+        const subject = subjectId(request);
+        requireRole(auth.role, "developer");
+        return scope(config, auth, subject, (client) =>
+          updateBrain(client, auth.tenantId, subject, params.brainId, body),
+        );
+      },
+      { body: brainUpdate },
+    );
 }
