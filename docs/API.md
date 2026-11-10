@@ -6,7 +6,7 @@ file by hand; run `bun run spec:docs`.
 - OpenAPI: 3.1.0
 - Version: 1.0.0
 - Server: https://api.memtavi.com
-- Endpoints: 33 operations across 24 paths
+- Endpoints: 34 operations across 25 paths
 - Schemas: 41 component schemas
 
 ## Authentication
@@ -39,6 +39,7 @@ Subject routes (require `x-subject-id`):
 - `/v1/brains/{brainId}/sources`
 - `/v1/brains/{brainId}/sources/{sourceId}`
 - `/v1/brains/{brainId}/sources/{sourceId}/content`
+- `/v1/brains/{brainId}/sources/{sourceId}/retry`
 - `/v1/webhooks`
 - `/v1/webhooks/{webhookId}`
 
@@ -79,6 +80,7 @@ Tenant routes (do not accept `x-subject-id`):
 - [`GET /v1/brains/{brainId}/sources/{sourceId}`](#get-v1brainsbrainidsourcessourceid) — Sources
 - [`DELETE /v1/brains/{brainId}/sources/{sourceId}`](#delete-v1brainsbrainidsourcessourceid) — Sources
 - [`GET /v1/brains/{brainId}/sources/{sourceId}/content`](#get-v1brainsbrainidsourcessourceidcontent) — Sources
+- [`POST /v1/brains/{brainId}/sources/{sourceId}/retry`](#post-v1brainsbrainidsourcessourceidretry) — Sources
 - [`GET /v1/members`](#get-v1members) — Members
 - [`GET /v1/tenant`](#get-v1tenant) — Tenant
 - [`GET /v1/webhooks`](#get-v1webhooks) — Webhooks
@@ -923,6 +925,40 @@ body returns `404`.
 | 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
+| 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
+| 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
+
+### POST /v1/brains/{brainId}/sources/{sourceId}/retry
+
+`retryIngestSource` · Tags: Sources
+
+Retry a failed ingest source
+
+Queues another attempt for a source whose status is `failed`, keeping the same source id.
+The status returns to `pending` and `lastError` is cleared. `attempts` counts accepted
+retries and is never reset. When the stored body or chunks exist the source is recompiled;
+otherwise the original fetch is repeated. Storage usage is not counted again. Requires
+developer or higher.
+
+**Security:** `x-api-key` + `x-subject-id`
+
+**Parameters**
+
+| Name | In | Required | Type | Notes |
+| --- | --- | --- | --- | --- |
+| `brainId` | path | yes | `string` | Prefixed brain id, `brn_` followed by 32 lowercase hex characters. Matches `^brn_[0-9a-f]{32}$`. |
+| `sourceId` | path | yes | `string` | Prefixed ingest source id, `src_` followed by 32 lowercase hex characters. Matches `^src_[0-9a-f]{32}$`. |
+
+**Responses**
+
+| Status | Description | Schema |
+| --- | --- | --- |
+| 202 | The source was requeued with status `pending`. | `IngestSource` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
+| 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
+| 403 | The key role does not permit this operation or granting a higher role. | `ErrorEnvelope` |
+| 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
+| 409 | Conflict with the current state, such as a page version conflict or a duplicate slug. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
 | 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
 

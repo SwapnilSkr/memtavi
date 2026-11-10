@@ -259,6 +259,50 @@ export async function createCapture(
   return stored;
 }
 
+export async function retrySource(
+  client: PoolClient,
+  tenantId: string,
+  subjectId: string,
+  brainId: string,
+  sourceId: string,
+): Promise<Record<string, unknown>> {
+  await requireBrain(client, tenantId, subjectId, brainId);
+  const found = await client.query(
+    `SELECT ${sourceColumns}, cardinality(chunk_uuids) AS "chunkCount"
+     FROM ingest_sources
+     WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND id = $4
+     AND deleted_at IS NULL FOR UPDATE`,
+    [tenantId, subjectId, brainId, sourceId],
+  );
+  const row = found.rows[0] as Row | undefined;
+  if (!row) throw new DomainError("NotFoundError", 404, "Not found");
+  if (row.status !== "failed") throw new DomainError("ConflictError", 409, "Source has not failed");
+
+  const attempts = Number(row.attempts ?? 0) + 1;
+  const storedBody = row.bodyRef !== null || Number(row.chunkCount ?? 0) > 0;
+  const updated = await client.query(
+    `UPDATE ingest_sources SET status = 'pending', last_error = NULL, attempts = $5
+     WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND id = $4
+     RETURNING ${sourceColumns}`,
+    [tenantId, subjectId, brainId, sourceId, attempts],
+  );
+  await client.query(
+    `INSERT INTO jobs (tenant_id, brain_id, type, payload, idempotency_key, max_attempts)
+     VALUES ($1, $2, $3, $4, $5, 5)
+     ON CONFLICT (tenant_id, idempotency_key) DO NOTHING`,
+    [
+      tenantId,
+      brainId,
+      storedBody ? "capture.compile" : "capture.ingest",
+      JSON.stringify({ sourceId, brainId }),
+      `retry:${sourceId}:${attempts}`,
+    ],
+  );
+  const result = updated.rows[0] as Row | undefined;
+  if (!result) throw new DomainError("InternalServerError", 500, "Internal server error");
+  return sourceBody(result);
+}
+
 export async function listSources(
   client: PoolClient,
   tenantId: string,

@@ -294,6 +294,22 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
       { method: "DELETE" },
       202,
     );
+    await harness.owner.query(
+      "UPDATE ingest_sources SET status = 'failed', last_error = 'Permanent failure' WHERE id = $1",
+      [sourceId],
+    );
+    const retried = (await callSuccess(
+      "retryIngestSource",
+      "/v1/brains/{brainId}/sources/{sourceId}/retry",
+      "POST",
+      `/v1/brains/${brainId}/sources/${sourceId}/retry`,
+      { method: "POST" },
+      202,
+    )) as { id: string; status: string; attempts: number; lastError: string | null };
+    expect(retried.id).toBe(sourceId);
+    expect(retried.status).toBe("pending");
+    expect(retried.attempts).toBe(1);
+    expect(retried.lastError).toBeNull();
 
     await callSuccess(
       "listPages",
@@ -530,6 +546,11 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
         path: `/v1/api-keys/${throwawayKeyId}`,
         options: { method: "DELETE" },
       },
+      {
+        operationId: "retryIngestSource",
+        path: `/v1/brains/${brainId}/sources/${sourceId}/retry`,
+        options: { method: "POST" },
+      },
     ];
     for (const entry of cases) {
       const probe = probes.get(entry.operationId);
@@ -587,6 +608,15 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
     contract.expectContract(replay, await replay.json(), {
       method: "POST",
       path: "/v1/brains/{brainId}/captures",
+    });
+
+    const retriedAgain = await harness.request(`/v1/brains/${brainId}/sources/${sourceId}/retry`, {
+      method: "POST",
+    });
+    expect(retriedAgain.status).toBe(409);
+    contract.expectContract(retriedAgain, await retriedAgain.json(), {
+      method: "POST",
+      path: "/v1/brains/{brainId}/sources/{sourceId}/retry",
     });
 
     const stale = await harness.request(`/v1/brains/${brainId}/pages/${pageSlug}`, {
