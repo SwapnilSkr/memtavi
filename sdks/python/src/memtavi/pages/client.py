@@ -8,7 +8,10 @@ from ..types.bucket import Bucket
 from ..types.deletion_receipt import DeletionReceipt
 from ..types.page import Page
 from ..types.page_status import PageStatus
+from ..types.page_version import PageVersion
+from ..types.page_version_diff import PageVersionDiff
 from .raw_client import AsyncRawPagesClient, RawPagesClient
+from .types.list_page_versions_response import ListPageVersionsResponse
 from .types.list_pages_response import ListPagesResponse
 
 # this is used as the default value for optional parameters
@@ -232,6 +235,160 @@ class PagesClient:
             status=status,
             version=version,
             request_options=request_options,
+        )
+        return _response.data
+
+    def list_page_versions(
+        self,
+        brain_id: str,
+        slug: str,
+        *,
+        limit: typing.Optional[int] = None,
+        offset: typing.Optional[int] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> ListPageVersionsResponse:
+        """
+        Lists the immutable version history of a page, newest first, without bodies.
+        Reading versions does not bump `lastReferencedAt`; only `getPage` does.
+
+        Parameters
+        ----------
+        brain_id : str
+            Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+
+        slug : str
+            The page slug within the brain.
+
+        limit : typing.Optional[int]
+            Maximum number of items to return.
+
+        offset : typing.Optional[int]
+            Number of items to skip before collecting the page.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        ListPageVersionsResponse
+            Page versions, newest first.
+
+        Examples
+        --------
+        from memtavi import MemtaviApi
+
+        client = MemtaviApi(
+            subject_id="YOUR_SUBJECT_ID",
+            api_key="YOUR_API_KEY",
+        )
+        client.pages.list_page_versions(
+            brain_id="brainId",
+            slug="slug",
+        )
+        """
+        _response = self._raw_client.list_page_versions(
+            brain_id, slug, limit=limit, offset=offset, request_options=request_options
+        )
+        return _response.data
+
+    def get_page_version(
+        self, brain_id: str, slug: str, version: int, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> PageVersion:
+        """
+        Returns one immutable page version, including its body. Reading a version does not
+        bump `lastReferencedAt`.
+
+        Parameters
+        ----------
+        brain_id : str
+            Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+
+        slug : str
+            The page slug within the brain.
+
+        version : int
+            The page version number.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        PageVersion
+            The page version.
+
+        Examples
+        --------
+        from memtavi import MemtaviApi
+
+        client = MemtaviApi(
+            subject_id="YOUR_SUBJECT_ID",
+            api_key="YOUR_API_KEY",
+        )
+        client.pages.get_page_version(
+            brain_id="brainId",
+            slug="slug",
+            version=1,
+        )
+        """
+        _response = self._raw_client.get_page_version(brain_id, slug, version, request_options=request_options)
+        return _response.data
+
+    def diff_page_versions(
+        self,
+        brain_id: str,
+        slug: str,
+        *,
+        from_: int,
+        to: typing.Optional[int] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> PageVersionDiff:
+        """
+        Line-based unified diff of `body` between two versions, with three lines of context.
+        `from` is required and `to` defaults to the page's current version. A missing or
+        malformed `from`, or a `from` that is greater than or equal to `to`, answers `400`.
+        A page or version that does not exist answers `404`. Bodies larger than 5,000 lines on
+        either side answer `400` rather than doing unbounded diff work. Reading versions does
+        not bump `lastReferencedAt`.
+
+        Parameters
+        ----------
+        brain_id : str
+            Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+
+        slug : str
+            The page slug within the brain.
+
+        from_ : int
+            The older version.
+
+        to : typing.Optional[int]
+            The newer version. Defaults to the page's current version.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        PageVersionDiff
+            The diff between the two versions.
+
+        Examples
+        --------
+        from memtavi import MemtaviApi
+
+        client = MemtaviApi(
+            subject_id="YOUR_SUBJECT_ID",
+            api_key="YOUR_API_KEY",
+        )
+        client.pages.diff_page_versions(
+            brain_id="brainId",
+            slug="slug",
+            from_=1,
+        )
+        """
+        _response = self._raw_client.diff_page_versions(
+            brain_id, slug, from_=from_, to=to, request_options=request_options
         )
         return _response.data
 
@@ -491,5 +648,183 @@ class AsyncPagesClient:
             status=status,
             version=version,
             request_options=request_options,
+        )
+        return _response.data
+
+    async def list_page_versions(
+        self,
+        brain_id: str,
+        slug: str,
+        *,
+        limit: typing.Optional[int] = None,
+        offset: typing.Optional[int] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> ListPageVersionsResponse:
+        """
+        Lists the immutable version history of a page, newest first, without bodies.
+        Reading versions does not bump `lastReferencedAt`; only `getPage` does.
+
+        Parameters
+        ----------
+        brain_id : str
+            Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+
+        slug : str
+            The page slug within the brain.
+
+        limit : typing.Optional[int]
+            Maximum number of items to return.
+
+        offset : typing.Optional[int]
+            Number of items to skip before collecting the page.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        ListPageVersionsResponse
+            Page versions, newest first.
+
+        Examples
+        --------
+        import asyncio
+
+        from memtavi import AsyncMemtaviApi
+
+        client = AsyncMemtaviApi(
+            subject_id="YOUR_SUBJECT_ID",
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.pages.list_page_versions(
+                brain_id="brainId",
+                slug="slug",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.list_page_versions(
+            brain_id, slug, limit=limit, offset=offset, request_options=request_options
+        )
+        return _response.data
+
+    async def get_page_version(
+        self, brain_id: str, slug: str, version: int, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> PageVersion:
+        """
+        Returns one immutable page version, including its body. Reading a version does not
+        bump `lastReferencedAt`.
+
+        Parameters
+        ----------
+        brain_id : str
+            Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+
+        slug : str
+            The page slug within the brain.
+
+        version : int
+            The page version number.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        PageVersion
+            The page version.
+
+        Examples
+        --------
+        import asyncio
+
+        from memtavi import AsyncMemtaviApi
+
+        client = AsyncMemtaviApi(
+            subject_id="YOUR_SUBJECT_ID",
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.pages.get_page_version(
+                brain_id="brainId",
+                slug="slug",
+                version=1,
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.get_page_version(brain_id, slug, version, request_options=request_options)
+        return _response.data
+
+    async def diff_page_versions(
+        self,
+        brain_id: str,
+        slug: str,
+        *,
+        from_: int,
+        to: typing.Optional[int] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> PageVersionDiff:
+        """
+        Line-based unified diff of `body` between two versions, with three lines of context.
+        `from` is required and `to` defaults to the page's current version. A missing or
+        malformed `from`, or a `from` that is greater than or equal to `to`, answers `400`.
+        A page or version that does not exist answers `404`. Bodies larger than 5,000 lines on
+        either side answer `400` rather than doing unbounded diff work. Reading versions does
+        not bump `lastReferencedAt`.
+
+        Parameters
+        ----------
+        brain_id : str
+            Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+
+        slug : str
+            The page slug within the brain.
+
+        from_ : int
+            The older version.
+
+        to : typing.Optional[int]
+            The newer version. Defaults to the page's current version.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        PageVersionDiff
+            The diff between the two versions.
+
+        Examples
+        --------
+        import asyncio
+
+        from memtavi import AsyncMemtaviApi
+
+        client = AsyncMemtaviApi(
+            subject_id="YOUR_SUBJECT_ID",
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.pages.diff_page_versions(
+                brain_id="brainId",
+                slug="slug",
+                from_=1,
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.diff_page_versions(
+            brain_id, slug, from_=from_, to=to, request_options=request_options
         )
         return _response.data

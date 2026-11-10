@@ -53,6 +53,25 @@ export async function listPages(
   return { items: items.rows, total: total.rows[0]?.total ?? 0, limit, offset };
 }
 
+export async function findPageBySlug(
+  client: PoolClient,
+  tenantId: string,
+  subjectId: string,
+  brainId: string,
+  slug: string,
+): Promise<{ id: string; version: number }> {
+  await requireBrain(client, tenantId, subjectId, brainId);
+  const result = await client.query<{ id: string; version: number }>(
+    `SELECT id, version FROM pages
+     WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND slug = $4
+     AND deletion_state = 'active'`,
+    [tenantId, subjectId, brainId, slug],
+  );
+  const page = result.rows[0];
+  if (!page) throw new DomainError("NotFoundError", 404, "Not found");
+  return page;
+}
+
 export async function getPageBySlug(
   client: PoolClient,
   tenantId: string,

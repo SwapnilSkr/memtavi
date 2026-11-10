@@ -9,6 +9,11 @@ export const indexLimit = t.Object({
   limit: t.Optional(t.Numeric({ minimum: 1, maximum: 200, multipleOf: 1, default: 40 })),
 });
 
+export const diffQuery = t.Object({
+  from: t.Numeric({ minimum: 1, multipleOf: 1 }),
+  to: t.Optional(t.Numeric({ minimum: 1, multipleOf: 1 })),
+});
+
 export const searchQuery = t.Object({
   q: t.String({ minLength: 1 }),
   limit: t.Optional(t.Numeric({ minimum: 1, maximum: 200, multipleOf: 1, default: 50 })),

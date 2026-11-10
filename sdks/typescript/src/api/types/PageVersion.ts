@@ -2,14 +2,15 @@
 
 import type * as MemtaviApi from "../index.js";
 
+/**
+ * One immutable page version, including its body.
+ */
 export interface PageVersion {
-    id: string;
-    pageId: string;
     version: number;
     title: string;
     summary: string;
     body: string;
-    ingestSourceId?: (string | null) | undefined;
     actor: MemtaviApi.ChangeActor;
+    ingestSourceId: string | null;
     createdAt: string;
 }

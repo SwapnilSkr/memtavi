@@ -7,9 +7,18 @@ import {
   listPages,
   updatePageBySlug,
 } from "../lib/pages";
-import { indexLimit, pageUpdate, pagination, permanentQuery, searchQuery } from "../lib/schemas";
+import {
+  diffQuery,
+  indexLimit,
+  pageUpdate,
+  pagination,
+  permanentQuery,
+  searchQuery,
+} from "../lib/schemas";
 import { searchPages } from "../lib/search";
+import { diffPageVersions, getPageVersion, listPageVersions } from "../lib/versions";
 import { auth } from "../middleware/auth";
+import { DomainError } from "../middleware/errors";
 import { scope, subjectId } from "../middleware/scope";
 
 export function pageRoutes(config: RouteConfig) {
@@ -74,6 +83,52 @@ export function pageRoutes(config: RouteConfig) {
         return receipt;
       },
       { query: permanentQuery },
+    )
+    .get(
+      "/v1/brains/:brainId/pages/:slug/versions",
+      ({ auth, request, params, query }) => {
+        const subject = subjectId(request);
+        return scope(config, auth, subject, (client) =>
+          listPageVersions(
+            client,
+            auth.tenantId,
+            subject,
+            params.brainId,
+            params.slug,
+            query.limit ?? 50,
+            query.offset ?? 0,
+          ),
+        );
+      },
+      { query: pagination },
+    )
+    .get("/v1/brains/:brainId/pages/:slug/versions/:version", ({ auth, request, params }) => {
+      const subject = subjectId(request);
+      const version = Number(params.version);
+      if (!Number.isInteger(version) || version < 1) {
+        throw new DomainError("BadRequestError", 400, "Invalid request");
+      }
+      return scope(config, auth, subject, (client) =>
+        getPageVersion(client, auth.tenantId, subject, params.brainId, params.slug, version),
+      );
+    })
+    .get(
+      "/v1/brains/:brainId/pages/:slug/diff",
+      ({ auth, request, params, query }) => {
+        const subject = subjectId(request);
+        return scope(config, auth, subject, (client) =>
+          diffPageVersions(
+            client,
+            auth.tenantId,
+            subject,
+            params.brainId,
+            params.slug,
+            query.from,
+            query.to,
+          ),
+        );
+      },
+      { query: diffQuery },
     )
     .get(
       "/v1/brains/:brainId/index",

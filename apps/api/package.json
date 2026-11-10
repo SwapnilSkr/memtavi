@@ -16,6 +16,7 @@
     "@memtavi/llm": "workspace:*",
     "@memtavi/shared": "workspace:*",
     "@memtavi/storage": "workspace:*",
+    "diff": "9.0.0",
     "elysia": "^1.4.0",
     "pg": "^8.16.3"
   },

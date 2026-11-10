@@ -1373,6 +1373,304 @@ client.pages.update_page(
 </dl>
 </details>
 
+<details><summary><code>client.pages.<a href="src/memtavi/pages/client.py">list_page_versions</a>(...) -> ListPageVersionsResponse</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Lists the immutable version history of a page, newest first, without bodies.
+Reading versions does not bump `lastReferencedAt`; only `getPage` does.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```python
+from memtavi import MemtaviApi
+from memtavi.environment import MemtaviApiEnvironment
+
+client = MemtaviApi(
+    api_key="<value>",
+    subject_id="<x-subject-id>",
+    environment=MemtaviApiEnvironment.DEFAULT,
+)
+
+client.pages.list_page_versions(
+    brain_id="brainId",
+    slug="slug",
+)
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**brain_id:** `str` — Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**slug:** `str` — The page slug within the brain.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**limit:** `typing.Optional[int]` — Maximum number of items to return.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**offset:** `typing.Optional[int]` — Number of items to skip before collecting the page.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**request_options:** `typing.Optional[RequestOptions]` — Request-specific configuration.
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.pages.<a href="src/memtavi/pages/client.py">get_page_version</a>(...) -> PageVersion</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Returns one immutable page version, including its body. Reading a version does not
+bump `lastReferencedAt`.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```python
+from memtavi import MemtaviApi
+from memtavi.environment import MemtaviApiEnvironment
+
+client = MemtaviApi(
+    api_key="<value>",
+    subject_id="<x-subject-id>",
+    environment=MemtaviApiEnvironment.DEFAULT,
+)
+
+client.pages.get_page_version(
+    brain_id="brainId",
+    slug="slug",
+    version=1,
+)
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**brain_id:** `str` — Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**slug:** `str` — The page slug within the brain.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**version:** `int` — The page version number.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**request_options:** `typing.Optional[RequestOptions]` — Request-specific configuration.
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.pages.<a href="src/memtavi/pages/client.py">diff_page_versions</a>(...) -> PageVersionDiff</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Line-based unified diff of `body` between two versions, with three lines of context.
+`from` is required and `to` defaults to the page's current version. A missing or
+malformed `from`, or a `from` that is greater than or equal to `to`, answers `400`.
+A page or version that does not exist answers `404`. Bodies larger than 5,000 lines on
+either side answer `400` rather than doing unbounded diff work. Reading versions does
+not bump `lastReferencedAt`.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```python
+from memtavi import MemtaviApi
+from memtavi.environment import MemtaviApiEnvironment
+
+client = MemtaviApi(
+    api_key="<value>",
+    subject_id="<x-subject-id>",
+    environment=MemtaviApiEnvironment.DEFAULT,
+)
+
+client.pages.diff_page_versions(
+    brain_id="brainId",
+    slug="slug",
+    from_=1,
+)
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**brain_id:** `str` — Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**slug:** `str` — The page slug within the brain.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**from:** `int` — The older version.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**to:** `typing.Optional[int]` — The newer version. Defaults to the page's current version.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**request_options:** `typing.Optional[RequestOptions]` — Request-specific configuration.
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
 ## Search
 <details><summary><code>client.search.<a href="src/memtavi/search/client.py">brain</a>(...) -> SearchBrainResponse</code></summary>
 <dl>

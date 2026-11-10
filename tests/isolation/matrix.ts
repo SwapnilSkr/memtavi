@@ -2,7 +2,7 @@ import type { RequestOptions } from "../support/harness";
 import type { TargetTable, World } from "./fixtures";
 
 const HTTP_METHODS = ["get", "post", "put", "patch", "delete"] as const;
-const CHILD_PARAMS = new Set(["sourceId", "slug", "connectionId", "changeId"]);
+const CHILD_PARAMS = new Set(["sourceId", "slug", "connectionId", "changeId", "version"]);
 const TENANT_SCOPED_PARAMS = new Set(["webhookId", "keyId"]);
 const SUBJECT_SCOPED_PARAMS = new Set(["webhookId"]);
 
@@ -205,6 +205,7 @@ interface ParamValues {
   brainId: string;
   sourceId: string;
   slug: string;
+  version: string;
   connectionId: string;
   changeId: string;
   webhookId: string;
@@ -216,6 +217,7 @@ function paramValues(kind: CaseKind, world: World): ParamValues {
     brainId: world.own.brainId,
     sourceId: world.own.sourceId,
     slug: world.own.pageSlug,
+    version: "1",
     connectionId: world.own.connectionId,
     changeId: world.own.changeId,
     webhookId: world.own.webhookId,
@@ -225,6 +227,7 @@ function paramValues(kind: CaseKind, world: World): ParamValues {
     brainId: world.sibling.brainId,
     sourceId: world.sibling.sourceId,
     slug: world.sibling.pageSlug,
+    version: "1",
     connectionId: world.sibling.connectionId,
     changeId: world.sibling.changeId,
     webhookId: world.sibling.webhookId,
@@ -234,6 +237,7 @@ function paramValues(kind: CaseKind, world: World): ParamValues {
     brainId: world.foreign.brainId,
     sourceId: world.foreign.sourceId,
     slug: world.foreign.pageSlug,
+    version: "1",
     connectionId: world.foreign.connectionId,
     changeId: world.foreign.changeId,
     webhookId: world.foreign.webhookId,
@@ -325,6 +329,7 @@ function buildCase(operation: SpecOperation, kind: CaseKind, world: World): Matr
   }
   if (operation.operationId === "deletePage") options.query = { permanent: "true" };
   if (operation.operationId === "searchBrain") options.query = { q: world.searchToken };
+  if (operation.operationId === "diffPageVersions") options.query = { from: "1", to: "2" };
   if (kind === "auth-missing-key") options.key = null;
   if (kind === "auth-unknown-key") options.key = world.keys.unknown;
   if (kind === "auth-revoked-key") options.key = world.keys.revoked;

@@ -6,8 +6,8 @@ file by hand; run `bun run spec:docs`.
 - OpenAPI: 3.1.0
 - Version: 1.0.0
 - Server: https://api.memtavi.com
-- Endpoints: 34 operations across 25 paths
-- Schemas: 41 component schemas
+- Endpoints: 37 operations across 28 paths
+- Schemas: 47 component schemas
 
 ## Authentication
 
@@ -33,6 +33,9 @@ Subject routes (require `x-subject-id`):
 - `/v1/brains/{brainId}/index`
 - `/v1/brains/{brainId}/pages`
 - `/v1/brains/{brainId}/pages/{slug}`
+- `/v1/brains/{brainId}/pages/{slug}/diff`
+- `/v1/brains/{brainId}/pages/{slug}/versions`
+- `/v1/brains/{brainId}/pages/{slug}/versions/{version}`
 - `/v1/brains/{brainId}/profile`
 - `/v1/brains/{brainId}/score`
 - `/v1/brains/{brainId}/search`
@@ -72,6 +75,9 @@ Tenant routes (do not accept `x-subject-id`):
 - [`GET /v1/brains/{brainId}/pages/{slug}`](#get-v1brainsbrainidpagesslug) — Pages
 - [`PATCH /v1/brains/{brainId}/pages/{slug}`](#patch-v1brainsbrainidpagesslug) — Pages
 - [`DELETE /v1/brains/{brainId}/pages/{slug}`](#delete-v1brainsbrainidpagesslug) — Pages
+- [`GET /v1/brains/{brainId}/pages/{slug}/diff`](#get-v1brainsbrainidpagesslugdiff) — Pages
+- [`GET /v1/brains/{brainId}/pages/{slug}/versions`](#get-v1brainsbrainidpagesslugversions) — Pages
+- [`GET /v1/brains/{brainId}/pages/{slug}/versions/{version}`](#get-v1brainsbrainidpagesslugversionsversion) — Pages
 - [`GET /v1/brains/{brainId}/profile`](#get-v1brainsbrainidprofile) — Profile
 - [`PATCH /v1/brains/{brainId}/profile`](#patch-v1brainsbrainidprofile) — Profile
 - [`GET /v1/brains/{brainId}/score`](#get-v1brainsbrainidscore) — Score
@@ -106,6 +112,7 @@ Tenant routes (do not accept `x-subject-id`):
   - [`DeletionReceipt`](#deletionreceipt)
   - [`DeletionState`](#deletionstate)
   - [`ErrorEnvelope`](#errorenvelope)
+  - [`ExportedPageVersion`](#exportedpageversion)
   - [`Graph`](#graph)
   - [`GraphEdge`](#graphedge)
   - [`GraphNode`](#graphnode)
@@ -118,6 +125,11 @@ Tenant routes (do not accept `x-subject-id`):
   - [`PageType`](#pagetype)
   - [`PageUpdate`](#pageupdate)
   - [`PageVersion`](#pageversion)
+  - [`PageVersionDiff`](#pageversiondiff)
+  - [`PageVersionDiffLine`](#pageversiondiffline)
+  - [`PageVersionField`](#pageversionfield)
+  - [`PageVersionHunk`](#pageversionhunk)
+  - [`PageVersionSummary`](#pageversionsummary)
   - [`Profile`](#profile)
   - [`ProfileUpdate`](#profileupdate)
   - [`Score`](#score)
@@ -521,7 +533,7 @@ Returns the brain and its pages, versions, sources and connections.
 
 | Status | Description | Schema |
 | --- | --- | --- |
-| 200 | The exported brain. | `object { brain: Brain, pages: Page[], versions: PageVersion[], sources: IngestSource[], connections: Connection[] }` |
+| 200 | The exported brain. | `object { brain: Brain, pages: Page[], versions: ExportedPageVersion[], sources: IngestSource[], connections: Connection[] }` |
 | 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
@@ -699,6 +711,102 @@ soft-delete flag.
 | Status | Description | Schema |
 | --- | --- | --- |
 | 202 | Deletion accepted for asynchronous processing. | `DeletionReceipt` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
+| 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
+| 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
+| 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
+| 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
+
+### GET /v1/brains/{brainId}/pages/{slug}/diff
+
+`diffPageVersions` · Tags: Pages
+
+Diff two page versions
+
+Line-based unified diff of `body` between two versions, with three lines of context.
+`from` is required and `to` defaults to the page's current version. A missing or
+malformed `from`, or a `from` that is greater than or equal to `to`, answers `400`.
+A page or version that does not exist answers `404`. Bodies larger than 5,000 lines on
+either side answer `400` rather than doing unbounded diff work. Reading versions does
+not bump `lastReferencedAt`.
+
+**Security:** `x-api-key` + `x-subject-id`
+
+**Parameters**
+
+| Name | In | Required | Type | Notes |
+| --- | --- | --- | --- | --- |
+| `brainId` | path | yes | `string` | Prefixed brain id, `brn_` followed by 32 lowercase hex characters. Matches `^brn_[0-9a-f]{32}$`. |
+| `slug` | path | yes | `string` | The page slug within the brain. Minimum length 1. |
+| `from` | query | yes | `integer` | The older version. Minimum 1. |
+| `to` | query | no | `integer` | The newer version. Defaults to the page's current version. Minimum 1. |
+
+**Responses**
+
+| Status | Description | Schema |
+| --- | --- | --- |
+| 200 | The diff between the two versions. | `PageVersionDiff` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
+| 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
+| 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
+| 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
+| 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
+
+### GET /v1/brains/{brainId}/pages/{slug}/versions
+
+`listPageVersions` · Tags: Pages
+
+List page versions
+
+Lists the immutable version history of a page, newest first, without bodies.
+Reading versions does not bump `lastReferencedAt`; only `getPage` does.
+
+**Security:** `x-api-key` + `x-subject-id`
+
+**Parameters**
+
+| Name | In | Required | Type | Notes |
+| --- | --- | --- | --- | --- |
+| `brainId` | path | yes | `string` | Prefixed brain id, `brn_` followed by 32 lowercase hex characters. Matches `^brn_[0-9a-f]{32}$`. |
+| `slug` | path | yes | `string` | The page slug within the brain. Minimum length 1. |
+| `limit` | query | no | `integer` | Maximum number of items to return. Default `50`. Minimum 1. Maximum 200. |
+| `offset` | query | no | `integer` | Number of items to skip before collecting the page. Default `0`. Minimum 0. |
+
+**Responses**
+
+| Status | Description | Schema |
+| --- | --- | --- |
+| 200 | Page versions, newest first. | `object { items: PageVersionSummary[], total: integer, limit: integer, offset: integer }` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
+| 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
+| 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
+| 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
+| 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
+
+### GET /v1/brains/{brainId}/pages/{slug}/versions/{version}
+
+`getPageVersion` · Tags: Pages
+
+Get a page version
+
+Returns one immutable page version, including its body. Reading a version does not
+bump `lastReferencedAt`.
+
+**Security:** `x-api-key` + `x-subject-id`
+
+**Parameters**
+
+| Name | In | Required | Type | Notes |
+| --- | --- | --- | --- | --- |
+| `brainId` | path | yes | `string` | Prefixed brain id, `brn_` followed by 32 lowercase hex characters. Matches `^brn_[0-9a-f]{32}$`. |
+| `slug` | path | yes | `string` | The page slug within the brain. Minimum length 1. |
+| `version` | path | yes | `integer` | The page version number. Minimum 1. |
+
+**Responses**
+
+| Status | Description | Schema |
+| --- | --- | --- |
+| 200 | The page version. | `PageVersion` |
 | 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
@@ -1289,6 +1397,24 @@ Required: `statusCode`, `timestamp`, `path`, `message`, `body`
 | `message` | `string` | yes |  |
 | `body` | `object { message: string, error: string, statusCode: integer }` | yes |  |
 
+### ExportedPageVersion
+
+A page version as returned by the brain export.
+
+Required: `id`, `pageId`, `version`, `title`, `summary`, `body`, `actor`, `createdAt`
+
+| Property | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | `string (uuid)` | yes |  |
+| `pageId` | `string` | yes |  |
+| `version` | `integer` | yes | Minimum 1. |
+| `title` | `string` | yes |  |
+| `summary` | `string` | yes |  |
+| `body` | `string` | yes |  |
+| `ingestSourceId` | `string \| null` | no |  |
+| `actor` | [`ChangeActor`](#changeactor) | yes |  |
+| `createdAt` | `string (date-time)` | yes |  |
+
 ### Graph
 
 Required: `nodes`, `edges`
@@ -1446,18 +1572,77 @@ Required: none
 
 ### PageVersion
 
-Required: `id`, `pageId`, `version`, `title`, `summary`, `body`, `actor`, `createdAt`
+One immutable page version, including its body.
+
+Required: `version`, `title`, `summary`, `body`, `actor`, `ingestSourceId`, `createdAt`
 
 | Property | Type | Required | Notes |
 | --- | --- | --- | --- |
-| `id` | `string (uuid)` | yes |  |
-| `pageId` | `string` | yes |  |
 | `version` | `integer` | yes | Minimum 1. |
 | `title` | `string` | yes |  |
 | `summary` | `string` | yes |  |
 | `body` | `string` | yes |  |
-| `ingestSourceId` | `string \| null` | no |  |
 | `actor` | [`ChangeActor`](#changeactor) | yes |  |
+| `ingestSourceId` | `string \| null` | yes |  |
+| `createdAt` | `string (date-time)` | yes |  |
+
+### PageVersionDiff
+
+A line-based unified diff between two page versions.
+
+Required: `from`, `to`, `title`, `summary`, `hunks`
+
+| Property | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `from` | `integer` | yes | Minimum 1. |
+| `to` | `integer` | yes | Minimum 1. |
+| `title` | [`PageVersionField`](#pageversionfield) | yes |  |
+| `summary` | [`PageVersionField`](#pageversionfield) | yes |  |
+| `hunks` | `PageVersionHunk[]` | yes |  |
+
+### PageVersionDiffLine
+
+Required: `op`, `text`
+
+| Property | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `op` | `string` | yes | One of `context`, `add`, `remove`. |
+| `text` | `string` | yes |  |
+
+### PageVersionField
+
+Required: `from`, `to`
+
+| Property | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `from` | `string` | yes |  |
+| `to` | `string` | yes |  |
+
+### PageVersionHunk
+
+Required: `oldStart`, `oldLines`, `newStart`, `newLines`, `lines`
+
+| Property | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `oldStart` | `integer` | yes | Minimum 0. |
+| `oldLines` | `integer` | yes | Minimum 0. |
+| `newStart` | `integer` | yes | Minimum 0. |
+| `newLines` | `integer` | yes | Minimum 0. |
+| `lines` | `PageVersionDiffLine[]` | yes |  |
+
+### PageVersionSummary
+
+One immutable page version without its body.
+
+Required: `version`, `title`, `summary`, `actor`, `ingestSourceId`, `createdAt`
+
+| Property | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `version` | `integer` | yes | Minimum 1. |
+| `title` | `string` | yes |  |
+| `summary` | `string` | yes |  |
+| `actor` | [`ChangeActor`](#changeactor) | yes |  |
+| `ingestSourceId` | `string \| null` | yes |  |
 | `createdAt` | `string (date-time)` | yes |  |
 
 ### Profile

@@ -23,6 +23,7 @@ if typing.TYPE_CHECKING:
         DeletionState,
         ErrorEnvelope,
         ErrorEnvelopeBody,
+        ExportedPageVersion,
         Graph,
         GraphEdge,
         GraphNode,
@@ -34,6 +35,12 @@ if typing.TYPE_CHECKING:
         PageStatus,
         PageType,
         PageVersion,
+        PageVersionDiff,
+        PageVersionDiffLine,
+        PageVersionDiffLineOp,
+        PageVersionField,
+        PageVersionHunk,
+        PageVersionSummary,
         Profile,
         Score,
         SearchHit,
@@ -77,7 +84,7 @@ if typing.TYPE_CHECKING:
     from .environment import MemtaviApiEnvironment
     from .export import ExportBrainResponse
     from .members import ListMembersResponse
-    from .pages import ListPagesResponse
+    from .pages import ListPageVersionsResponse, ListPagesResponse
     from .search import GetIndexResponse, SearchBrainResponse
     from .sources import ListIngestSourcesResponse
     from .webhooks import ListWebhooksResponse, WebhookCreateEventsItem
@@ -102,6 +109,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "ErrorEnvelope": ".types",
     "ErrorEnvelopeBody": ".types",
     "ExportBrainResponse": ".export",
+    "ExportedPageVersion": ".types",
     "ForbiddenError": ".errors",
     "GetIndexResponse": ".search",
     "Graph": ".types",
@@ -116,6 +124,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "ListConnectionsResponse": ".connections",
     "ListIngestSourcesResponse": ".sources",
     "ListMembersResponse": ".members",
+    "ListPageVersionsResponse": ".pages",
     "ListPagesResponse": ".pages",
     "ListWebhooksResponse": ".webhooks",
     "Member": ".types",
@@ -127,6 +136,12 @@ _dynamic_imports: typing.Dict[str, str] = {
     "PageStatus": ".types",
     "PageType": ".types",
     "PageVersion": ".types",
+    "PageVersionDiff": ".types",
+    "PageVersionDiffLine": ".types",
+    "PageVersionDiffLineOp": ".types",
+    "PageVersionField": ".types",
+    "PageVersionHunk": ".types",
+    "PageVersionSummary": ".types",
     "Profile": ".types",
     "Score": ".types",
     "SearchBrainResponse": ".search",
@@ -199,6 +214,7 @@ __all__ = [
     "ErrorEnvelope",
     "ErrorEnvelopeBody",
     "ExportBrainResponse",
+    "ExportedPageVersion",
     "ForbiddenError",
     "GetIndexResponse",
     "Graph",
@@ -213,6 +229,7 @@ __all__ = [
     "ListConnectionsResponse",
     "ListIngestSourcesResponse",
     "ListMembersResponse",
+    "ListPageVersionsResponse",
     "ListPagesResponse",
     "ListWebhooksResponse",
     "Member",
@@ -224,6 +241,12 @@ __all__ = [
     "PageStatus",
     "PageType",
     "PageVersion",
+    "PageVersionDiff",
+    "PageVersionDiffLine",
+    "PageVersionDiffLineOp",
+    "PageVersionField",
+    "PageVersionHunk",
+    "PageVersionSummary",
     "Profile",
     "Score",
     "SearchBrainResponse",

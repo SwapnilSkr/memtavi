@@ -6,15 +6,15 @@ import pydantic
 from ...core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 from ...types.brain import Brain
 from ...types.connection import Connection
+from ...types.exported_page_version import ExportedPageVersion
 from ...types.ingest_source import IngestSource
 from ...types.page import Page
-from ...types.page_version import PageVersion
 
 
 class ExportBrainResponse(UniversalBaseModel):
     brain: Brain
     pages: typing.List[Page]
-    versions: typing.List[PageVersion]
+    versions: typing.List[ExportedPageVersion]
     sources: typing.List[IngestSource]
     connections: typing.List[Connection]
 
