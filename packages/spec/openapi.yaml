@@ -211,6 +211,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DeletionReceipt"
+        "400":
+          $ref: "#/components/responses/Error400"
         "401":
           $ref: "#/components/responses/Error401"
         "403":

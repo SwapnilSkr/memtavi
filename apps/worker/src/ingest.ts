@@ -97,6 +97,13 @@ export async function ingestCapture({
   fetchDocument,
 }: JobContext): Promise<void> {
   const { sourceId, brainId } = payloadOf(job.payload);
+  if (brainId !== job.brainId) throw new JobError("permanent", "Invalid job payload");
+  const brain = await client.query(
+    `SELECT id FROM brains WHERE tenant_id = $1 AND id = $2
+     AND deletion_state = 'active' FOR SHARE`,
+    [job.tenantId, brainId],
+  );
+  if (!brain.rowCount) return;
   const result = await client.query<SourceRow>(SOURCE_SQL, [job.tenantId, brainId, sourceId]);
   const source = result.rows[0];
   if (!source) throw new JobError("permanent", "Source not found");

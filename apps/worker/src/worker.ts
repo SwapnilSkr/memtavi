@@ -10,6 +10,7 @@ import type { ObjectStore } from "@memtavi/storage/types";
 import type { PoolClient } from "pg";
 import { compileCapture } from "./compile";
 import { ingestCapture } from "./ingest";
+import { purgeBrain } from "./purge";
 import {
   type ClaimedJob,
   type CompilerConfig,
@@ -131,6 +132,7 @@ export function createWorker(config: WorkerConfig): Worker {
     "capture.ingest": ingestCapture,
     "capture.compile": compileCapture,
     "webhook.deliver": deliverWebhook,
+    "brain.purge": purgeBrain,
   };
   const types = Object.keys(handlers);
   if (types.length === 0) throw new Error("At least one job handler is required");

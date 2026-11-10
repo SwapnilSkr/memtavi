@@ -64,7 +64,8 @@ export async function getBrain(
   brainId: string,
 ) {
   const result = await client.query(
-    `SELECT ${columns} FROM brains WHERE tenant_id = $1 AND subject_id = $2 AND id = $3`,
+    `SELECT ${columns} FROM brains WHERE tenant_id = $1 AND subject_id = $2 AND id = $3
+     AND deletion_state = 'active' FOR SHARE`,
     [tenantId, subjectId, brainId],
   );
   if (!result.rows[0]) throw new DomainError("NotFoundError", 404, "Not found");
@@ -80,7 +81,7 @@ export async function updateBrain(
 ) {
   const found = await client.query(
     `SELECT ${columns} FROM brains
-     WHERE tenant_id = $1 AND subject_id = $2 AND id = $3
+     WHERE tenant_id = $1 AND subject_id = $2 AND id = $3 AND deletion_state = 'active'
      FOR UPDATE`,
     [tenantId, subjectId, brainId],
   );
@@ -126,13 +127,51 @@ export async function listBrains(
   offset: number,
 ) {
   const total = await client.query<{ total: number }>(
-    "SELECT count(*)::int AS total FROM brains WHERE tenant_id = $1 AND subject_id = $2",
+    `SELECT count(*)::int AS total FROM brains WHERE tenant_id = $1 AND subject_id = $2
+     AND deletion_state = 'active'`,
     [tenantId, subjectId],
   );
   const items = await client.query(
     `SELECT ${columns} FROM brains WHERE tenant_id = $1 AND subject_id = $2
+     AND deletion_state = 'active'
      ORDER BY id LIMIT $3 OFFSET $4`,
     [tenantId, subjectId, limit, offset],
   );
   return { items: items.rows, total: total.rows[0]?.total ?? 0, limit, offset };
+}
+
+export async function deleteBrain(
+  client: PoolClient,
+  tenantId: string,
+  subjectId: string,
+  brainId: string,
+) {
+  const found = await client.query(
+    `SELECT id FROM brains WHERE tenant_id = $1 AND subject_id = $2 AND id = $3
+     AND deletion_state = 'active' FOR UPDATE`,
+    [tenantId, subjectId, brainId],
+  );
+  if (!found.rowCount) throw new DomainError("NotFoundError", 404, "Not found");
+  await client.query(
+    `UPDATE brains SET deletion_state = 'deleting', updated_at = now()
+     WHERE tenant_id = $1 AND subject_id = $2 AND id = $3`,
+    [tenantId, subjectId, brainId],
+  );
+  await client.query(
+    `INSERT INTO deletion_ops (tenant_id, brain_id, target_type, target_id, state)
+     VALUES ($1, $2, 'brain', $2, 'pending')`,
+    [tenantId, brainId],
+  );
+  await client.query(
+    `INSERT INTO jobs (tenant_id, brain_id, type, payload, idempotency_key)
+     VALUES ($1, $2, 'brain.purge', jsonb_build_object('brainId', $2::text), $3)
+     ON CONFLICT (tenant_id, idempotency_key) DO NOTHING`,
+    [tenantId, brainId, `brain.purge:${brainId}`],
+  );
+  await client.query(
+    `INSERT INTO audit_events (tenant_id, actor_type, actor_id, action, target_type, target_id)
+     VALUES ($1, 'subject', $2, 'brain.delete', 'brain', $3)`,
+    [tenantId, subjectId, brainId],
+  );
+  return { id: brainId, targetType: "brain", state: "pending" };
 }

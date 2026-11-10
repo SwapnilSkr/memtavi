@@ -238,7 +238,9 @@ export const brains = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    unique("brains_tenant_subject_slug_unique").on(table.tenantId, table.subjectId, table.slug),
+    uniqueIndex("brains_tenant_subject_slug_unique")
+      .on(table.tenantId, table.subjectId, table.slug)
+      .where(sql`${table.deletionState} = 'active'`),
     unique("brains_tenant_id_unique").on(table.tenantId, table.id),
     unique("brains_tenant_subject_id_unique").on(table.tenantId, table.subjectId, table.id),
     index("brains_name_trgm_gin").using("gin", table.name.op("gin_trgm_ops")),
