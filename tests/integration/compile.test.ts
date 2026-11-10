@@ -438,24 +438,75 @@ describe("capture.compile", () => {
     expect(provider.calls.filter((call) => call.kind === "chat")).toHaveLength(1);
   });
 
+  test.each(["original", "replay"] as const)(
+    "replays of one source cannot duplicate compiler writes when the %s job runs first",
+    async (firstJob) => {
+      await capture();
+      const replay = await owner.query<{ id: string }>(
+        `INSERT INTO jobs (tenant_id, brain_id, type, payload, idempotency_key)
+         SELECT tenant_id, brain_id, type, payload, idempotency_key || ':replay' FROM jobs WHERE id = $1
+         RETURNING id`,
+        [jobId],
+      );
+      const replayId = replay.rows[0]?.id ?? "";
+      const winnerId = firstJob === "original" ? jobId : replayId;
+      const loserId = firstJob === "original" ? replayId : jobId;
+      await owner.query("UPDATE jobs SET available_at = now() + interval '1 hour' WHERE id = $1", [
+        loserId,
+      ]);
+      const instance = worker();
+      const won = await instance.runOnce();
+      await owner.query("UPDATE jobs SET available_at = now() WHERE id = $1", [loserId]);
+      const lost = await instance.runOnce();
+      expect([won, lost]).toEqual([true, true]);
+      expect(await counts()).toEqual({
+        pages: 1,
+        versions: 1,
+        sources: 1,
+        events: 1,
+        embeddings: 1,
+        ledger: winnerId === jobId ? 3 : 0,
+        reviews: 0,
+      });
+      const ledger = await owner.query<{ job_id: string; n: number }>(
+        `SELECT job_id, count(*)::int AS n FROM usage_ledger
+         WHERE tenant_id = $1 AND job_id = ANY($2::uuid[]) GROUP BY job_id`,
+        [tenantId, [jobId, replayId]],
+      );
+      expect(ledger.rows).toHaveLength(1);
+      expect(ledger.rows[0]?.job_id).toBe(winnerId);
+      expect(ledger.rows[0]?.n).toBe(3);
+      expect(provider.calls.filter((call) => call.kind === "chat")).toHaveLength(1);
+    },
+  );
+
   test("concurrent replays of one source cannot duplicate compiler writes", async () => {
     await capture();
-    await owner.query(
+    const replay = await owner.query<{ id: string }>(
       `INSERT INTO jobs (tenant_id, brain_id, type, payload, idempotency_key)
-       SELECT tenant_id, brain_id, type, payload, idempotency_key || ':replay' FROM jobs WHERE id = $1`,
+       SELECT tenant_id, brain_id, type, payload, idempotency_key || ':replay' FROM jobs WHERE id = $1
+       RETURNING id`,
       [jobId],
     );
+    const replayId = replay.rows[0]?.id ?? "";
     const instance = worker();
     expect(await Promise.all([instance.runOnce(), instance.runOnce()])).toEqual([true, true]);
-    expect(await counts()).toEqual({
+    expect(await counts()).toMatchObject({
       pages: 1,
       versions: 1,
       sources: 1,
       events: 1,
       embeddings: 1,
-      ledger: 3,
       reviews: 0,
     });
+    const ledger = await owner.query<{ job_id: string; n: number }>(
+      `SELECT job_id, count(*)::int AS n FROM usage_ledger
+       WHERE tenant_id = $1 AND job_id = ANY($2::uuid[]) GROUP BY job_id`,
+      [tenantId, [jobId, replayId]],
+    );
+    expect(ledger.rows).toHaveLength(1);
+    expect([jobId, replayId].includes(ledger.rows[0]?.job_id ?? "")).toBe(true);
+    expect(ledger.rows[0]?.n).toBe(3);
     expect(provider.calls.filter((call) => call.kind === "chat")).toHaveLength(1);
   });
 
