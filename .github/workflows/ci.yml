@@ -131,5 +131,7 @@ jobs:
         run: bun test apps/web/src
       - name: Isolation tests
         run: bun run test:isolation
+      - name: Contract tests
+        run: bun run test:contract
       - name: Integration tests
         run: bun run test:integration

@@ -147,6 +147,14 @@
         "typescript": "^7.0.2",
       },
     },
+    "tests/contract": {
+      "name": "@memtavi/contract-tests",
+      "version": "0.0.0",
+      "dependencies": {
+        "@memtavi/shared": "workspace:*",
+        "@memtavi/test-support": "workspace:*",
+      },
+    },
     "tests/integration": {
       "name": "@memtavi/integration-tests",
       "dependencies": {
@@ -174,6 +182,23 @@
         "@memtavi/db": "workspace:*",
         "@memtavi/shared": "workspace:*",
         "pg": "^8.16.3",
+      },
+      "devDependencies": {
+        "@types/pg": "^8.15.5",
+      },
+    },
+    "tests/support": {
+      "name": "@memtavi/test-support",
+      "version": "0.0.0",
+      "dependencies": {
+        "@memtavi/api": "workspace:*",
+        "@memtavi/db": "workspace:*",
+        "@memtavi/shared": "workspace:*",
+        "@memtavi/storage": "workspace:*",
+        "ajv": "^8.17.1",
+        "ajv-formats": "^3.0.1",
+        "pg": "^8.16.3",
+        "yaml": "^2.8.1",
       },
       "devDependencies": {
         "@types/pg": "^8.15.5",
@@ -321,6 +346,8 @@
 
     "@memtavi/client": ["@memtavi/client@workspace:packages/client"],
 
+    "@memtavi/contract-tests": ["@memtavi/contract-tests@workspace:tests/contract"],
+
     "@memtavi/core": ["@memtavi/core@workspace:packages/core"],
 
     "@memtavi/db": ["@memtavi/db@workspace:packages/db"],
@@ -342,6 +369,8 @@
     "@memtavi/spec": ["@memtavi/spec@workspace:packages/spec"],
 
     "@memtavi/storage": ["@memtavi/storage@workspace:packages/storage"],
+
+    "@memtavi/test-support": ["@memtavi/test-support@workspace:tests/support"],
 
     "@memtavi/web": ["@memtavi/web@workspace:apps/web"],
 
