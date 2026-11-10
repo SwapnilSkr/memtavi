@@ -5,7 +5,7 @@ import type * as MemtaviApi from "../../../index.js";
 export interface ExportBrainResponse {
     brain: MemtaviApi.Brain;
     pages: MemtaviApi.Page[];
-    versions: MemtaviApi.PageVersion[];
+    versions: MemtaviApi.ExportedPageVersion[];
     sources: MemtaviApi.IngestSource[];
     connections: MemtaviApi.Connection[];
 }

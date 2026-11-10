@@ -459,4 +459,338 @@ export class PagesClient {
             "/v1/brains/{brainId}/pages/{slug}",
         );
     }
+
+    /**
+     * Lists the immutable version history of a page, newest first, without bodies.
+     * Reading versions does not bump `lastReferencedAt`; only `getPage` does.
+     *
+     * @param {MemtaviApi.ListPageVersionsRequest} request
+     * @param {PagesClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link MemtaviApi.BadRequestError}
+     * @throws {@link MemtaviApi.UnauthorizedError}
+     * @throws {@link MemtaviApi.NotFoundError}
+     * @throws {@link MemtaviApi.TooManyRequestsError}
+     * @throws {@link MemtaviApi.InternalServerError}
+     * @throws {@link errors.MemtaviApiError}
+     * @throws {@link errors.MemtaviApiTimeoutError}
+     *
+     * @example
+     *     await client.pages.listPageVersions({
+     *         brainId: "brainId",
+     *         slug: "slug"
+     *     })
+     */
+    public listPageVersions(
+        request: MemtaviApi.ListPageVersionsRequest,
+        requestOptions?: PagesClient.RequestOptions,
+    ): core.HttpResponsePromise<MemtaviApi.ListPageVersionsResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__listPageVersions(request, requestOptions));
+    }
+
+    private async __listPageVersions(
+        request: MemtaviApi.ListPageVersionsRequest,
+        requestOptions?: PagesClient.RequestOptions,
+    ): Promise<core.WithRawResponse<MemtaviApi.ListPageVersionsResponse>> {
+        const { brainId, slug, limit, offset } = request;
+        const _queryParams: Record<string, unknown> = {
+            limit,
+            offset,
+        };
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({ "x-subject-id": requestOptions?.subjectId ?? this._options?.subjectId }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.MemtaviApiEnvironment.Default,
+                `v1/brains/${core.url.encodePathParam(brainId, errors.MemtaviApiError)}/pages/${core.url.encodePathParam(slug, errors.MemtaviApiError)}/versions`,
+            ),
+            method: "GET",
+            headers: _headers,
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as MemtaviApi.ListPageVersionsResponse, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new MemtaviApi.BadRequestError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 401:
+                    throw new MemtaviApi.UnauthorizedError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 404:
+                    throw new MemtaviApi.NotFoundError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 429:
+                    throw new MemtaviApi.TooManyRequestsError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 500:
+                    throw new MemtaviApi.InternalServerError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                default:
+                    throw new errors.MemtaviApiError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "GET",
+            "/v1/brains/{brainId}/pages/{slug}/versions",
+        );
+    }
+
+    /**
+     * Returns one immutable page version, including its body. Reading a version does not
+     * bump `lastReferencedAt`.
+     *
+     * @param {MemtaviApi.GetPageVersionRequest} request
+     * @param {PagesClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link MemtaviApi.BadRequestError}
+     * @throws {@link MemtaviApi.UnauthorizedError}
+     * @throws {@link MemtaviApi.NotFoundError}
+     * @throws {@link MemtaviApi.TooManyRequestsError}
+     * @throws {@link MemtaviApi.InternalServerError}
+     * @throws {@link errors.MemtaviApiError}
+     * @throws {@link errors.MemtaviApiTimeoutError}
+     *
+     * @example
+     *     await client.pages.getPageVersion({
+     *         brainId: "brainId",
+     *         slug: "slug",
+     *         version: 1
+     *     })
+     */
+    public getPageVersion(
+        request: MemtaviApi.GetPageVersionRequest,
+        requestOptions?: PagesClient.RequestOptions,
+    ): core.HttpResponsePromise<MemtaviApi.PageVersion> {
+        return core.HttpResponsePromise.fromPromise(this.__getPageVersion(request, requestOptions));
+    }
+
+    private async __getPageVersion(
+        request: MemtaviApi.GetPageVersionRequest,
+        requestOptions?: PagesClient.RequestOptions,
+    ): Promise<core.WithRawResponse<MemtaviApi.PageVersion>> {
+        const { brainId, slug, version } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({ "x-subject-id": requestOptions?.subjectId ?? this._options?.subjectId }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.MemtaviApiEnvironment.Default,
+                `v1/brains/${core.url.encodePathParam(brainId, errors.MemtaviApiError)}/pages/${core.url.encodePathParam(slug, errors.MemtaviApiError)}/versions/${core.url.encodePathParam(version, errors.MemtaviApiError)}`,
+            ),
+            method: "GET",
+            headers: _headers,
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as MemtaviApi.PageVersion, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new MemtaviApi.BadRequestError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 401:
+                    throw new MemtaviApi.UnauthorizedError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 404:
+                    throw new MemtaviApi.NotFoundError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 429:
+                    throw new MemtaviApi.TooManyRequestsError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 500:
+                    throw new MemtaviApi.InternalServerError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                default:
+                    throw new errors.MemtaviApiError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "GET",
+            "/v1/brains/{brainId}/pages/{slug}/versions/{version}",
+        );
+    }
+
+    /**
+     * Line-based unified diff of `body` between two versions, with three lines of context.
+     * `from` is required and `to` defaults to the page's current version. A missing or
+     * malformed `from`, or a `from` that is greater than or equal to `to`, answers `400`.
+     * A page or version that does not exist answers `404`. Bodies larger than 5,000 lines on
+     * either side answer `400` rather than doing unbounded diff work. Reading versions does
+     * not bump `lastReferencedAt`.
+     *
+     * @param {MemtaviApi.DiffPageVersionsRequest} request
+     * @param {PagesClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link MemtaviApi.BadRequestError}
+     * @throws {@link MemtaviApi.UnauthorizedError}
+     * @throws {@link MemtaviApi.NotFoundError}
+     * @throws {@link MemtaviApi.TooManyRequestsError}
+     * @throws {@link MemtaviApi.InternalServerError}
+     * @throws {@link errors.MemtaviApiError}
+     * @throws {@link errors.MemtaviApiTimeoutError}
+     *
+     * @example
+     *     await client.pages.diffPageVersions({
+     *         brainId: "brainId",
+     *         slug: "slug",
+     *         from: 1
+     *     })
+     */
+    public diffPageVersions(
+        request: MemtaviApi.DiffPageVersionsRequest,
+        requestOptions?: PagesClient.RequestOptions,
+    ): core.HttpResponsePromise<MemtaviApi.PageVersionDiff> {
+        return core.HttpResponsePromise.fromPromise(this.__diffPageVersions(request, requestOptions));
+    }
+
+    private async __diffPageVersions(
+        request: MemtaviApi.DiffPageVersionsRequest,
+        requestOptions?: PagesClient.RequestOptions,
+    ): Promise<core.WithRawResponse<MemtaviApi.PageVersionDiff>> {
+        const { brainId, slug, from: from_, to } = request;
+        const _queryParams: Record<string, unknown> = {
+            from: from_,
+            to,
+        };
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({ "x-subject-id": requestOptions?.subjectId ?? this._options?.subjectId }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.MemtaviApiEnvironment.Default,
+                `v1/brains/${core.url.encodePathParam(brainId, errors.MemtaviApiError)}/pages/${core.url.encodePathParam(slug, errors.MemtaviApiError)}/diff`,
+            ),
+            method: "GET",
+            headers: _headers,
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as MemtaviApi.PageVersionDiff, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new MemtaviApi.BadRequestError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 401:
+                    throw new MemtaviApi.UnauthorizedError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 404:
+                    throw new MemtaviApi.NotFoundError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 429:
+                    throw new MemtaviApi.TooManyRequestsError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 500:
+                    throw new MemtaviApi.InternalServerError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                default:
+                    throw new errors.MemtaviApiError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "GET",
+            "/v1/brains/{brainId}/pages/{slug}/diff",
+        );
+    }
 }

@@ -22,6 +22,7 @@ if typing.TYPE_CHECKING:
     from .deletion_state import DeletionState
     from .error_envelope import ErrorEnvelope
     from .error_envelope_body import ErrorEnvelopeBody
+    from .exported_page_version import ExportedPageVersion
     from .graph import Graph
     from .graph_edge import GraphEdge
     from .graph_node import GraphNode
@@ -33,6 +34,12 @@ if typing.TYPE_CHECKING:
     from .page_status import PageStatus
     from .page_type import PageType
     from .page_version import PageVersion
+    from .page_version_diff import PageVersionDiff
+    from .page_version_diff_line import PageVersionDiffLine
+    from .page_version_diff_line_op import PageVersionDiffLineOp
+    from .page_version_field import PageVersionField
+    from .page_version_hunk import PageVersionHunk
+    from .page_version_summary import PageVersionSummary
     from .profile import Profile
     from .score import Score
     from .search_hit import SearchHit
@@ -58,6 +65,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "DeletionState": ".deletion_state",
     "ErrorEnvelope": ".error_envelope",
     "ErrorEnvelopeBody": ".error_envelope_body",
+    "ExportedPageVersion": ".exported_page_version",
     "Graph": ".graph",
     "GraphEdge": ".graph_edge",
     "GraphNode": ".graph_node",
@@ -69,6 +77,12 @@ _dynamic_imports: typing.Dict[str, str] = {
     "PageStatus": ".page_status",
     "PageType": ".page_type",
     "PageVersion": ".page_version",
+    "PageVersionDiff": ".page_version_diff",
+    "PageVersionDiffLine": ".page_version_diff_line",
+    "PageVersionDiffLineOp": ".page_version_diff_line_op",
+    "PageVersionField": ".page_version_field",
+    "PageVersionHunk": ".page_version_hunk",
+    "PageVersionSummary": ".page_version_summary",
     "Profile": ".profile",
     "Score": ".score",
     "SearchHit": ".search_hit",
@@ -118,6 +132,7 @@ __all__ = [
     "DeletionState",
     "ErrorEnvelope",
     "ErrorEnvelopeBody",
+    "ExportedPageVersion",
     "Graph",
     "GraphEdge",
     "GraphNode",
@@ -129,6 +144,12 @@ __all__ = [
     "PageStatus",
     "PageType",
     "PageVersion",
+    "PageVersionDiff",
+    "PageVersionDiffLine",
+    "PageVersionDiffLineOp",
+    "PageVersionField",
+    "PageVersionHunk",
+    "PageVersionSummary",
     "Profile",
     "Score",
     "SearchHit",

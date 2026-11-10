@@ -201,6 +201,11 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
               ($6, $2, $3, $4, 'delete-me', 'Delete me', '', '', 'topic', 'hash-delete')`,
       [alphaId, harness.tenants.a, harness.subjects.a, brainId, betaId, deleteId],
     );
+    await harness.owner.query(
+      `INSERT INTO page_versions (tenant_id, page_id, version, title, summary, body, actor)
+       VALUES ($1, $2, 1, 'Alpha guide', 'The first page', 'alpha body', 'compiler')`,
+      [harness.tenants.a, alphaId],
+    );
     connectionId = newId("connection");
     await harness.owner.query(
       `INSERT INTO connections
@@ -333,6 +338,30 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
       "PATCH",
       `/v1/brains/${brainId}/pages/${pageSlug}`,
       { method: "PATCH", body: { title: "Alpha guide v2", version: 1 } },
+      200,
+    );
+    await callSuccess(
+      "listPageVersions",
+      "/v1/brains/{brainId}/pages/{slug}/versions",
+      "GET",
+      `/v1/brains/${brainId}/pages/${pageSlug}/versions`,
+      {},
+      200,
+    );
+    await callSuccess(
+      "getPageVersion",
+      "/v1/brains/{brainId}/pages/{slug}/versions/{version}",
+      "GET",
+      `/v1/brains/${brainId}/pages/${pageSlug}/versions/1`,
+      {},
+      200,
+    );
+    await callSuccess(
+      "diffPageVersions",
+      "/v1/brains/{brainId}/pages/{slug}/diff",
+      "GET",
+      `/v1/brains/${brainId}/pages/${pageSlug}/diff?from=1&to=2`,
+      {},
       200,
     );
     await callSuccess(

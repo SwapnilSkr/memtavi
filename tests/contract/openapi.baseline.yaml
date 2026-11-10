@@ -601,6 +601,184 @@ paths:
         "500":
           $ref: "#/components/responses/Error500"
 
+  /v1/brains/{brainId}/pages/{slug}/versions:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+      - $ref: "#/components/parameters/Slug"
+    get:
+      operationId: listPageVersions
+      tags:
+        - Pages
+      summary: List page versions
+      description: |
+        Lists the immutable version history of a page, newest first, without bodies.
+        Reading versions does not bump `lastReferencedAt`; only `getPage` does.
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Page versions, newest first.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                  - total
+                  - limit
+                  - offset
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PageVersionSummary"
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+              example:
+                items:
+                  - version: 3
+                    title: Compiler prompt
+                    summary: How the compiler chooses a band
+                    actor: compiler
+                    ingestSourceId: null
+                    createdAt: "2026-11-10T10:00:00.000Z"
+                total: 1
+                limit: 50
+                offset: 0
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/brains/{brainId}/pages/{slug}/versions/{version}:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+      - $ref: "#/components/parameters/Slug"
+      - $ref: "#/components/parameters/Version"
+    get:
+      operationId: getPageVersion
+      tags:
+        - Pages
+      summary: Get a page version
+      description: |
+        Returns one immutable page version, including its body. Reading a version does not
+        bump `lastReferencedAt`.
+      responses:
+        "200":
+          description: The page version.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageVersion"
+              example:
+                version: 2
+                title: Compiler prompt
+                summary: How the compiler chooses a band
+                body: "Bands are chosen by the policy threshold.\n"
+                actor: compiler
+                ingestSourceId: src_0123456789abcdef0123456789abcdef
+                createdAt: "2026-11-10T10:00:00.000Z"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/brains/{brainId}/pages/{slug}/diff:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+      - $ref: "#/components/parameters/Slug"
+    get:
+      operationId: diffPageVersions
+      tags:
+        - Pages
+      summary: Diff two page versions
+      description: |
+        Line-based unified diff of `body` between two versions, with three lines of context.
+        `from` is required and `to` defaults to the page's current version. A missing or
+        malformed `from`, or a `from` that is greater than or equal to `to`, answers `400`.
+        A page or version that does not exist answers `404`. Bodies larger than 5,000 lines on
+        either side answer `400` rather than doing unbounded diff work. Reading versions does
+        not bump `lastReferencedAt`.
+      parameters:
+        - name: from
+          in: query
+          required: true
+          description: The older version.
+          schema:
+            type: integer
+            minimum: 1
+        - name: to
+          in: query
+          required: false
+          description: The newer version. Defaults to the page's current version.
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: The diff between the two versions.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageVersionDiff"
+              example:
+                from: 1
+                to: 2
+                title:
+                  from: Compiler prompt
+                  to: Compiler prompt
+                summary:
+                  from: How the compiler chooses a band
+                  to: How the compiler chooses a band and a route
+                hunks:
+                  - oldStart: 1
+                    oldLines: 2
+                    newStart: 1
+                    newLines: 2
+                    lines:
+                      - op: context
+                        text: Bands are chosen by the policy threshold.
+                      - op: remove
+                        text: Routing is out of scope.
+                      - op: add
+                        text: Routing follows the band.
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
   /v1/brains/{brainId}/search:
     parameters:
       - $ref: "#/components/parameters/BrainId"
@@ -1039,7 +1217,7 @@ paths:
                   versions:
                     type: array
                     items:
-                      $ref: "#/components/schemas/PageVersion"
+                      $ref: "#/components/schemas/ExportedPageVersion"
                   sources:
                     type: array
                     items:
@@ -1462,6 +1640,14 @@ components:
       schema:
         type: string
         minLength: 1
+    Version:
+      name: version
+      in: path
+      required: true
+      description: The page version number.
+      schema:
+        type: integer
+        minimum: 1
     WebhookId:
       name: webhookId
       in: path
@@ -1911,8 +2097,68 @@ components:
           minimum: 1
           description: The version the client last read. A mismatch returns `409`.
 
+    PageVersionSummary:
+      type: object
+      description: One immutable page version without its body.
+      required:
+        - version
+        - title
+        - summary
+        - actor
+        - ingestSourceId
+        - createdAt
+      properties:
+        version:
+          type: integer
+          minimum: 1
+        title:
+          type: string
+        summary:
+          type: string
+        actor:
+          $ref: "#/components/schemas/ChangeActor"
+        ingestSourceId:
+          type:
+            - string
+            - "null"
+        createdAt:
+          type: string
+          format: date-time
+
     PageVersion:
       type: object
+      description: One immutable page version, including its body.
+      required:
+        - version
+        - title
+        - summary
+        - body
+        - actor
+        - ingestSourceId
+        - createdAt
+      properties:
+        version:
+          type: integer
+          minimum: 1
+        title:
+          type: string
+        summary:
+          type: string
+        body:
+          type: string
+        actor:
+          $ref: "#/components/schemas/ChangeActor"
+        ingestSourceId:
+          type:
+            - string
+            - "null"
+        createdAt:
+          type: string
+          format: date-time
+
+    ExportedPageVersion:
+      type: object
+      description: A page version as returned by the brain export.
       required:
         - id
         - pageId
@@ -1946,6 +2192,83 @@ components:
         createdAt:
           type: string
           format: date-time
+
+    PageVersionDiff:
+      type: object
+      description: A line-based unified diff between two page versions.
+      required:
+        - from
+        - to
+        - title
+        - summary
+        - hunks
+      properties:
+        from:
+          type: integer
+          minimum: 1
+        to:
+          type: integer
+          minimum: 1
+        title:
+          $ref: "#/components/schemas/PageVersionField"
+        summary:
+          $ref: "#/components/schemas/PageVersionField"
+        hunks:
+          type: array
+          items:
+            $ref: "#/components/schemas/PageVersionHunk"
+
+    PageVersionField:
+      type: object
+      required:
+        - from
+        - to
+      properties:
+        from:
+          type: string
+        to:
+          type: string
+
+    PageVersionHunk:
+      type: object
+      required:
+        - oldStart
+        - oldLines
+        - newStart
+        - newLines
+        - lines
+      properties:
+        oldStart:
+          type: integer
+          minimum: 0
+        oldLines:
+          type: integer
+          minimum: 0
+        newStart:
+          type: integer
+          minimum: 0
+        newLines:
+          type: integer
+          minimum: 0
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/PageVersionDiffLine"
+
+    PageVersionDiffLine:
+      type: object
+      required:
+        - op
+        - text
+      properties:
+        op:
+          type: string
+          enum:
+            - context
+            - add
+            - remove
+        text:
+          type: string
 
     Capture:
       type: object

@@ -11,16 +11,18 @@ from .change_actor import ChangeActor
 
 
 class PageVersion(UniversalBaseModel):
-    id: str
-    page_id: typing_extensions.Annotated[str, FieldMetadata(alias="pageId"), pydantic.Field(alias="pageId")]
+    """
+    One immutable page version, including its body.
+    """
+
     version: int
     title: str
     summary: str
     body: str
+    actor: ChangeActor
     ingest_source_id: typing_extensions.Annotated[
         typing.Optional[str], FieldMetadata(alias="ingestSourceId"), pydantic.Field(alias="ingestSourceId")
     ] = None
-    actor: ChangeActor
     created_at: typing_extensions.Annotated[
         dt.datetime, FieldMetadata(alias="createdAt"), pydantic.Field(alias="createdAt")
     ]

@@ -939,6 +939,213 @@ await client.pages.updatePage({
 </dl>
 </details>
 
+<details><summary><code>client.pages.<a href="/src/api/resources/pages/client/Client.ts">listPageVersions</a>({ ...params }) -> MemtaviApi.ListPageVersionsResponse</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Lists the immutable version history of a page, newest first, without bodies.
+Reading versions does not bump `lastReferencedAt`; only `getPage` does.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.pages.listPageVersions({
+    brainId: "brainId",
+    slug: "slug"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `MemtaviApi.ListPageVersionsRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `PagesClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.pages.<a href="/src/api/resources/pages/client/Client.ts">getPageVersion</a>({ ...params }) -> MemtaviApi.PageVersion</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Returns one immutable page version, including its body. Reading a version does not
+bump `lastReferencedAt`.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.pages.getPageVersion({
+    brainId: "brainId",
+    slug: "slug",
+    version: 1
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `MemtaviApi.GetPageVersionRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `PagesClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.pages.<a href="/src/api/resources/pages/client/Client.ts">diffPageVersions</a>({ ...params }) -> MemtaviApi.PageVersionDiff</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Line-based unified diff of `body` between two versions, with three lines of context.
+`from` is required and `to` defaults to the page's current version. A missing or
+malformed `from`, or a `from` that is greater than or equal to `to`, answers `400`.
+A page or version that does not exist answers `404`. Bodies larger than 5,000 lines on
+either side answer `400` rather than doing unbounded diff work. Reading versions does
+not bump `lastReferencedAt`.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.pages.diffPageVersions({
+    brainId: "brainId",
+    slug: "slug",
+    from: 1
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `MemtaviApi.DiffPageVersionsRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `PagesClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
 ## Search
 <details><summary><code>client.search.<a href="/src/api/resources/search/client/Client.ts">brain</a>({ ...params }) -> MemtaviApi.SearchBrainResponse</code></summary>
 <dl>
