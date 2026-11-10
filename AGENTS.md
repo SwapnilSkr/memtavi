@@ -68,7 +68,7 @@ bun run eval:smoke       bun run bench:search
 | [agents-dispatch](./context/agents-dispatch.md) | 5.4 | running tools/agent.sh, reading an exit code, debugging a lane | Commands, exit codes, lane flags, installed CLIs |
 | [agents-lanes](./context/agents-lanes.md) | 5.9 | routing a task, choosing a lane, a lane is out | Roles, harnesses, tiers, UI vs frontend logic, escalation, reroutes |
 | [agents-workflow](./context/agents-workflow.md) | 4.8 | writing a brief, reviewing a diff, running a fix round | The loop, the brief template, the review checklist, verdicts |
-| [backlog](./context/backlog.md) | 2.8 | choosing the next slice, checking remaining product or hardening work | Remaining product, hardening, deployment and deferred items, in priority order |
+| [backlog](./context/backlog.md) | 2.9 | choosing the next slice, checking remaining product or hardening work | Remaining product, hardening, deployment and deferred items, in priority order |
 | [conv-api](./context/conv-api.md) | 3.5 | touching apps/api or packages/spec | Spec-first contract, wire compatibility, error envelope, pagination, idempotency |
 | [conv-code](./context/conv-code.md) | 2.7 | writing or reviewing any TypeScript in this repo | Language, module layout, error handling, logging, naming |
 | [conv-compiler](./context/conv-compiler.md) | 3.6 | touching packages/core, packages/llm, a prompt, or a policy | Pipeline stages, policy bands, prompt versioning, determinism, eval gates |
@@ -77,8 +77,8 @@ bun run eval:smoke       bun run bench:search
 | [conv-tests](./context/conv-tests.md) | 2.6 | writing a test, choosing a Done when, re-running verification | What each suite must prove, the commands, and what is forbidden |
 | [conv-web](./context/conv-web.md) | 3.0 | touching apps/web | Inspector stack, state boundaries, evidence UI, accessibility |
 | [gl-changelog-archive](./context/gl-changelog-archive.md) | 3.8 | looking up an older shipped change | Shipped changes before the current phase, newest first |
-| [gl-changelog](./context/gl-changelog.md) | 3.3 | recording or checking what shipped | Shipped changes, newest first, dated |
+| [gl-changelog](./context/gl-changelog.md) | 4.0 | recording or checking what shipped | Shipped changes, newest first, dated |
 | [gl-decisions-archive](./context/gl-decisions-archive.md) | 2.8 | researching why a foundational choice was made | Settled decisions that no longer need loading per task, newest last |
 | [gl-decisions](./context/gl-decisions.md) | 5.8 | checking or recording a decision | Accepted decisions, newest last, dated |
-| [status](./context/status.md) | 1.8 | resuming work, deciding what to do next | What is complete, what is blocked, and the next slice |
+| [status](./context/status.md) | 2.0 | resuming work, deciding what to do next | What is complete, what is blocked, and the next slice |
 <!-- nodes:end -->
