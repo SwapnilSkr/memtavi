@@ -9,6 +9,7 @@
   "workspaces": [
     "apps/*",
     "packages/*",
+    "sdks/typescript",
     "tests/*"
   ],
   "scripts": {
@@ -21,6 +22,9 @@
     "spec:docs:check": "bun packages/spec/docs.mjs --check",
     "spec:compat": "bun packages/spec/compat.mjs",
     "spec:baseline": "bun packages/spec/compat.mjs --update",
+    "sdk:generate": "bun packages/spec/sdk.mjs --generate",
+    "sdk:check": "bun packages/spec/sdk.mjs --check",
+    "sdk:build": "bun run --cwd sdks/typescript build",
     "lint": "biome check .",
     "format": "biome format --write .",
     "test:unit": "bun test packages tests/eval",
@@ -30,6 +34,7 @@
     "test:integration": "bun test tests/integration --pass-with-no-tests",
     "test:isolation": "bun test tests/isolation --pass-with-no-tests",
     "test:contract": "bun test tests/contract --pass-with-no-tests",
+    "test:sdk": "bun run sdk:build && bun test sdks/typescript/test && uv run --project sdks/python --with pytest pytest sdks/python/tests -q",
     "dev:web": "bun run --cwd apps/web dev",
     "build:web": "bun run --cwd apps/web build",
     "typecheck:web": "bun run --cwd apps/web typecheck"

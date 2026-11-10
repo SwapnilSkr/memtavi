@@ -11,11 +11,11 @@ groups:
         version: 3.108.9
         output:
           location: local-file-system
-          path: ../packages/spec/generated/typescript-sdk
+          path: ../sdks/typescript/src
   python-sdk:
     generators:
       - name: fernapi/fern-python-sdk
         version: 4.64.1
         output:
           location: local-file-system
-          path: ../packages/spec/generated/python-sdk
+          path: ../sdks/python/src/memtavi
