@@ -37,7 +37,7 @@ const OPERATION_NOT_IMPLEMENTED = "Operation not implemented yet.";
 const RATE_LIMITED = "Rate limiting is out of scope for this brief.";
 const SERVER_ERROR = "A 5xx needs fault injection and is out of scope for this brief.";
 
-const UNIMPLEMENTED = new Set(["listMembers"]);
+const UNIMPLEMENTED = new Set<string>();
 const UNKNOWN_BRAIN = `brn_${"0".repeat(32)}`;
 const UNKNOWN_UUID = "00000000-0000-4000-8000-000000000000";
 const INVALID_KEY = "mtv_invalid_contract_key";
@@ -65,18 +65,7 @@ const UNEXERCISED: readonly Unexercised[] = [
     .map((pair) => ({ ...pair, reason: OPERATION_NOT_IMPLEMENTED })),
 ];
 
-const KNOWN_DRIFT: readonly KnownDrift[] = [
-  {
-    operationId: "listMembers",
-    method: "GET",
-    template: "/v1/members",
-    status: 404,
-    documented: false,
-    reason: "No route is registered and 404 is not a documented status for this operation.",
-    path: () => "/v1/members",
-    options: {},
-  },
-];
+const KNOWN_DRIFT: readonly KnownDrift[] = [];
 
 describe.skipIf(!hasTestDatabase)("the API contract", () => {
   let harness: Harness;
@@ -449,6 +438,7 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
     );
 
     await callSuccess("getTenant", "/v1/tenant", "GET", "/v1/tenant", {}, 200);
+    await callSuccess("listMembers", "/v1/members", "GET", "/v1/members", {}, 200);
     await callSuccess("listApiKeys", "/v1/api-keys", "GET", "/v1/api-keys", {}, 200);
     const viewer = (await callSuccess(
       "createApiKey",
@@ -528,6 +518,7 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
         options: { method: "DELETE" },
       },
       { operationId: "getTenant", path: "/v1/tenant", options: {} },
+      { operationId: "listMembers", path: "/v1/members", options: {} },
       { operationId: "listApiKeys", path: "/v1/api-keys", options: {} },
       {
         operationId: "createApiKey",

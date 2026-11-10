@@ -9,6 +9,8 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-11** — `GET /v1/members` (`listMembers`): admin keys list their tenant's members through a `SECURITY DEFINER` function scoped to `app.tenant_id` (migration 0011); the runtime still cannot read `users`. Every spec operation now has a route.
+
 - **2026-11-11** — `DELETE /v1/brains/{brainId}` (`deleteBrain`): `202` receipt, brain hidden from every read and capture at once, `brain.purge` job deletes child rows then stored objects (crash-safe, idempotent), content-free tombstone keeps the `deletion_ops` record, slug reusable (partial unique index, migration 0010). Captures lock the brain, so none can land under a purge.
 
 - **2026-11-11** — `PATCH /v1/brains/{brainId}` (`updateBrain`): partial update, developer role, tenant-checked `projectId`, `null` clears it, empty body writes nothing. Contract and isolation suites cover it with no exemption.

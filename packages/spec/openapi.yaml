@@ -1190,6 +1190,8 @@ paths:
                     type: integer
                   offset:
                     type: integer
+        "400":
+          $ref: "#/components/responses/Error400"
         "401":
           $ref: "#/components/responses/Error401"
         "403":

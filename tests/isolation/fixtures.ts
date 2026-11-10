@@ -36,6 +36,7 @@ export interface World {
   sibling: SubjectFixtures;
   foreign: SubjectFixtures;
   foreignTenant: ForeignTenant;
+  members: { own: string; foreign: string };
   keys: {
     own: string;
     nonOwner: string;
@@ -378,11 +379,21 @@ export async function seedWorld(harness: Harness): Promise<World> {
   const foreignTenant = tenant.rows[0];
   if (!foreignTenant) throw new Error("The second isolation tenant is missing");
 
+  const members = await owner.query<{ id: string; email: string; name: string; tenant_id: string }>(
+    `SELECT u.id, u.email, u.name, m.tenant_id FROM users u
+     JOIN memberships m ON m.user_id = u.id WHERE m.tenant_id = ANY($1::uuid[])`,
+    [[harness.tenants.a, harness.tenants.b]],
+  );
+  const ownMember = members.rows.find((member) => member.tenant_id === harness.tenants.a);
+  const foreignMember = members.rows.find((member) => member.tenant_id === harness.tenants.b);
+  if (!ownMember || !foreignMember) throw new Error("The isolation members are missing");
+
   return {
     own,
     sibling,
     foreign,
     foreignTenant,
+    members: { own: ownMember.id, foreign: foreignMember.id },
     keys: {
       own: harness.keys.a,
       nonOwner: nonOwner.key,
@@ -402,6 +413,9 @@ export async function seedWorld(harness: Harness): Promise<World> {
       foreignTenant.id,
       foreignTenant.name,
       foreignTenant.slug,
+      foreignMember.id,
+      foreignMember.email,
+      foreignMember.name,
     ],
   };
 }
