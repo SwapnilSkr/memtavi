@@ -17,7 +17,7 @@ Last updated 2026-11-11.
 - **Compiler**: chunk → extract → MWS → PFS → patch/split → versions/embeddings; batched patches; entity pages; evidence re-anchor.
 - **Surfaces**: MCP (6 tools), shared client (20 ops), CLI (incl. webhooks), inspector (9 screens), generated API docs, Fern-generated TS and Python SDKs (all 33 ops, unpublished).
 - **Phase 5 so far**: budget caps, rate limiting + request logs, 10k search benchmark, backup/restore rehearsal, contract diff.
-- **Tests**: 544 unit, 185 integration, 72 isolation, 113 web, 6 SDK smoke. CI green.
+- **Tests**: 550 unit, 185 integration, 78 isolation, 9 contract, 113 web, 6 SDK smoke. CI green.
 
 ## Blocked or deferred
 
@@ -28,6 +28,8 @@ Last updated 2026-11-11.
 ## Now
 
 - **SDKs shipped** (2026-11-11): Fern cloud generates source; we own the manifests; `sdk:check` and `test:sdk` in CI. See `docs/sdks.md`.
-- **Next**: the HTTP endpoint isolation matrix plus `test:contract` response validation (the Phase 5 gates), then provider-failure drills and OTel.
+- **Response validation shipped** (2026-11-11): `test:contract` covers every operation in strict mode.
+- **Isolation matrix shipped** (2026-11-11): every routed operation probed with foreign ids; zero leaks. Phase 5 isolation gate met for routed operations.
+- **Next**: reconcile the spec with the routes (3 spec-only operations, undocumented `400`s), then provider-failure drills and OTel.
 
 Full list: [backlog](./backlog.md).

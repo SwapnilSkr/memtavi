@@ -9,6 +9,10 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-11** — HTTP isolation matrix: spec-generated foreign-tenant, foreign-subject, foreign-child and tenant-scoped probes on every routed operation, list leak scans, and auth negatives; a catalog-driven snapshot proves all 27 tenant-scoped tables unchanged. Zero leaks. 78 isolation tests.
+
+- **2026-11-11** — Response validation: `test:contract` drives all 33 operations through the app on the test DB, validates status, `x-request-id` and bodies in strict mode (undocumented fields fail), and a two-sided coverage guard fails on any untested documented status. Shared harness in `tests/support`. Found 3 spec-only operations (`updateBrain`, `deleteBrain`, `listMembers`) with no route. 550 unit tests.
+
 - **2026-11-11** — SDKs: Fern cloud generates `@memtavi/sdk` (TS, ESM, zero deps) and `memtavi` (Python) into `sdks/`; manifests are ours because Fern gates package metadata by plan. `sdk:check` (spec hash + README) and `test:sdk` (offline smoke, both languages) in CI; generation verified deterministic. 544 unit tests.
 
 - **2026-11-06** — Contract compatibility diff: 3.1-aware baseline in `tests/contract`, `spec:compat` in CI, breaking changes fail with a JSON Pointer. 538 tests.
