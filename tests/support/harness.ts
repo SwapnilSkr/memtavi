@@ -74,6 +74,13 @@ export async function createHarness(now: () => Date = () => FIXED_NOW): Promise<
 
     process.env.APP_DATABASE_URL = applicationUrl;
     const db = await import("@memtavi/db/client");
+    try {
+      await db.pool.query("SELECT 1");
+    } catch (error) {
+      throw new Error("the shared @memtavi/db/client pool is unusable; did another suite end it?", {
+        cause: error,
+      });
+    }
     fixturesAuthorized = true;
     keys.a = await bootstrap(owner, "Contract A", slugA);
     keys.b = await bootstrap(owner, "Contract B", slugB);
