@@ -57,9 +57,41 @@ comparison path, so a self-referential schema terminates instead of hanging.
    and its client impact in the changelog.
 4. Never edit `tests/contract/openapi.baseline.yaml` by hand.
 
+## Response validation
+
+`bun run test:contract` drives every operation in `packages/spec/openapi.yaml` through the real app
+against a seeded `memtavi_test` database and validates each response against the spec. It runs in CI
+after `test:isolation`.
+
+`tests/support` is the shared harness: `@memtavi/test-support/harness` boots the app with fake
+storage and a fixed clock and bootstraps two tenants; `@memtavi/test-support/contract` loads the
+spec once, resolves response `$ref`s, compiles each (operation, status) schema once, and records
+which pairs were validated.
+
+Strict mode adds `unevaluatedProperties: false` to every object schema that declares `properties`
+and sets neither `additionalProperties` nor `unevaluatedProperties`, on a deep copy of the spec. A
+response carrying a field the spec does not document fails. Schemas that set
+`additionalProperties: true` keep that escape hatch. `openapi.yaml` is never modified.
+
+The coverage guard fails the suite when a documented (operation, status) pair has no validated
+response. Two named lists keep the suite green without hiding work:
+
+- `UNEXERCISED` in `tests/contract/api.test.ts`: documented pairs the suite cannot produce, each
+  with a reason. Every entry must still be a gap, so it cannot silently cover a regression.
+- `KNOWN_DRIFT` in the same file: current behaviour that differs from the spec. The test asserts
+  today's behaviour through that list, and every item is a follow-up brief.
+
+Adding an operation:
+
+1. Add it to the spec with `operationId`, a tag and every documented status.
+2. Add its route and add a success call plus the reachable error calls to
+   `tests/contract/api.test.ts`.
+3. Run `bun run test:contract`. A missing validated pair fails the coverage guard.
+
 ## Known limits
 
-- The diff reads the spec, not live traffic. Response validation against the spec is not implemented yet; `bun run test:contract` is currently a placeholder that passes with no tests.
+- The diff reads the spec, not live traffic. The strict response checks live in
+  `bun run test:contract`, not in `spec:compat`.
 - Changing a `pattern` string is always flagged. The diff cannot prove that two regular
   expressions accept the same language.
 - A business-rule change that keeps the wire shape, such as a new `409` condition, is invisible.
