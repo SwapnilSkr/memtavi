@@ -11,13 +11,12 @@ Ordered by product value per unit of risk. Remove items as they land.
 
 ## Phase 5, hardening
 
-- **Budget caps (next)**: enforce the monthly cap from `usage_ledger` before every provider call; seed a default row per tenant.
-- **Rate limiting**: per-key limits with `429` and `Retry-After`; the plan's defaults are 300/min API and 120/min MCP.
-- **Structured logging + OTel**: request and job ids, tenant, route, duration; never bodies, prompts or keys.
-- **10k benchmark**: seed 10k pages, measure FTS and vector p50/p95, wire `bench:search`.
+- **OTel**: traces across api → job → provider; JSON request logs already ship.
+- **FTS under RLS**: the GIN index is unreachable because `ts_match_vq` is not leakproof; scans are sequential (`docs/benchmarks.md`).
 - ~~Backup/restore rehearsal~~ (schema-only pass, 0.38 s RTO); still run it against the 10k-page shape for a real production RTO.
 - ~~Contract diff~~ (`spec:compat`, baseline in `tests/contract`); response validation against the spec is still missing and `test:contract` remains a placeholder.
-- **Isolation endpoint matrix**: every route with a foreign brain/page/source/change/connection id and a foreign subject.
+- **Isolation endpoint matrix (next)**: every route with a foreign brain/page/source/change/connection id and a foreign subject. Today's suite is DB/RLS-level only.
+- **Response validation**: `test:contract` has no tests; validate every route's responses against the spec.
 - **Provider failure drills**: rate limit, timeout, malformed output; assert retries and no partial pages.
 
 ## Product gaps
@@ -30,6 +29,9 @@ Ordered by product value per unit of risk. Remove items as they land.
 - **Inspector read cost**: the pages table fetches full bodies; switch to `/index` and add pagination.
 - **Eval quality**: 15% exact / 0.205 F1 on a 20-question slice, 37 reviews; run full LoCoMo before tuning prompts.
 
+- **Missing v1 endpoints**: source retry, page versions + diff, contested resolve + routing reviews, score history and suggestions, profile suggestions.
+- **SDK publishing**: npm and PyPI accounts, licence; then optionally rebase the CLI/MCP on `@memtavi/sdk`.
+
 ## Deployment
 
 - API and worker are not hosted; only S3 and CloudFront exist.
@@ -41,5 +43,4 @@ Ordered by product value per unit of risk. Remove items as they land.
 ## Deferred by decision
 
 - **OAuth connector**: blocked on human login; do not fake a consent flow.
-- **Fern SDKs**: generator emits source without manifests; revisit only if packaging is fixed.
 - **Phase 6 extras**: daily briefs, Slack, Telegram, MCP Apps, audio transcription.
