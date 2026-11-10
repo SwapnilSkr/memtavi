@@ -413,6 +413,46 @@ paths:
         "500":
           $ref: "#/components/responses/Error500"
 
+  /v1/brains/{brainId}/sources/{sourceId}/retry:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+      - $ref: "#/components/parameters/SourceId"
+    post:
+      operationId: retryIngestSource
+      tags:
+        - Sources
+      summary: Retry a failed ingest source
+      description: |
+        Queues another attempt for a source whose status is `failed`, keeping the same source id.
+        The status returns to `pending` and `lastError` is cleared. `attempts` counts accepted
+        retries and is never reset. When the stored body or chunks exist the source is recompiled;
+        otherwise the original fetch is repeated. Storage usage is not counted again. Requires
+        developer or higher.
+      responses:
+        "202":
+          description: The source was requeued with status `pending`.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestSource"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
   /v1/brains/{brainId}/pages:
     parameters:
       - $ref: "#/components/parameters/BrainId"

@@ -26,7 +26,7 @@ Ordered by product value per unit of risk. Remove items as they land.
 - **Inspector read cost**: the pages table fetches full bodies; switch to `/index` and add pagination.
 - **Eval quality**: 15% exact / 0.205 F1 on a 20-question slice, 37 reviews; run full LoCoMo before tuning prompts.
 
-- **Missing v1 endpoints**: source retry, page versions + diff, contested resolve + routing reviews, score history and suggestions, profile suggestions.
+- **Missing v1 endpoints**: page versions + diff, contested resolve + routing reviews, score history and suggestions, profile suggestions.
 - **SDK publishing**: npm and PyPI accounts, licence; then optionally rebase the CLI/MCP on `@memtavi/sdk`.
 
 ## Deployment

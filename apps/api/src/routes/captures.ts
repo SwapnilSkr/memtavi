@@ -5,8 +5,10 @@ import {
   getSource,
   getSourceContent,
   listSources,
+  retrySource,
 } from "../lib/captures";
 import type { RouteConfig } from "../lib/config";
+import { requireRole } from "../lib/roles";
 import { captureCreate, pagination } from "../lib/schemas";
 import { auth } from "../middleware/auth";
 import { DomainError } from "../middleware/errors";
@@ -73,6 +75,15 @@ export function captureRoutes(config: RouteConfig) {
           params.sourceId,
         ),
       );
+    })
+    .post("/v1/brains/:brainId/sources/:sourceId/retry", async ({ auth, request, params, set }) => {
+      const subject = subjectId(request);
+      requireRole(auth.role, "developer");
+      const source = await scope(config, auth, subject, (client) =>
+        retrySource(client, auth.tenantId, subject, params.brainId, params.sourceId),
+      );
+      set.status = 202;
+      return source;
     })
     .delete("/v1/brains/:brainId/sources/:sourceId", async ({ auth, request, params, set }) => {
       const subject = subjectId(request);

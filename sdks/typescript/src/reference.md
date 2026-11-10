@@ -601,6 +601,76 @@ await client.sources.getSourceContent({
 </dl>
 </details>
 
+<details><summary><code>client.sources.<a href="/src/api/resources/sources/client/Client.ts">retryIngestSource</a>({ ...params }) -> MemtaviApi.IngestSource</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Queues another attempt for a source whose status is `failed`, keeping the same source id.
+The status returns to `pending` and `lastError` is cleared. `attempts` counts accepted
+retries and is never reset. When the stored body or chunks exist the source is recompiled;
+otherwise the original fetch is repeated. Storage usage is not counted again. Requires
+developer or higher.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.sources.retryIngestSource({
+    brainId: "brainId",
+    sourceId: "sourceId"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `MemtaviApi.RetryIngestSourceRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `SourcesClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
 ## Pages
 <details><summary><code>client.pages.<a href="/src/api/resources/pages/client/Client.ts">listPages</a>({ ...params }) -> MemtaviApi.ListPagesResponse</code></summary>
 <dl>

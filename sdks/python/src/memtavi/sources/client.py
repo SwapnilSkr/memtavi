@@ -185,6 +185,48 @@ class SourcesClient:
         _response = self._raw_client.get_source_content(brain_id, source_id, request_options=request_options)
         return _response.data
 
+    def retry_ingest_source(
+        self, brain_id: str, source_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> IngestSource:
+        """
+        Queues another attempt for a source whose status is `failed`, keeping the same source id.
+        The status returns to `pending` and `lastError` is cleared. `attempts` counts accepted
+        retries and is never reset. When the stored body or chunks exist the source is recompiled;
+        otherwise the original fetch is repeated. Storage usage is not counted again. Requires
+        developer or higher.
+
+        Parameters
+        ----------
+        brain_id : str
+            Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+
+        source_id : str
+            Prefixed ingest source id, `src_` followed by 32 lowercase hex characters.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        IngestSource
+            The source was requeued with status `pending`.
+
+        Examples
+        --------
+        from memtavi import MemtaviApi
+
+        client = MemtaviApi(
+            subject_id="YOUR_SUBJECT_ID",
+            api_key="YOUR_API_KEY",
+        )
+        client.sources.retry_ingest_source(
+            brain_id="brainId",
+            source_id="sourceId",
+        )
+        """
+        _response = self._raw_client.retry_ingest_source(brain_id, source_id, request_options=request_options)
+        return _response.data
+
 
 class AsyncSourcesClient:
     def __init__(self, *, client_wrapper: AsyncClientWrapper):
@@ -390,4 +432,54 @@ class AsyncSourcesClient:
         asyncio.run(main())
         """
         _response = await self._raw_client.get_source_content(brain_id, source_id, request_options=request_options)
+        return _response.data
+
+    async def retry_ingest_source(
+        self, brain_id: str, source_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> IngestSource:
+        """
+        Queues another attempt for a source whose status is `failed`, keeping the same source id.
+        The status returns to `pending` and `lastError` is cleared. `attempts` counts accepted
+        retries and is never reset. When the stored body or chunks exist the source is recompiled;
+        otherwise the original fetch is repeated. Storage usage is not counted again. Requires
+        developer or higher.
+
+        Parameters
+        ----------
+        brain_id : str
+            Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+
+        source_id : str
+            Prefixed ingest source id, `src_` followed by 32 lowercase hex characters.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        IngestSource
+            The source was requeued with status `pending`.
+
+        Examples
+        --------
+        import asyncio
+
+        from memtavi import AsyncMemtaviApi
+
+        client = AsyncMemtaviApi(
+            subject_id="YOUR_SUBJECT_ID",
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.sources.retry_ingest_source(
+                brain_id="brainId",
+                source_id="sourceId",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.retry_ingest_source(brain_id, source_id, request_options=request_options)
         return _response.data

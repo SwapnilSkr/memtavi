@@ -870,6 +870,93 @@ client.sources.get_source_content(
 </dl>
 </details>
 
+<details><summary><code>client.sources.<a href="src/memtavi/sources/client.py">retry_ingest_source</a>(...) -> IngestSource</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Queues another attempt for a source whose status is `failed`, keeping the same source id.
+The status returns to `pending` and `lastError` is cleared. `attempts` counts accepted
+retries and is never reset. When the stored body or chunks exist the source is recompiled;
+otherwise the original fetch is repeated. Storage usage is not counted again. Requires
+developer or higher.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```python
+from memtavi import MemtaviApi
+from memtavi.environment import MemtaviApiEnvironment
+
+client = MemtaviApi(
+    api_key="<value>",
+    subject_id="<x-subject-id>",
+    environment=MemtaviApiEnvironment.DEFAULT,
+)
+
+client.sources.retry_ingest_source(
+    brain_id="brainId",
+    source_id="sourceId",
+)
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**brain_id:** `str` — Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**source_id:** `str` — Prefixed ingest source id, `src_` followed by 32 lowercase hex characters.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**request_options:** `typing.Optional[RequestOptions]` — Request-specific configuration.
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
 ## Pages
 <details><summary><code>client.pages.<a href="src/memtavi/pages/client.py">list_pages</a>(...) -> ListPagesResponse</code></summary>
 <dl>
