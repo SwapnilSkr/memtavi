@@ -48,8 +48,8 @@ copy of the document. A response with an undocumented field therefore fails. Sch
 `UNEXERCISED` table. It fails when a pair is neither validated nor listed, and it also fails when a
 listed pair was actually validated, so the table cannot hide new work.
 
-- `UNEXERCISED` entries are `{ operationId, status, reason }`. `429`, `5xx`, unreachable `409` and
-  `422` pairs, and operations with no route, are listed there with their reason.
+- `UNEXERCISED` entries are `{ operationId, status, reason }`. `429`, `5xx` and operations with no
+  route are listed there with their reason.
 - `KNOWN_DRIFT` entries record current behaviour that differs from the spec. The suite asserts
   today's behaviour through that table, and every item is a follow-up brief. Do not fix drift by
   editing the spec or a route in this suite.

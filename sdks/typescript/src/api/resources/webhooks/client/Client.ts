@@ -131,7 +131,6 @@ export class WebhooksClient {
      *
      * @throws {@link MemtaviApi.BadRequestError}
      * @throws {@link MemtaviApi.UnauthorizedError}
-     * @throws {@link MemtaviApi.ConflictError}
      * @throws {@link MemtaviApi.UnprocessableEntityError}
      * @throws {@link MemtaviApi.TooManyRequestsError}
      * @throws {@link MemtaviApi.InternalServerError}
@@ -194,11 +193,6 @@ export class WebhooksClient {
                     );
                 case 401:
                     throw new MemtaviApi.UnauthorizedError(
-                        _response.error.body as MemtaviApi.ErrorEnvelope,
-                        _response.rawResponse,
-                    );
-                case 409:
-                    throw new MemtaviApi.ConflictError(
                         _response.error.body as MemtaviApi.ErrorEnvelope,
                         _response.rawResponse,
                     );

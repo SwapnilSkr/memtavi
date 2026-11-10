@@ -9,6 +9,10 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-11** — `PATCH /v1/brains/{brainId}` (`updateBrain`): partial update, developer role, tenant-checked `projectId`, `null` clears it, empty body writes nothing. Contract and isolation suites cover it with no exemption.
+
+- **2026-11-11** — Spec statuses match the routes: `400` documented on 13 operations, `403` on `updateBrain`/`deleteBrain`/`listMembers`, 13 never-raised `422`/`409`/`404` removed (baseline updated; no client could receive them). `createWebhook` keeps its real `422`. SDKs regenerated.
+
 - **2026-11-11** — HTTP isolation matrix: spec-generated foreign-tenant, foreign-subject, foreign-child and tenant-scoped probes on every routed operation, list leak scans, and auth negatives; a catalog-driven snapshot proves all 27 tenant-scoped tables unchanged. Zero leaks. 78 isolation tests.
 
 - **2026-11-11** — Response validation: `test:contract` drives all 33 operations through the app on the test DB, validates status, `x-request-id` and bodies in strict mode (undocumented fields fail), and a two-sided coverage guard fails on any untested documented status. Shared harness in `tests/support`. Found 3 spec-only operations (`updateBrain`, `deleteBrain`, `listMembers`) with no route. 550 unit tests.

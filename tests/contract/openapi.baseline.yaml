@@ -129,8 +129,6 @@ paths:
           $ref: "#/components/responses/Error403"
         "409":
           $ref: "#/components/responses/Error409"
-        "422":
-          $ref: "#/components/responses/Error422"
         "429":
           $ref: "#/components/responses/Error429"
         "500":
@@ -189,12 +187,10 @@ paths:
           $ref: "#/components/responses/Error400"
         "401":
           $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
         "404":
           $ref: "#/components/responses/Error404"
-        "409":
-          $ref: "#/components/responses/Error409"
-        "422":
-          $ref: "#/components/responses/Error422"
         "429":
           $ref: "#/components/responses/Error429"
         "500":
@@ -217,6 +213,8 @@ paths:
                 $ref: "#/components/schemas/DeletionReceipt"
         "401":
           $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
         "404":
           $ref: "#/components/responses/Error404"
         "429":
@@ -270,8 +268,6 @@ paths:
           $ref: "#/components/responses/Error404"
         "409":
           $ref: "#/components/responses/Error409"
-        "422":
-          $ref: "#/components/responses/Error422"
         "429":
           $ref: "#/components/responses/Error429"
         "500":
@@ -314,6 +310,8 @@ paths:
                     type: integer
                   offset:
                     type: integer
+        "400":
+          $ref: "#/components/responses/Error400"
         "401":
           $ref: "#/components/responses/Error401"
         "404":
@@ -342,6 +340,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/IngestSource"
+        "400":
+          $ref: "#/components/responses/Error400"
         "401":
           $ref: "#/components/responses/Error401"
         "404":
@@ -366,6 +366,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DeletionReceipt"
+        "400":
+          $ref: "#/components/responses/Error400"
         "401":
           $ref: "#/components/responses/Error401"
         "404":
@@ -398,6 +400,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SourceContentUrl"
+        "400":
+          $ref: "#/components/responses/Error400"
         "401":
           $ref: "#/components/responses/Error401"
         "404":
@@ -445,6 +449,8 @@ paths:
                     type: integer
                   offset:
                     type: integer
+        "400":
+          $ref: "#/components/responses/Error400"
         "401":
           $ref: "#/components/responses/Error401"
         "404":
@@ -476,6 +482,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Page"
+        "400":
+          $ref: "#/components/responses/Error400"
         "401":
           $ref: "#/components/responses/Error401"
         "404":
@@ -516,8 +524,6 @@ paths:
           $ref: "#/components/responses/Error404"
         "409":
           $ref: "#/components/responses/Error409"
-        "422":
-          $ref: "#/components/responses/Error422"
         "429":
           $ref: "#/components/responses/Error429"
         "500":
@@ -613,8 +619,6 @@ paths:
           $ref: "#/components/responses/Error401"
         "404":
           $ref: "#/components/responses/Error404"
-        "422":
-          $ref: "#/components/responses/Error422"
         "429":
           $ref: "#/components/responses/Error429"
         "500":
@@ -657,6 +661,8 @@ paths:
                     type: integer
                   offset:
                     type: integer
+        "400":
+          $ref: "#/components/responses/Error400"
         "401":
           $ref: "#/components/responses/Error401"
         "404":
@@ -685,6 +691,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Graph"
+        "400":
+          $ref: "#/components/responses/Error400"
         "401":
           $ref: "#/components/responses/Error401"
         "404":
@@ -731,6 +739,8 @@ paths:
                     type: integer
                   offset:
                     type: integer
+        "400":
+          $ref: "#/components/responses/Error400"
         "401":
           $ref: "#/components/responses/Error401"
         "404":
@@ -772,8 +782,6 @@ paths:
           $ref: "#/components/responses/Error401"
         "404":
           $ref: "#/components/responses/Error404"
-        "422":
-          $ref: "#/components/responses/Error422"
         "429":
           $ref: "#/components/responses/Error429"
         "500":
@@ -816,6 +824,8 @@ paths:
                     type: integer
                   offset:
                     type: integer
+        "400":
+          $ref: "#/components/responses/Error400"
         "401":
           $ref: "#/components/responses/Error401"
         "404":
@@ -857,8 +867,6 @@ paths:
           $ref: "#/components/responses/Error401"
         "404":
           $ref: "#/components/responses/Error404"
-        "422":
-          $ref: "#/components/responses/Error422"
         "429":
           $ref: "#/components/responses/Error429"
         "500":
@@ -883,6 +891,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Score"
+        "400":
+          $ref: "#/components/responses/Error400"
         "401":
           $ref: "#/components/responses/Error401"
         "404":
@@ -910,6 +920,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Profile"
+        "400":
+          $ref: "#/components/responses/Error400"
         "401":
           $ref: "#/components/responses/Error401"
         "404":
@@ -945,8 +957,6 @@ paths:
           $ref: "#/components/responses/Error401"
         "404":
           $ref: "#/components/responses/Error404"
-        "422":
-          $ref: "#/components/responses/Error422"
         "429":
           $ref: "#/components/responses/Error429"
         "500":
@@ -996,6 +1006,8 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/Connection"
+        "400":
+          $ref: "#/components/responses/Error400"
         "401":
           $ref: "#/components/responses/Error401"
         "404":
@@ -1079,8 +1091,6 @@ paths:
           $ref: "#/components/responses/Error400"
         "401":
           $ref: "#/components/responses/Error401"
-        "409":
-          $ref: "#/components/responses/Error409"
         "422":
           $ref: "#/components/responses/Error422"
         "429":
@@ -1137,8 +1147,6 @@ paths:
           $ref: "#/components/responses/Error401"
         "403":
           $ref: "#/components/responses/Error403"
-        "404":
-          $ref: "#/components/responses/Error404"
         "429":
           $ref: "#/components/responses/Error429"
         "500":
@@ -1182,6 +1190,8 @@ paths:
                     type: integer
         "401":
           $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
         "429":
           $ref: "#/components/responses/Error429"
         "500":
@@ -1262,10 +1272,6 @@ paths:
           $ref: "#/components/responses/Error401"
         "403":
           $ref: "#/components/responses/Error403"
-        "409":
-          $ref: "#/components/responses/Error409"
-        "422":
-          $ref: "#/components/responses/Error422"
         "429":
           $ref: "#/components/responses/Error429"
         "500":

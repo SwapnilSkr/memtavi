@@ -12,13 +12,11 @@ from ..core.parse_error import ParsingError
 from ..core.pydantic_utilities import parse_obj_as
 from ..core.request_options import RequestOptions
 from ..errors.bad_request_error import BadRequestError
-from ..errors.conflict_error import ConflictError
 from ..errors.forbidden_error import ForbiddenError
 from ..errors.internal_server_error import InternalServerError
 from ..errors.not_found_error import NotFoundError
 from ..errors.too_many_requests_error import TooManyRequestsError
 from ..errors.unauthorized_error import UnauthorizedError
-from ..errors.unprocessable_entity_error import UnprocessableEntityError
 from ..types.api_key import ApiKey
 from ..types.error_envelope import ErrorEnvelope
 from ..types.member_role import MemberRole
@@ -221,28 +219,6 @@ class RawApiKeysClient:
                 )
             if _response.status_code == 403:
                 raise ForbiddenError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        ErrorEnvelope,
-                        parse_obj_as(
-                            type_=ErrorEnvelope,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            if _response.status_code == 409:
-                raise ConflictError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        ErrorEnvelope,
-                        parse_obj_as(
-                            type_=ErrorEnvelope,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            if _response.status_code == 422:
-                raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
                         ErrorEnvelope,
@@ -577,28 +553,6 @@ class AsyncRawApiKeysClient:
                 )
             if _response.status_code == 403:
                 raise ForbiddenError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        ErrorEnvelope,
-                        parse_obj_as(
-                            type_=ErrorEnvelope,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            if _response.status_code == 409:
-                raise ConflictError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        ErrorEnvelope,
-                        parse_obj_as(
-                            type_=ErrorEnvelope,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            if _response.status_code == 422:
-                raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
                         ErrorEnvelope,

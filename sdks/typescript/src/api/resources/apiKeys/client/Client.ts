@@ -138,8 +138,6 @@ export class ApiKeysClient {
      * @throws {@link MemtaviApi.BadRequestError}
      * @throws {@link MemtaviApi.UnauthorizedError}
      * @throws {@link MemtaviApi.ForbiddenError}
-     * @throws {@link MemtaviApi.ConflictError}
-     * @throws {@link MemtaviApi.UnprocessableEntityError}
      * @throws {@link MemtaviApi.TooManyRequestsError}
      * @throws {@link MemtaviApi.InternalServerError}
      * @throws {@link errors.MemtaviApiError}
@@ -205,16 +203,6 @@ export class ApiKeysClient {
                     );
                 case 403:
                     throw new MemtaviApi.ForbiddenError(
-                        _response.error.body as MemtaviApi.ErrorEnvelope,
-                        _response.rawResponse,
-                    );
-                case 409:
-                    throw new MemtaviApi.ConflictError(
-                        _response.error.body as MemtaviApi.ErrorEnvelope,
-                        _response.rawResponse,
-                    );
-                case 422:
-                    throw new MemtaviApi.UnprocessableEntityError(
                         _response.error.body as MemtaviApi.ErrorEnvelope,
                         _response.rawResponse,
                     );

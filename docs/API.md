@@ -179,8 +179,6 @@ Requires admin or higher. The role defaults to viewer and cannot exceed the call
 | 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 403 | The key role does not permit this operation or granting a higher role. | `ErrorEnvelope` |
-| 409 | Conflict with the current state, such as a page version conflict or a duplicate slug. | `ErrorEnvelope` |
-| 422 | The request is well formed but semantically invalid. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
 | 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
 
@@ -262,7 +260,6 @@ Creates a brain for the subject in `x-subject-id`. Requires developer or higher.
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 403 | The key role does not permit this operation or granting a higher role. | `ErrorEnvelope` |
 | 409 | Conflict with the current state, such as a page version conflict or a duplicate slug. | `ErrorEnvelope` |
-| 422 | The request is well formed but semantically invalid. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
 | 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
 
@@ -316,9 +313,8 @@ Update a brain
 | 200 | The updated brain. | `Brain` |
 | 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
+| 403 | The key role does not permit this operation or granting a higher role. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
-| 409 | Conflict with the current state, such as a page version conflict or a duplicate slug. | `ErrorEnvelope` |
-| 422 | The request is well formed but semantically invalid. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
 | 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
 
@@ -344,6 +340,7 @@ Accepts an asynchronous deletion of the brain and everything under it.
 | --- | --- | --- |
 | 202 | Deletion accepted for asynchronous processing. | `DeletionReceipt` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
+| 403 | The key role does not permit this operation or granting a higher role. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
 | 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
@@ -380,7 +377,6 @@ supplying both returns `400`. The capture is queued, not compiled in the request
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
 | 409 | Conflict with the current state, such as a page version conflict or a duplicate slug. | `ErrorEnvelope` |
-| 422 | The request is well formed but semantically invalid. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
 | 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
 
@@ -405,6 +401,7 @@ List change events
 | Status | Description | Schema |
 | --- | --- | --- |
 | 200 | Change events for the brain, newest first. | `object { items: ChangeEvent[], total: integer, limit: integer, offset: integer }` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
@@ -439,7 +436,6 @@ Marks the change event as seen. Acknowledging is idempotent.
 | 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
-| 422 | The request is well formed but semantically invalid. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
 | 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
 
@@ -464,6 +460,7 @@ List connections
 | Status | Description | Schema |
 | --- | --- | --- |
 | 200 | Connections in the brain. | `object { items: Connection[], total: integer, limit: integer, offset: integer }` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
@@ -498,7 +495,6 @@ Marks the connection as seen. Acknowledging is idempotent.
 | 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
-| 422 | The request is well formed but semantically invalid. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
 | 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
 
@@ -523,6 +519,7 @@ Returns the brain and its pages, versions, sources and connections.
 | Status | Description | Schema |
 | --- | --- | --- |
 | 200 | The exported brain. | `object { brain: Brain, pages: Page[], versions: PageVersion[], sources: IngestSource[], connections: Connection[] }` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
@@ -549,6 +546,7 @@ Returns the page nodes and connection edges of the brain.
 | Status | Description | Schema |
 | --- | --- | --- |
 | 200 | The graph. | `Graph` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
@@ -576,6 +574,7 @@ Returns the compact index of pages in the brain.
 | Status | Description | Schema |
 | --- | --- | --- |
 | 200 | Index entries for the brain. | `object { items: IndexEntry[], total: integer, limit: integer, offset: integer }` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
@@ -604,6 +603,7 @@ Lists pages without bumping `lastReferencedAt`.
 | Status | Description | Schema |
 | --- | --- | --- |
 | 200 | Pages in the brain. | `object { items: Page[], total: integer, limit: integer, offset: integer }` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
@@ -632,6 +632,7 @@ list hydrator, so list endpoints do not bump it.
 | Status | Description | Schema |
 | --- | --- | --- |
 | 200 | The page. | `Page` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
@@ -668,7 +669,6 @@ the current version returns `409`.
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
 | 409 | Conflict with the current state, such as a page version conflict or a duplicate slug. | `ErrorEnvelope` |
-| 422 | The request is well formed but semantically invalid. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
 | 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
 
@@ -721,6 +721,7 @@ Get the subject profile
 | Status | Description | Schema |
 | --- | --- | --- |
 | 200 | The profile attached to the brain. | `Profile` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
@@ -752,7 +753,6 @@ Update the subject profile
 | 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
-| 422 | The request is well formed but semantically invalid. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
 | 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
 
@@ -777,6 +777,7 @@ Returns the latest score snapshot for the brain.
 | Status | Description | Schema |
 | --- | --- | --- |
 | 200 | The latest score snapshot. | `Score` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
@@ -810,7 +811,6 @@ carries the vector score only, so results can appear out of similarity order.
 | 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
-| 422 | The request is well formed but semantically invalid. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
 | 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
 
@@ -835,6 +835,7 @@ List ingest sources
 | Status | Description | Schema |
 | --- | --- | --- |
 | 200 | Ingest sources for the brain. | `object { items: IngestSource[], total: integer, limit: integer, offset: integer }` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
@@ -860,6 +861,7 @@ Get an ingest source
 | Status | Description | Schema |
 | --- | --- | --- |
 | 200 | The ingest source. | `IngestSource` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
@@ -887,6 +889,7 @@ Deletes the source. Pages derived from it stay in place.
 | Status | Description | Schema |
 | --- | --- | --- |
 | 202 | Deletion accepted for asynchronous processing. | `DeletionReceipt` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
@@ -916,6 +919,7 @@ body returns `404`.
 | Status | Description | Schema |
 | --- | --- | --- |
 | 200 | A short-lived URL for the stored source body. | `SourceContentUrl` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
@@ -942,6 +946,7 @@ List members
 | --- | --- | --- |
 | 200 | Members of the tenant. | `object { items: Member[], total: integer, limit: integer, offset: integer }` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
+| 403 | The key role does not permit this operation or granting a higher role. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
 | 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
 
@@ -963,7 +968,6 @@ Requires owner.
 | 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 403 | The key role does not permit this operation or granting a higher role. | `ErrorEnvelope` |
-| 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
 | 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
 
@@ -1015,7 +1019,6 @@ Registers a webhook for the subject in `x-subject-id` and returns its signing se
 | 201 | The webhook was created. The response carries the plaintext `secret` once; it is never returned again. | `Webhook` |
 | 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
-| 409 | Conflict with the current state, such as a page version conflict or a duplicate slug. | `ErrorEnvelope` |
 | 422 | The request is well formed but semantically invalid. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
 | 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |

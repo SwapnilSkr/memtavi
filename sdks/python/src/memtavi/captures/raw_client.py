@@ -16,7 +16,6 @@ from ..errors.internal_server_error import InternalServerError
 from ..errors.not_found_error import NotFoundError
 from ..errors.too_many_requests_error import TooManyRequestsError
 from ..errors.unauthorized_error import UnauthorizedError
-from ..errors.unprocessable_entity_error import UnprocessableEntityError
 from ..types.bucket import Bucket
 from ..types.capture_kind import CaptureKind
 from ..types.error_envelope import ErrorEnvelope
@@ -144,17 +143,6 @@ class RawCapturesClient:
                 )
             if _response.status_code == 409:
                 raise ConflictError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        ErrorEnvelope,
-                        parse_obj_as(
-                            type_=ErrorEnvelope,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            if _response.status_code == 422:
-                raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
                         ErrorEnvelope,
@@ -313,17 +301,6 @@ class AsyncRawCapturesClient:
                 )
             if _response.status_code == 409:
                 raise ConflictError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        ErrorEnvelope,
-                        parse_obj_as(
-                            type_=ErrorEnvelope,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            if _response.status_code == 422:
-                raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
                         ErrorEnvelope,
