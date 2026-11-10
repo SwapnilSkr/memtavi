@@ -57,6 +57,27 @@ comparison path, so a self-referential schema terminates instead of hanging.
    and its client impact in the changelog.
 4. Never edit `tests/contract/openapi.baseline.yaml` by hand.
 
+## Baseline updates
+
+2026-11-10 — **Removed response codes the API never returns.** The baseline was refreshed with the
+following deliberate removals, so `spec:compat` reports them once here instead of on every run:
+
+- `422` on eight operations (`createBrain`, `createCapture`, `updatePage`, `searchBrain`,
+  `ackConnection`, `ackChange`, `updateProfile`, `createApiKey`). The error middleware maps a
+  schema validation failure to `400`, and no other handler on these operations raises a `422`, so
+  no client could have received one. `createWebhook` keeps its `422`: `validateEvents` in
+  `apps/api/src/lib/webhooks.ts` raises it for duplicate events and for an event outside
+  `WEBHOOK_EVENTS`, and `test:contract` now exercises both.
+- `409` on `createWebhook`, `createApiKey` and `updateBrain`. No handler has a conflict path for
+  these operations, so the status was never produced.
+- `404` on `getTenant`. Only an owner key reaches the handler and an owner key always carries its
+  tenant, so the status was never produced.
+
+No client breaks: a status that was never sent cannot be depended on, and every removal only makes
+the documented surface smaller. The same change adds `400` to the thirteen operations that reject a
+malformed `x-subject-id` and `403` to `updateBrain`, `deleteBrain` and `listMembers`, all
+non-breaking additions.
+
 ## Response validation
 
 `bun run test:contract` drives every operation in `packages/spec/openapi.yaml` through the real app

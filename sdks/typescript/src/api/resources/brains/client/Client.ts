@@ -133,7 +133,6 @@ export class BrainsClient {
      * @throws {@link MemtaviApi.UnauthorizedError}
      * @throws {@link MemtaviApi.ForbiddenError}
      * @throws {@link MemtaviApi.ConflictError}
-     * @throws {@link MemtaviApi.UnprocessableEntityError}
      * @throws {@link MemtaviApi.TooManyRequestsError}
      * @throws {@link MemtaviApi.InternalServerError}
      * @throws {@link errors.MemtaviApiError}
@@ -204,11 +203,6 @@ export class BrainsClient {
                     );
                 case 409:
                     throw new MemtaviApi.ConflictError(
-                        _response.error.body as MemtaviApi.ErrorEnvelope,
-                        _response.rawResponse,
-                    );
-                case 422:
-                    throw new MemtaviApi.UnprocessableEntityError(
                         _response.error.body as MemtaviApi.ErrorEnvelope,
                         _response.rawResponse,
                     );
@@ -336,6 +330,7 @@ export class BrainsClient {
      * @param {BrainsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link MemtaviApi.UnauthorizedError}
+     * @throws {@link MemtaviApi.ForbiddenError}
      * @throws {@link MemtaviApi.NotFoundError}
      * @throws {@link MemtaviApi.TooManyRequestsError}
      * @throws {@link MemtaviApi.InternalServerError}
@@ -393,6 +388,11 @@ export class BrainsClient {
                         _response.error.body as MemtaviApi.ErrorEnvelope,
                         _response.rawResponse,
                     );
+                case 403:
+                    throw new MemtaviApi.ForbiddenError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
                 case 404:
                     throw new MemtaviApi.NotFoundError(
                         _response.error.body as MemtaviApi.ErrorEnvelope,
@@ -426,9 +426,8 @@ export class BrainsClient {
      *
      * @throws {@link MemtaviApi.BadRequestError}
      * @throws {@link MemtaviApi.UnauthorizedError}
+     * @throws {@link MemtaviApi.ForbiddenError}
      * @throws {@link MemtaviApi.NotFoundError}
-     * @throws {@link MemtaviApi.ConflictError}
-     * @throws {@link MemtaviApi.UnprocessableEntityError}
      * @throws {@link MemtaviApi.TooManyRequestsError}
      * @throws {@link MemtaviApi.InternalServerError}
      * @throws {@link errors.MemtaviApiError}
@@ -493,18 +492,13 @@ export class BrainsClient {
                         _response.error.body as MemtaviApi.ErrorEnvelope,
                         _response.rawResponse,
                     );
+                case 403:
+                    throw new MemtaviApi.ForbiddenError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
                 case 404:
                     throw new MemtaviApi.NotFoundError(
-                        _response.error.body as MemtaviApi.ErrorEnvelope,
-                        _response.rawResponse,
-                    );
-                case 409:
-                    throw new MemtaviApi.ConflictError(
-                        _response.error.body as MemtaviApi.ErrorEnvelope,
-                        _response.rawResponse,
-                    );
-                case 422:
-                    throw new MemtaviApi.UnprocessableEntityError(
                         _response.error.body as MemtaviApi.ErrorEnvelope,
                         _response.rawResponse,
                     );

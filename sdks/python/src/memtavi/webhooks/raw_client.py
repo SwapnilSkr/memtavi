@@ -11,7 +11,6 @@ from ..core.parse_error import ParsingError
 from ..core.pydantic_utilities import parse_obj_as
 from ..core.request_options import RequestOptions
 from ..errors.bad_request_error import BadRequestError
-from ..errors.conflict_error import ConflictError
 from ..errors.internal_server_error import InternalServerError
 from ..errors.not_found_error import NotFoundError
 from ..errors.too_many_requests_error import TooManyRequestsError
@@ -191,17 +190,6 @@ class RawWebhooksClient:
                 )
             if _response.status_code == 401:
                 raise UnauthorizedError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        ErrorEnvelope,
-                        parse_obj_as(
-                            type_=ErrorEnvelope,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            if _response.status_code == 409:
-                raise ConflictError(
                     headers=dict(_response.headers),
                     body=typing.cast(
                         ErrorEnvelope,
@@ -506,17 +494,6 @@ class AsyncRawWebhooksClient:
                 )
             if _response.status_code == 401:
                 raise UnauthorizedError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        ErrorEnvelope,
-                        parse_obj_as(
-                            type_=ErrorEnvelope,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            if _response.status_code == 409:
-                raise ConflictError(
                     headers=dict(_response.headers),
                     body=typing.cast(
                         ErrorEnvelope,

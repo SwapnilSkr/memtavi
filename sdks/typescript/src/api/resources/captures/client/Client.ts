@@ -37,7 +37,6 @@ export class CapturesClient {
      * @throws {@link MemtaviApi.UnauthorizedError}
      * @throws {@link MemtaviApi.NotFoundError}
      * @throws {@link MemtaviApi.ConflictError}
-     * @throws {@link MemtaviApi.UnprocessableEntityError}
      * @throws {@link MemtaviApi.TooManyRequestsError}
      * @throws {@link MemtaviApi.InternalServerError}
      * @throws {@link errors.MemtaviApiError}
@@ -113,11 +112,6 @@ export class CapturesClient {
                     );
                 case 409:
                     throw new MemtaviApi.ConflictError(
-                        _response.error.body as MemtaviApi.ErrorEnvelope,
-                        _response.rawResponse,
-                    );
-                case 422:
-                    throw new MemtaviApi.UnprocessableEntityError(
                         _response.error.body as MemtaviApi.ErrorEnvelope,
                         _response.rawResponse,
                     );

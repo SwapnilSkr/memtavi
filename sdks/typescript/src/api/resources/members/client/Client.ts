@@ -30,6 +30,7 @@ export class MembersClient {
      * @param {MembersClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link MemtaviApi.UnauthorizedError}
+     * @throws {@link MemtaviApi.ForbiddenError}
      * @throws {@link MemtaviApi.TooManyRequestsError}
      * @throws {@link MemtaviApi.InternalServerError}
      * @throws {@link errors.MemtaviApiError}
@@ -89,6 +90,11 @@ export class MembersClient {
             switch (_response.error.statusCode) {
                 case 401:
                     throw new MemtaviApi.UnauthorizedError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 403:
+                    throw new MemtaviApi.ForbiddenError(
                         _response.error.body as MemtaviApi.ErrorEnvelope,
                         _response.rawResponse,
                     );

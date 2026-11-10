@@ -12,7 +12,6 @@ from ..core.request_options import RequestOptions
 from ..errors.bad_request_error import BadRequestError
 from ..errors.forbidden_error import ForbiddenError
 from ..errors.internal_server_error import InternalServerError
-from ..errors.not_found_error import NotFoundError
 from ..errors.too_many_requests_error import TooManyRequestsError
 from ..errors.unauthorized_error import UnauthorizedError
 from ..types.error_envelope import ErrorEnvelope
@@ -77,17 +76,6 @@ class RawTenantClient:
                 )
             if _response.status_code == 403:
                 raise ForbiddenError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        ErrorEnvelope,
-                        parse_obj_as(
-                            type_=ErrorEnvelope,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            if _response.status_code == 404:
-                raise NotFoundError(
                     headers=dict(_response.headers),
                     body=typing.cast(
                         ErrorEnvelope,
@@ -186,17 +174,6 @@ class AsyncRawTenantClient:
                 )
             if _response.status_code == 403:
                 raise ForbiddenError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        ErrorEnvelope,
-                        parse_obj_as(
-                            type_=ErrorEnvelope,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            if _response.status_code == 404:
-                raise NotFoundError(
                     headers=dict(_response.headers),
                     body=typing.cast(
                         ErrorEnvelope,

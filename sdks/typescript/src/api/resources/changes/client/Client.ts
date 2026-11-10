@@ -30,6 +30,7 @@ export class ChangesClient {
      * @param {MemtaviApi.ListChangesRequest} request
      * @param {ChangesClient.RequestOptions} requestOptions - Request-specific configuration.
      *
+     * @throws {@link MemtaviApi.BadRequestError}
      * @throws {@link MemtaviApi.UnauthorizedError}
      * @throws {@link MemtaviApi.NotFoundError}
      * @throws {@link MemtaviApi.TooManyRequestsError}
@@ -91,6 +92,11 @@ export class ChangesClient {
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
+                case 400:
+                    throw new MemtaviApi.BadRequestError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
                 case 401:
                     throw new MemtaviApi.UnauthorizedError(
                         _response.error.body as MemtaviApi.ErrorEnvelope,
@@ -132,7 +138,6 @@ export class ChangesClient {
      * @throws {@link MemtaviApi.BadRequestError}
      * @throws {@link MemtaviApi.UnauthorizedError}
      * @throws {@link MemtaviApi.NotFoundError}
-     * @throws {@link MemtaviApi.UnprocessableEntityError}
      * @throws {@link MemtaviApi.TooManyRequestsError}
      * @throws {@link MemtaviApi.InternalServerError}
      * @throws {@link errors.MemtaviApiError}
@@ -203,11 +208,6 @@ export class ChangesClient {
                     );
                 case 404:
                     throw new MemtaviApi.NotFoundError(
-                        _response.error.body as MemtaviApi.ErrorEnvelope,
-                        _response.rawResponse,
-                    );
-                case 422:
-                    throw new MemtaviApi.UnprocessableEntityError(
                         _response.error.body as MemtaviApi.ErrorEnvelope,
                         _response.rawResponse,
                     );

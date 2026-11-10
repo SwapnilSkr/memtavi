@@ -31,6 +31,7 @@ export class ScoreClient {
      * @param {MemtaviApi.GetScoreRequest} request
      * @param {ScoreClient.RequestOptions} requestOptions - Request-specific configuration.
      *
+     * @throws {@link MemtaviApi.BadRequestError}
      * @throws {@link MemtaviApi.UnauthorizedError}
      * @throws {@link MemtaviApi.NotFoundError}
      * @throws {@link MemtaviApi.TooManyRequestsError}
@@ -84,6 +85,11 @@ export class ScoreClient {
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
+                case 400:
+                    throw new MemtaviApi.BadRequestError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
                 case 401:
                     throw new MemtaviApi.UnauthorizedError(
                         _response.error.body as MemtaviApi.ErrorEnvelope,

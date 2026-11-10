@@ -32,6 +32,7 @@ export class PagesClient {
      * @param {MemtaviApi.ListPagesRequest} request
      * @param {PagesClient.RequestOptions} requestOptions - Request-specific configuration.
      *
+     * @throws {@link MemtaviApi.BadRequestError}
      * @throws {@link MemtaviApi.UnauthorizedError}
      * @throws {@link MemtaviApi.NotFoundError}
      * @throws {@link MemtaviApi.TooManyRequestsError}
@@ -93,6 +94,11 @@ export class PagesClient {
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
+                case 400:
+                    throw new MemtaviApi.BadRequestError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
                 case 401:
                     throw new MemtaviApi.UnauthorizedError(
                         _response.error.body as MemtaviApi.ErrorEnvelope,
@@ -132,6 +138,7 @@ export class PagesClient {
      * @param {MemtaviApi.GetPageRequest} request
      * @param {PagesClient.RequestOptions} requestOptions - Request-specific configuration.
      *
+     * @throws {@link MemtaviApi.BadRequestError}
      * @throws {@link MemtaviApi.UnauthorizedError}
      * @throws {@link MemtaviApi.NotFoundError}
      * @throws {@link MemtaviApi.TooManyRequestsError}
@@ -186,6 +193,11 @@ export class PagesClient {
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
+                case 400:
+                    throw new MemtaviApi.BadRequestError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
                 case 401:
                     throw new MemtaviApi.UnauthorizedError(
                         _response.error.body as MemtaviApi.ErrorEnvelope,
@@ -346,7 +358,6 @@ export class PagesClient {
      * @throws {@link MemtaviApi.UnauthorizedError}
      * @throws {@link MemtaviApi.NotFoundError}
      * @throws {@link MemtaviApi.ConflictError}
-     * @throws {@link MemtaviApi.UnprocessableEntityError}
      * @throws {@link MemtaviApi.TooManyRequestsError}
      * @throws {@link MemtaviApi.InternalServerError}
      * @throws {@link errors.MemtaviApiError}
@@ -419,11 +430,6 @@ export class PagesClient {
                     );
                 case 409:
                     throw new MemtaviApi.ConflictError(
-                        _response.error.body as MemtaviApi.ErrorEnvelope,
-                        _response.rawResponse,
-                    );
-                case 422:
-                    throw new MemtaviApi.UnprocessableEntityError(
                         _response.error.body as MemtaviApi.ErrorEnvelope,
                         _response.rawResponse,
                     );

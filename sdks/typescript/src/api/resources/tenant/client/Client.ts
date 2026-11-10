@@ -33,7 +33,6 @@ export class TenantClient {
      * @throws {@link MemtaviApi.BadRequestError}
      * @throws {@link MemtaviApi.UnauthorizedError}
      * @throws {@link MemtaviApi.ForbiddenError}
-     * @throws {@link MemtaviApi.NotFoundError}
      * @throws {@link MemtaviApi.TooManyRequestsError}
      * @throws {@link MemtaviApi.InternalServerError}
      * @throws {@link errors.MemtaviApiError}
@@ -90,11 +89,6 @@ export class TenantClient {
                     );
                 case 403:
                     throw new MemtaviApi.ForbiddenError(
-                        _response.error.body as MemtaviApi.ErrorEnvelope,
-                        _response.rawResponse,
-                    );
-                case 404:
-                    throw new MemtaviApi.NotFoundError(
                         _response.error.body as MemtaviApi.ErrorEnvelope,
                         _response.rawResponse,
                     );
