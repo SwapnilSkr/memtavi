@@ -34,13 +34,7 @@ const EMBEDDING_MODEL = "text-embedding-3-small";
 const DIMENSIONS = 1536;
 const RESULT_LIMIT = 20;
 
-const FTS_QUERY = `SELECT p.id, p.slug, ts_rank(p.search_tsv, websearch_to_tsquery('english', $4)) AS rank
-   FROM pages p
-   WHERE p.tenant_id = $1 AND p.subject_id = $2 AND p.brain_id = $3
-     AND p.deletion_state = 'active'
-     AND p.search_tsv @@ websearch_to_tsquery('english', $4)
-   ORDER BY rank DESC, p.slug, p.id
-   LIMIT ${RESULT_LIMIT}`;
+const FTS_QUERY = `SELECT * FROM public.search_pages_keyword($1, $2, ${RESULT_LIMIT})`;
 
 const VECTOR_QUERY = `SELECT p.id, (e.embedding <=> $4::vector) AS distance
    FROM pages p
@@ -265,7 +259,7 @@ async function main(options: Options): Promise<void> {
     const runFts = (phrase: string) =>
       dbClient.withTenant(
         tenantKey,
-        (client) => client.query(FTS_QUERY, [tenantKey, subjectId, brainKey, phrase]),
+        (client) => client.query(FTS_QUERY, [brainKey, phrase]),
         subjectId,
       );
     const runVector = () =>
@@ -275,6 +269,12 @@ async function main(options: Options): Promise<void> {
           client.query(VECTOR_QUERY, [tenantKey, subjectId, brainKey, vector, EMBEDDING_MODEL]),
         subjectId,
       );
+
+    const ginScansBefore = (
+      await owner.unsafe<{ idx_scan: string }[]>(
+        `SELECT idx_scan FROM pg_stat_user_indexes WHERE indexrelname = 'pages_search_tsv_gin'`,
+      )
+    )[0]?.idx_scan;
 
     for (let index = 0; index < options.warmup; index += 1) {
       await runFts(`alpha${index % 100}`);
@@ -299,6 +299,15 @@ async function main(options: Options): Promise<void> {
 
     const fts = summarize(ftsSamples);
     const vectorSummary = summarize(vectorSamples);
+    await dbClient.withTenant(tenantKey, (client) =>
+      client.query("SELECT pg_stat_force_next_flush()"),
+    );
+    await owner.unsafe("SELECT pg_stat_clear_snapshot()");
+    const ginScansAfter = (
+      await owner.unsafe<{ idx_scan: string }[]>(
+        `SELECT idx_scan FROM pg_stat_user_indexes WHERE indexrelname = 'pages_search_tsv_gin'`,
+      )
+    )[0]?.idx_scan;
     process.stdout.write(
       `${[
         "search benchmark",
@@ -307,6 +316,7 @@ async function main(options: Options): Promise<void> {
         `sizes: pages_total=${Number(sizes.pagesTotal)} pages_index=${Number(sizes.pagesIndex)} embeddings_total=${Number(sizes.embeddingsTotal)} embeddings_index=${Number(sizes.embeddingsIndex)}`,
         formatSummary("fts", fts),
         formatSummary("vector", vectorSummary),
+        `pages_search_tsv_gin idx_scan: before=${ginScansBefore} after=${ginScansAfter} delta=${Number(ginScansAfter) - Number(ginScansBefore)}`,
         ...(options.keep
           ? [`kept tenant=${tenantKey} subject=${subjectId} brain=${brainKey}`]
           : []),

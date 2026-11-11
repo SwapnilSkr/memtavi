@@ -66,16 +66,8 @@ export async function searchPages(
   await requireBrain(client, tenantId, subjectId, brainId);
 
   const keyword = await client.query<KeywordRow>(
-    `SELECT p.id AS "pageId", p.slug, p.title, p.summary, p.page_type AS "pageType",
-       ts_rank(p.search_tsv, websearch_to_tsquery('english', $4)) AS "rank",
-       COALESCE(p.last_compiled_at, p.last_referenced_at, to_timestamp(0)) AS "updatedAt"
-     FROM pages p
-     WHERE p.tenant_id = $1 AND p.subject_id = $2 AND p.brain_id = $3
-     AND p.deletion_state = 'active'
-     AND p.search_tsv @@ websearch_to_tsquery('english', $4)
-     ORDER BY "rank" DESC, p.slug, p.id
-     LIMIT $5`,
-    [tenantId, subjectId, brainId, options.q, options.limit],
+    `SELECT * FROM public.search_pages_keyword($1, $2, $3)`,
+    [brainId, options.q, options.limit],
   );
 
   const keywordIds = new Set(keyword.rows.map((row) => row.pageId));
