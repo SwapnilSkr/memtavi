@@ -322,6 +322,80 @@ client.profile.update_profile(
 </dl>
 </details>
 
+<details><summary><code>client.profile.<a href="src/memtavi/profile/client.py">suggest_profile</a>(...) -> ProfileSuggestions</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Requires developer or higher. Uses up to 40 prompt-index page summaries and the current profile, never page bodies. Best-effort suggestions are never applied automatically; use updateProfile to apply one. Fewer than 3 pages returns an empty set without a model call. Budget caps and the emergency stop refuse model work with 429 and Retry-After. Missing configuration or transient provider failures return 503 with Retry-After; permanent provider failures return 502.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```python
+from memtavi import MemtaviApi
+from memtavi.environment import MemtaviApiEnvironment
+
+client = MemtaviApi(
+    api_key="<value>",
+    subject_id="<x-subject-id>",
+    environment=MemtaviApiEnvironment.DEFAULT,
+)
+
+client.profile.suggest_profile(
+    brain_id="brainId",
+)
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**brain_id:** `str` — Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**request_options:** `typing.Optional[RequestOptions]` — Request-specific configuration.
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
 ## Brains
 <details><summary><code>client.brains.<a href="src/memtavi/brains/client.py">list_brains</a>(...) -> ListBrainsResponse</code></summary>
 <dl>

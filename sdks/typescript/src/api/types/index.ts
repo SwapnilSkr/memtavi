@@ -32,6 +32,7 @@ export * from "./PageVersionField.js";
 export * from "./PageVersionHunk.js";
 export * from "./PageVersionSummary.js";
 export * from "./Profile.js";
+export * from "./ProfileSuggestions.js";
 export * from "./RoutingReview.js";
 export * from "./RoutingReviewList.js";
 export * from "./RoutingReviewResolve.js";

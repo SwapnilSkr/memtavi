@@ -317,6 +317,23 @@ describe.skipIf(!hasTestDatabase)("the HTTP isolation matrix", () => {
     expect([...UNIMPLEMENTED]).toEqual([]);
   });
 
+  test("profile suggestions cover foreign tenant, foreign subject and all auth negatives without exemptions", () => {
+    expect(
+      cases
+        .filter((entry) => entry.operationId === "suggestProfile")
+        .map((entry) => entry.kind)
+        .sort(),
+    ).toEqual([
+      "auth-malformed-subject",
+      "auth-missing-key",
+      "auth-revoked-key",
+      "auth-unknown-key",
+      "foreign-subject",
+      "foreign-tenant",
+    ]);
+    expect(EXEMPT.some((entry) => entry.operationId === "suggestProfile")).toBe(false);
+  });
+
   test("the snapshot discovers every tenant-scoped table and filters by the narrowest column", () => {
     const discovered = plan.tables.map((entry) => entry.table);
     expect(discovered).toEqual(expect.arrayContaining([...EXPECTED_TENANT_SCOPED_TABLES]));

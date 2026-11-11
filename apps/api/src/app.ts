@@ -1,6 +1,6 @@
 import { withIsolatedTrace } from "@memtavi/shared/telemetry";
 import { Elysia } from "elysia";
-import type { AppConfig, RouteConfig } from "./lib/config";
+import { type AppConfig, profileSuggestionsFromEnv, type RouteConfig } from "./lib/config";
 import { createRateLimiter } from "./lib/rate-limit";
 import { errors } from "./middleware/errors";
 import { requestId } from "./middleware/request-id";
@@ -23,8 +23,10 @@ import { webhookRoutes } from "./routes/webhooks";
 
 export function createApp(config: AppConfig) {
   const securityDenials = { 401: 0, 403: 0, 404: 0 };
+  const profileSuggestions = config.profileSuggestions ?? profileSuggestionsFromEnv();
   const routeConfig: RouteConfig = {
     ...config,
+    ...(profileSuggestions === undefined ? {} : { profileSuggestions }),
     rateLimiter: createRateLimiter({
       limit: config.rateLimitPerMinute ?? 300,
       ...(config.now === undefined ? {} : { now: config.now }),

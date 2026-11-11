@@ -6,8 +6,8 @@ file by hand; run `bun run spec:docs`.
 - OpenAPI: 3.1.0
 - Version: 1.0.0
 - Server: https://api.memtavi.com
-- Endpoints: 46 operations across 36 paths
-- Schemas: 63 component schemas
+- Endpoints: 47 operations across 37 paths
+- Schemas: 64 component schemas
 
 ## Authentication
 
@@ -38,6 +38,7 @@ Subject routes (require `x-subject-id`):
 - `/v1/brains/{brainId}/pages/{slug}/versions`
 - `/v1/brains/{brainId}/pages/{slug}/versions/{version}`
 - `/v1/brains/{brainId}/profile`
+- `/v1/brains/{brainId}/profile/suggestions`
 - `/v1/brains/{brainId}/routing-reviews`
 - `/v1/brains/{brainId}/routing-reviews/{reviewId}/dismiss`
 - `/v1/brains/{brainId}/routing-reviews/{reviewId}/resolve`
@@ -89,6 +90,7 @@ Tenant routes (do not accept `x-subject-id`):
 - [`GET /v1/brains/{brainId}/pages/{slug}/versions/{version}`](#get-v1brainsbrainidpagesslugversionsversion) — Pages
 - [`GET /v1/brains/{brainId}/profile`](#get-v1brainsbrainidprofile) — Profile
 - [`PATCH /v1/brains/{brainId}/profile`](#patch-v1brainsbrainidprofile) — Profile
+- [`POST /v1/brains/{brainId}/profile/suggestions`](#post-v1brainsbrainidprofilesuggestions) — Profile
 - [`GET /v1/brains/{brainId}/routing-reviews`](#get-v1brainsbrainidrouting-reviews) — Reviews
 - [`POST /v1/brains/{brainId}/routing-reviews/{reviewId}/dismiss`](#post-v1brainsbrainidrouting-reviewsreviewiddismiss) — Reviews
 - [`POST /v1/brains/{brainId}/routing-reviews/{reviewId}/resolve`](#post-v1brainsbrainidrouting-reviewsreviewidresolve) — Reviews
@@ -151,6 +153,7 @@ Tenant routes (do not accept `x-subject-id`):
   - [`PageVersionHunk`](#pageversionhunk)
   - [`PageVersionSummary`](#pageversionsummary)
   - [`Profile`](#profile)
+  - [`ProfileSuggestions`](#profilesuggestions)
   - [`ProfileUpdate`](#profileupdate)
   - [`RoutingReview`](#routingreview)
   - [`RoutingReviewDismiss`](#routingreviewdismiss)
@@ -943,6 +946,36 @@ Update the subject profile
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
 | 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
+
+### POST /v1/brains/{brainId}/profile/suggestions
+
+`suggestProfile` · Tags: Profile
+
+Suggest profile fields from existing pages
+
+Requires developer or higher. Uses up to 40 prompt-index page summaries and the current profile, never page bodies. Best-effort suggestions are never applied automatically; use updateProfile to apply one. Fewer than 3 pages returns an empty set without a model call. Budget caps and the emergency stop refuse model work with 429 and Retry-After. Missing configuration or transient provider failures return 503 with Retry-After; permanent provider failures return 502.
+
+**Security:** `x-api-key` + `x-subject-id`
+
+**Parameters**
+
+| Name | In | Required | Type | Notes |
+| --- | --- | --- | --- | --- |
+| `brainId` | path | yes | `string` | Prefixed brain id, `brn_` followed by 32 lowercase hex characters. Matches `^brn_[0-9a-f]{32}$`. |
+
+**Responses**
+
+| Status | Description | Schema |
+| --- | --- | --- |
+| 200 | Evidence-backed suggestions, or an empty set when signal is thin. | `ProfileSuggestions` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
+| 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
+| 403 | The key role does not permit this operation or granting a higher role. | `ErrorEnvelope` |
+| 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
+| 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
+| 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
+| 502 | Permanent upstream provider failure (UpstreamError). | `ErrorEnvelope` |
+| 503 | Suggestions are not configured or the provider is temporarily unavailable (ServiceUnavailableError). Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
 
 ### GET /v1/brains/{brainId}/routing-reviews
 
@@ -2006,6 +2039,17 @@ Required: `brainId`, `whoTheyAre`, `whatTheyDo`, `focus`, `goals`, `currentProje
 | `stuckOn` | `string` | yes |  |
 | `vaultOrganization` | `string` | yes |  |
 | `directives` | `object` | yes | Free-form object. |
+
+### ProfileSuggestions
+
+Required: `generatedBy`, `model`, `promptHash`, `items`
+
+| Property | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `generatedBy` | `string` | yes | One of `model`. |
+| `model` | `string` | yes |  |
+| `promptHash` | `string` | yes | Matches `^[a-f0-9]{64}$`. |
+| `items` | `object { field: string, value: string, confidence: number, evidence: object { slug: string, title: string }[] }[]` | yes |  |
 
 ### ProfileUpdate
 

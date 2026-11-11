@@ -4,7 +4,11 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@memtavi/api": "workspace:*",
+    "@memtavi/db": "workspace:*",
+    "@memtavi/llm": "workspace:*",
     "@memtavi/shared": "workspace:*",
+    "@memtavi/storage": "workspace:*",
     "@memtavi/test-support": "workspace:*"
   }
 }

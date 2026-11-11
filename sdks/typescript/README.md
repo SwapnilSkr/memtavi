@@ -36,8 +36,8 @@ Instantiate and use the client with the following:
 import { MemtaviApiClient } from "./src/Client";
 
 const client = new MemtaviApiClient({ apiKey: "YOUR_API_KEY", subjectId: "YOUR_SUBJECT_ID" });
-await client.brains.createBrain({
-    name: "name"
+await client.profile.suggestProfile({
+    brainId: "brainId"
 });
 ```
 
@@ -75,7 +75,7 @@ will be thrown.
 import { MemtaviApiError } from "MemtaviApi";
 
 try {
-    await client.brains.createBrain(...);
+    await client.profile.suggestProfile(...);
 } catch (err) {
     if (err instanceof MemtaviApiError) {
         console.log(err.statusCode);
@@ -112,7 +112,7 @@ const client = new MemtaviApiClient({
     }
 });
 
-const response = await client.brains.createBrain(..., {
+const response = await client.profile.suggestProfile(..., {
     headers: {
         'X-Custom-Header': 'custom value'
     }
@@ -124,7 +124,7 @@ const response = await client.brains.createBrain(..., {
 If you would like to send additional query string parameters as part of the request, use the `queryParams` request option.
 
 ```typescript
-const response = await client.brains.createBrain(..., {
+const response = await client.profile.suggestProfile(..., {
     queryParams: {
         'customQueryParamKey': 'custom query param value'
     }
@@ -154,7 +154,7 @@ Which status codes are retried depends on the `retryStatusCodes` generator confi
 Use the `maxRetries` request option to configure this behavior.
 
 ```typescript
-const response = await client.brains.createBrain(..., {
+const response = await client.profile.suggestProfile(..., {
     maxRetries: 0 // override maxRetries at the request level
 });
 ```
@@ -164,7 +164,7 @@ const response = await client.brains.createBrain(..., {
 The SDK defaults to a 60 second timeout. Use the `timeoutInSeconds` option to configure this behavior.
 
 ```typescript
-const response = await client.brains.createBrain(..., {
+const response = await client.profile.suggestProfile(..., {
     timeoutInSeconds: 30 // override timeout to 30s
 });
 ```
@@ -175,7 +175,7 @@ The SDK allows users to abort requests at any point by passing in an abort signa
 
 ```typescript
 const controller = new AbortController();
-const response = await client.brains.createBrain(..., {
+const response = await client.profile.suggestProfile(..., {
     abortSignal: controller.signal
 });
 controller.abort(); // aborts the request
@@ -187,7 +187,7 @@ The SDK provides access to raw response data, including headers, through the `.w
 The `.withRawResponse()` method returns a promise that results to an object with a `data` and a `rawResponse` property.
 
 ```typescript
-const { data, rawResponse } = await client.brains.createBrain(...).withRawResponse();
+const { data, rawResponse } = await client.profile.suggestProfile(...).withRawResponse();
 
 console.log(data);
 console.log(rawResponse.headers['X-My-Header']);

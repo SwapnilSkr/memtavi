@@ -1,8 +1,13 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { createApp } from "@memtavi/api/app";
+import { createFakeProvider } from "@memtavi/llm/fake";
+import { ProviderError } from "@memtavi/llm/provider";
 import { newId } from "@memtavi/shared/ids";
+import { createFakeStore } from "@memtavi/storage/fake";
 import { type Contract, ContractViolation, createContract } from "@memtavi/test-support/contract";
 import {
   createHarness,
+  FIXED_NOW,
   type Harness,
   hasTestDatabase,
   type RequestOptions,
@@ -38,13 +43,14 @@ const RATE_LIMITED = "Rate limiting is out of scope for this brief.";
 const SERVER_ERROR = "A 5xx needs fault injection and is out of scope for this brief.";
 
 const UNIMPLEMENTED = new Set<string>();
-const REVIEW_OPERATIONS = new Set([
+const EXHAUSTIVE_OPERATIONS = new Set([
   "listRoutingReviews",
   "resolveRoutingReview",
   "dismissRoutingReview",
   "getMemorySettings",
   "updateMemorySettings",
   "approveIngestSource",
+  "suggestProfile",
 ]);
 const UNKNOWN_BRAIN = `brn_${"0".repeat(32)}`;
 const UNKNOWN_UUID = "00000000-0000-4000-8000-000000000000";
@@ -55,11 +61,11 @@ const contract: Contract = createContract();
 const UNEXERCISED: readonly Unexercised[] = [
   ...contract
     .documented()
-    .filter((pair) => pair.status === 429 && !REVIEW_OPERATIONS.has(pair.operationId))
+    .filter((pair) => pair.status === 429 && !EXHAUSTIVE_OPERATIONS.has(pair.operationId))
     .map((pair) => ({ ...pair, reason: RATE_LIMITED })),
   ...contract
     .documented()
-    .filter((pair) => pair.status === 500 && !REVIEW_OPERATIONS.has(pair.operationId))
+    .filter((pair) => pair.status === 500 && !EXHAUSTIVE_OPERATIONS.has(pair.operationId))
     .map((pair) => ({ ...pair, reason: SERVER_ERROR })),
   ...contract
     .documented()
@@ -196,6 +202,16 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
       { method: "PATCH", body: { name: "Contract renamed" } },
       200,
     );
+
+    const suggestions = (await callSuccess(
+      "suggestProfile",
+      "/v1/brains/{brainId}/profile/suggestions",
+      "POST",
+      `/v1/brains/${brainId}/profile/suggestions`,
+      { method: "POST" },
+      200,
+    )) as { items: unknown[] };
+    expect(suggestions.items).toEqual([]);
 
     const alphaId = newId("page");
     const betaId = newId("page");
@@ -706,6 +722,11 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
   test("a viewer key is forbidden from every privileged operation", async () => {
     const cases: Array<{ operationId: string; path: string; options: RequestOptions }> = [
       {
+        operationId: "suggestProfile",
+        path: `/v1/brains/${brainId}/profile/suggestions`,
+        options: { method: "POST" },
+      },
+      {
         operationId: "updateMemorySettings",
         path: "/v1/memory-settings",
         options: { method: "PUT", body: { mode: "off" } },
@@ -861,15 +882,15 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
     });
   });
 
-  test("review and memory operations validate rate limiting and internal errors without exemptions", async () => {
+  test("review, memory and profile suggestion operations validate rate limiting and internal errors without exemptions", async () => {
     const limited = await createHarness();
     try {
       for (let count = 0; count < 300; count += 1) {
         expect((await limited.request("/v1/brains")).status).toBe(200);
       }
-      for (const operationId of REVIEW_OPERATIONS) {
+      for (const operationId of EXHAUSTIVE_OPERATIONS) {
         const probe = probes.get(operationId);
-        if (!probe) throw new Error(`Missing review probe ${operationId}`);
+        if (!probe) throw new Error(`Missing exhaustive probe ${operationId}`);
         const response = await limited.request(probe.path, probe.options);
         const body = await response.json();
         expect(response.status).toBe(429);
@@ -884,9 +905,9 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
       throw new Error("Injected database failure");
     };
     try {
-      for (const operationId of REVIEW_OPERATIONS) {
+      for (const operationId of EXHAUSTIVE_OPERATIONS) {
         const probe = probes.get(operationId);
-        if (!probe) throw new Error(`Missing review probe ${operationId}`);
+        if (!probe) throw new Error(`Missing exhaustive probe ${operationId}`);
         const response = await harness.request(probe.path, probe.options);
         const body = await response.json();
         expect(response.status).toBe(500);
@@ -897,6 +918,61 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
       harness.owner.query = query;
     }
   });
+
+  test.each([
+    undefined,
+    new ProviderError("server_error", true, "PRIVATE_PROVIDER_PAYLOAD", 503),
+    new ProviderError("bad_request", false, "PRIVATE_PROVIDER_PAYLOAD", 400),
+  ])(
+    "profile suggestion configuration or upstream failure %s validates without exemptions",
+    async (failure) => {
+      const created = await harness.request("/v1/brains", {
+        method: "POST",
+        body: { name: "Unavailable suggestions", slug: `unavailable-${crypto.randomUUID()}` },
+      });
+      expect(created.status).toBe(201);
+      const { id } = (await created.json()) as { id: string };
+      for (let index = 0; index < 3; index += 1) {
+        await harness.owner.query(
+          `INSERT INTO pages
+           (id, tenant_id, subject_id, brain_id, slug, title, summary, body, page_type, content_hash)
+         VALUES ($1, $2, $3, $4, $5, 'Page', 'Summary', '', 'topic', $5)`,
+          [newId("page"), harness.tenants.a, harness.subjects.a, id, `page-${index}`],
+        );
+      }
+      const provider = createFakeProvider();
+      if (failure) provider.queueChat(failure);
+      const db = await import("@memtavi/db/client");
+      const app = createApp({
+        ownerPool: harness.owner,
+        withTenant: db.withTenant,
+        store: createFakeStore(),
+        now: () => FIXED_NOW,
+        budgetEmergencyStop: () => false,
+        ...(failure ? { profileSuggestions: { provider, model: "pinned-chat-v1" } } : {}),
+      });
+      const path = `/v1/brains/${id}/profile/suggestions`;
+      const response = await app.handle(
+        new Request(`http://localhost${path}`, {
+          method: "POST",
+          headers: { "x-api-key": harness.keys.a, "x-subject-id": harness.subjects.a },
+        }),
+      );
+      const body = await response.json();
+      const unavailable = !failure || failure.transient;
+      expect(response.status).toBe(unavailable ? 503 : 502);
+      expect(body).toMatchObject({
+        body: { error: unavailable ? "ServiceUnavailableError" : "UpstreamError" },
+      });
+      expect(response.headers.get("Retry-After")).toBe(unavailable ? "60" : null);
+      expect(JSON.stringify(body)).not.toContain("PRIVATE_PROVIDER_PAYLOAD");
+      expect(provider.calls).toHaveLength(failure ? 1 : 0);
+      contract.expectContract(response, body, {
+        method: "POST",
+        path: "/v1/brains/{brainId}/profile/suggestions",
+      });
+    },
+  );
 
   test("a bad enum and a capture with both content and fetchUrl answer 400", async () => {
     const badEnum = await harness.request(`/v1/brains/${brainId}/pages/${pageSlug}`, {

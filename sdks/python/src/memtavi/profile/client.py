@@ -6,6 +6,7 @@ from ..core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from ..core.request_options import RequestOptions
 from ..types.memory_settings import MemorySettings
 from ..types.profile import Profile
+from ..types.profile_suggestions import ProfileSuggestions
 from .raw_client import AsyncRawProfileClient, RawProfileClient
 from .types.memory_settings_update_mode import MemorySettingsUpdateMode
 
@@ -186,6 +187,40 @@ class ProfileClient:
             directives=directives,
             request_options=request_options,
         )
+        return _response.data
+
+    def suggest_profile(
+        self, brain_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> ProfileSuggestions:
+        """
+        Requires developer or higher. Uses up to 40 prompt-index page summaries and the current profile, never page bodies. Best-effort suggestions are never applied automatically; use updateProfile to apply one. Fewer than 3 pages returns an empty set without a model call. Budget caps and the emergency stop refuse model work with 429 and Retry-After. Missing configuration or transient provider failures return 503 with Retry-After; permanent provider failures return 502.
+
+        Parameters
+        ----------
+        brain_id : str
+            Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        ProfileSuggestions
+            Evidence-backed suggestions, or an empty set when signal is thin.
+
+        Examples
+        --------
+        from memtavi import MemtaviApi
+
+        client = MemtaviApi(
+            subject_id="YOUR_SUBJECT_ID",
+            api_key="YOUR_API_KEY",
+        )
+        client.profile.suggest_profile(
+            brain_id="brainId",
+        )
+        """
+        _response = self._raw_client.suggest_profile(brain_id, request_options=request_options)
         return _response.data
 
 
@@ -394,4 +429,46 @@ class AsyncProfileClient:
             directives=directives,
             request_options=request_options,
         )
+        return _response.data
+
+    async def suggest_profile(
+        self, brain_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> ProfileSuggestions:
+        """
+        Requires developer or higher. Uses up to 40 prompt-index page summaries and the current profile, never page bodies. Best-effort suggestions are never applied automatically; use updateProfile to apply one. Fewer than 3 pages returns an empty set without a model call. Budget caps and the emergency stop refuse model work with 429 and Retry-After. Missing configuration or transient provider failures return 503 with Retry-After; permanent provider failures return 502.
+
+        Parameters
+        ----------
+        brain_id : str
+            Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        ProfileSuggestions
+            Evidence-backed suggestions, or an empty set when signal is thin.
+
+        Examples
+        --------
+        import asyncio
+
+        from memtavi import AsyncMemtaviApi
+
+        client = AsyncMemtaviApi(
+            subject_id="YOUR_SUBJECT_ID",
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.profile.suggest_profile(
+                brain_id="brainId",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.suggest_profile(brain_id, request_options=request_options)
         return _response.data

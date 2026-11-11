@@ -407,4 +407,124 @@ export class ProfileClient {
             "/v1/brains/{brainId}/profile",
         );
     }
+
+    /**
+     * Requires developer or higher. Uses up to 40 prompt-index page summaries and the current profile, never page bodies. Best-effort suggestions are never applied automatically; use updateProfile to apply one. Fewer than 3 pages returns an empty set without a model call. Budget caps and the emergency stop refuse model work with 429 and Retry-After. Missing configuration or transient provider failures return 503 with Retry-After; permanent provider failures return 502.
+     *
+     * @param {MemtaviApi.SuggestProfileRequest} request
+     * @param {ProfileClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link MemtaviApi.BadRequestError}
+     * @throws {@link MemtaviApi.UnauthorizedError}
+     * @throws {@link MemtaviApi.ForbiddenError}
+     * @throws {@link MemtaviApi.NotFoundError}
+     * @throws {@link MemtaviApi.TooManyRequestsError}
+     * @throws {@link MemtaviApi.InternalServerError}
+     * @throws {@link MemtaviApi.BadGatewayError}
+     * @throws {@link MemtaviApi.ServiceUnavailableError}
+     * @throws {@link errors.MemtaviApiError}
+     * @throws {@link errors.MemtaviApiTimeoutError}
+     *
+     * @example
+     *     await client.profile.suggestProfile({
+     *         brainId: "brainId"
+     *     })
+     */
+    public suggestProfile(
+        request: MemtaviApi.SuggestProfileRequest,
+        requestOptions?: ProfileClient.RequestOptions,
+    ): core.HttpResponsePromise<MemtaviApi.ProfileSuggestions> {
+        return core.HttpResponsePromise.fromPromise(this.__suggestProfile(request, requestOptions));
+    }
+
+    private async __suggestProfile(
+        request: MemtaviApi.SuggestProfileRequest,
+        requestOptions?: ProfileClient.RequestOptions,
+    ): Promise<core.WithRawResponse<MemtaviApi.ProfileSuggestions>> {
+        const { brainId } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({ "x-subject-id": requestOptions?.subjectId ?? this._options?.subjectId }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.MemtaviApiEnvironment.Default,
+                `v1/brains/${core.url.encodePathParam(brainId, errors.MemtaviApiError)}/profile/suggestions`,
+            ),
+            method: "POST",
+            headers: _headers,
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as MemtaviApi.ProfileSuggestions, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new MemtaviApi.BadRequestError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 401:
+                    throw new MemtaviApi.UnauthorizedError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 403:
+                    throw new MemtaviApi.ForbiddenError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 404:
+                    throw new MemtaviApi.NotFoundError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 429:
+                    throw new MemtaviApi.TooManyRequestsError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 500:
+                    throw new MemtaviApi.InternalServerError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 502:
+                    throw new MemtaviApi.BadGatewayError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 503:
+                    throw new MemtaviApi.ServiceUnavailableError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                default:
+                    throw new errors.MemtaviApiError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "POST",
+            "/v1/brains/{brainId}/profile/suggestions",
+        );
+    }
 }
