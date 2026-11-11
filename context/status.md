@@ -11,25 +11,20 @@ Last updated 2026-11-11.
 
 ## Complete
 
-- **Phase 1**: capture, storage, worker, LLM, compiler core and wire, eval harness.
-- **Phase 2/3**: full read path, changes, graph, score/profile, inspector capture → read → correct, connections/changes screens, export, permanent delete, webhooks, MCP and CLI.
-- **Storage**: private S3 + CloudFront OAC with signed URLs; bodies in S3, knowledge in Postgres.
-- **Compiler**: chunk → extract → MWS → PFS → patch/split → versions/embeddings; batched patches; entity pages; evidence re-anchor.
-- **Surfaces**: MCP (6 tools), shared client (20 ops), CLI (incl. webhooks), inspector (9 screens), generated API docs, Fern-generated TS and Python SDKs (all 33 ops, unpublished).
-- **Phase 5 so far**: budget caps, rate limiting + request logs, 10k search benchmark, backup/restore rehearsal, contract diff.
-- **Tests**: 550 unit, 185 integration, 78 isolation, 9 contract, 113 web, 6 SDK smoke. CI green.
+- **Phase 1–3**: capture, storage, worker, compiler, full read path, changes, graph, connections discovery, health scores with history and suggestions, profile with model suggestions, contested resolve, routing reviews, page versions and diff, memory modes, retention, export, brain update and delete, members, webhooks with PRD event names.
+- **Surfaces**: 47 spec operations, all routed; MCP (6 tools), CLI, inspector (14 screens incl. conflicts, reviews, health, settings), Fern TS and Python SDKs (unpublished).
+- **Phase 5**: budget caps, rate limits, request logs with trace ids, OpenTelemetry (off by default), provider failure drills, 10k search benchmark, backup/restore rehearsal, spec compat gate, strict response validation, HTTP isolation matrix.
+- **Tests**: 645 unit, 362 integration, 88 isolation, 18 contract, 296 web, 7 SDK smoke. CI green.
 
-## Blocked or deferred
+## Blocked on the owner
 
-- **OAuth connector**: needs a human login route (sessions/OIDC); not faked.
-- **SDK publishing**: `@memtavi/sdk` and `memtavi` build; npm/PyPI accounts and a licence are owner decisions.
-- **Deployment**: API and worker are not hosted; custom domain/TLS, CloudFront logs and a budget alarm are pending.
+- **SDK publishing**: npm/PyPI accounts and a licence.
+- **Deployment**: API and worker are not hosted; storage stack needs an update (worker `s3:ListBucket` for retention); domain/TLS, logs, budget alarm.
+- **OAuth connector**: needs a human login route.
 
 ## Now
 
-- **SDKs shipped** (2026-11-11): Fern cloud generates source; we own the manifests; `sdk:check` and `test:sdk` in CI. See `docs/sdks.md`.
-- **Response validation shipped** (2026-11-11): `test:contract` covers every operation in strict mode.
-- **Isolation matrix shipped** (2026-11-11): every routed operation probed with foreign ids; zero leaks. Phase 5 isolation gate met for routed operations.
-- **Next**: reconcile the spec with the routes (3 spec-only operations, undocumented `400`s), then provider-failure drills and OTel.
+- v1 product scope in the backlog is shipped (PRs 3–21). Remaining engineering: FTS under RLS (sequential scans), a full LoCoMo eval before prompt tuning, and a UI presentation pass on the inspector.
+- `gh` active account may differ from the repo owner; push with the owner's token.
 
 Full list: [backlog](./backlog.md).
