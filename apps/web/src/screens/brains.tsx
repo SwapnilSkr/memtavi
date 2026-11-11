@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { EmptyState, ErrorBanner, Loading, Pagination } from "../components/feedback";
+import { StatusBadge } from "../components/status-badge";
 import type { Brain, ListResponse } from "../lib/api";
 import { useApi } from "../lib/api-context";
 import { applyCacheEffect } from "../lib/invalidation";
@@ -79,25 +80,33 @@ export function Brains() {
   });
   return (
     <>
-      <h1>Your brains</h1>
-      <p className="text-slate-600">
-        Choose a brain to inspect its pages and search its knowledge.
-      </p>
+      <div>
+        <h1>Your brains</h1>
+        <p className="mt-1 text-slate-600">
+          Choose a brain to inspect its pages and search its knowledge.
+        </p>
+      </div>
       <ErrorBanner error={brains.error ?? create.error} />
       {receipts.length > 0 ? (
         <div aria-live="polite" className="space-y-2">
           {receipts.map((receipt) => (
-            <p key={receipt.id} role="status">
+            <div
+              key={receipt.id}
+              role="status"
+              className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs sm:text-sm text-amber-900"
+            >
               Deletion receipt for “{receipt.name}”: {receipt.state}. The purge is asynchronous and
               cannot be undone.
-            </p>
+            </div>
           ))}
         </div>
       ) : null}
-      <section aria-labelledby="create-heading" className="panel">
-        <h2 id="create-heading">Create a brain</h2>
+      <section aria-labelledby="create-heading" className="panel space-y-4">
+        <h2 id="create-heading" className="section-title">
+          Create a brain
+        </h2>
         <form
-          className="mt-4 grid gap-4 sm:grid-cols-2"
+          className="grid gap-4 sm:grid-cols-2"
           onSubmit={(event) => {
             event.preventDefault();
             if (name.trim() && !create.isPending) create.mutate();
@@ -109,22 +118,24 @@ export function Brains() {
               id="brain-name"
               required
               maxLength={200}
+              placeholder="e.g. Engineering Handbook"
               value={name}
               onChange={(event) => setName(event.target.value)}
             />
           </div>
           <div>
             <label htmlFor="brain-description">
-              Description <span className="font-normal">(optional)</span>
+              Description <span className="font-normal text-slate-400">(optional)</span>
             </label>
             <input
               id="brain-description"
+              placeholder="What this brain covers"
               value={description}
               onChange={(event) => setDescription(event.target.value)}
             />
           </div>
           <button
-            className="primary justify-self-start"
+            className="btn-primary justify-self-start"
             type="submit"
             disabled={create.isPending || !name.trim()}
           >
@@ -136,7 +147,10 @@ export function Brains() {
       {brains.data?.items.length === 0 ? (
         <EmptyState>
           <p>
-            No brains on this page. Create one above or <Link to="/">return to the first page</Link>
+            No brains on this page. Create one above or{" "}
+            <Link to="/" className="font-semibold text-indigo-700 hover:underline">
+              return to the first page
+            </Link>
             .
           </p>
         </EmptyState>
@@ -149,14 +163,23 @@ export function Brains() {
           const deletingThis = remove.isPending && remove.variables?.id === brain.id;
           return (
             <li className="panel min-w-0 space-y-3" key={brain.id}>
-              <h2>
-                <Link to={`/brains/${encodeURIComponent(brain.id)}/pages`}>{brain.name}</Link>
-              </h2>
-              <p className="break-words text-slate-600">{brain.description || "No description"}</p>
-              <p className="help">Deletion state: {brain.deletionState}</p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-base font-semibold">
+                  <Link
+                    to={`/brains/${encodeURIComponent(brain.id)}/pages`}
+                    className="text-slate-900 hover:text-indigo-700"
+                  >
+                    {brain.name}
+                  </Link>
+                </h2>
+                <StatusBadge status={brain.deletionState} />
+              </div>
+              <p className="break-words text-sm text-slate-600">
+                {brain.description || "No description"}
+              </p>
               {renaming ? (
                 <form
-                  className="space-y-3"
+                  className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3"
                   onSubmit={(event) => {
                     event.preventDefault();
                     const next = draftName.trim();
@@ -174,9 +197,9 @@ export function Brains() {
                       onChange={(event) => setDraftName(event.target.value)}
                     />
                   </div>
-                  <div className="flex flex-wrap gap-3">
+                  <div className="flex flex-wrap gap-2">
                     <button
-                      className="primary"
+                      className="btn-primary text-xs"
                       type="submit"
                       disabled={
                         renamingThis || !draftName.trim() || draftName.trim() === brain.name
@@ -186,6 +209,7 @@ export function Brains() {
                     </button>
                     <button
                       type="button"
+                      className="btn-secondary text-xs"
                       disabled={renamingThis}
                       onClick={() => {
                         setEditingId(null);
@@ -198,12 +222,14 @@ export function Brains() {
                 </form>
               ) : null}
               {confirming ? (
-                <div className="space-y-3">
-                  <p>Delete “{brain.name}”? The purge is asynchronous and cannot be undone.</p>
-                  <div className="flex flex-wrap gap-3">
+                <div className="space-y-3 rounded-lg border border-red-200 bg-red-50 p-3">
+                  <p className="text-sm font-medium text-red-900">
+                    Delete “{brain.name}”? The purge is asynchronous and cannot be undone.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      className="border-red-300 bg-red-50 text-red-900 hover:bg-red-100"
+                      className="btn-danger text-xs"
                       disabled={deletingThis}
                       onClick={() => remove.mutate({ id: brain.id, name: brain.name })}
                     >
@@ -211,6 +237,7 @@ export function Brains() {
                     </button>
                     <button
                       type="button"
+                      className="btn-secondary text-xs"
                       disabled={deletingThis}
                       onClick={() => {
                         setConfirmingId(null);
@@ -223,9 +250,10 @@ export function Brains() {
                 </div>
               ) : null}
               {brain.deletionState === "active" && !renaming && !confirming ? (
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap gap-2 pt-1">
                   <button
                     type="button"
+                    className="btn-secondary text-xs"
                     onClick={() => {
                       setConfirmingId(null);
                       setEditingId(brain.id);
@@ -233,18 +261,18 @@ export function Brains() {
                       rename.reset();
                     }}
                   >
-                    Rename {brain.name}
+                    Rename
                   </button>
                   <button
                     type="button"
-                    className="border-red-300 bg-red-50 text-red-900 hover:bg-red-100"
+                    className="btn-danger text-xs"
                     onClick={() => {
                       setEditingId(null);
                       setConfirmingId(brain.id);
                       remove.reset();
                     }}
                   >
-                    Delete {brain.name}
+                    Delete
                   </button>
                 </div>
               ) : null}

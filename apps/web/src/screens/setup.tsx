@@ -6,10 +6,12 @@ export function Setup({ onSave }: { onSave: (session: Session) => void }) {
   const [error, setError] = useState<Error | null>(null);
   return (
     <main className="mx-auto max-w-xl px-4 py-12">
-      <h1>Connect your inspector</h1>
-      <p className="mb-6 mt-3 text-slate-600">
-        Enter your API connection. Settings are saved only for this browser tab’s session.
-      </p>
+      <div className="mb-6">
+        <h1>Connect your inspector</h1>
+        <p className="mt-2 text-sm text-slate-600">
+          Enter your API connection. Settings are saved only for this browser tab’s session.
+        </p>
+      </div>
       <ErrorBanner error={error} />
       <form
         className="panel space-y-5"
@@ -88,7 +90,7 @@ export function Setup({ onSave }: { onSave: (session: Session) => void }) {
             placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
           />
         </div>
-        <button className="primary" type="submit">
+        <button className="btn-primary" type="submit">
           Connect
         </button>
       </form>

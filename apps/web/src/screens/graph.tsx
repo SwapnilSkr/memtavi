@@ -15,19 +15,25 @@ export function GraphScreen() {
     queryFn: () => api.getGraph(brainId),
   });
   const layout = useMemo(() => (graph.data ? layoutGraph(graph.data) : null), [graph.data]);
+
   return (
     <>
-      <h1>Brain graph</h1>
-      <p className="text-slate-600">
-        Follow a page to inspect it. Thicker lines mean stronger connections.
-      </p>
+      <div>
+        <h1>Brain graph</h1>
+        <p className="mt-1 text-slate-600">
+          Follow a page to inspect it. Thicker lines mean stronger connections.
+        </p>
+      </div>
       <ErrorBanner error={graph.error} />
       {graph.isPending ? <Loading label="Loading brain graph" /> : null}
       {layout?.nodes.length === 0 ? (
         <EmptyState>
           <p>
             No pages to graph yet.{" "}
-            <Link to={`/brains/${encodeURIComponent(brainId)}/capture`}>
+            <Link
+              to={`/brains/${encodeURIComponent(brainId)}/capture`}
+              className="font-medium text-indigo-700 hover:underline"
+            >
               Capture some knowledge
             </Link>{" "}
             to get started.
@@ -35,29 +41,38 @@ export function GraphScreen() {
         </EmptyState>
       ) : null}
       {layout && layout.nodes.length > 0 ? (
-        <section className="panel min-w-0" aria-label="Page connections">
-          <p className="help" aria-live="polite">
-            {layout.nodes.length} pages · {layout.edges.length} connections. Scroll horizontally to
-            explore the graph on smaller screens.
-          </p>
-          <ul className="my-4 flex flex-wrap gap-5 text-sm" aria-label="Connection strength legend">
-            {(["weak", "medium", "strong"] as const).map((strength) => (
-              <li key={strength} className="flex items-center gap-2">
-                <svg width="32" height="12" aria-hidden="true">
-                  <line
-                    x1="0"
-                    y1="6"
-                    x2="32"
-                    y2="6"
-                    stroke="currentColor"
-                    strokeWidth={strengths[strength]}
-                  />
-                </svg>
-                {strength}
-              </li>
-            ))}
-          </ul>
-          <section className="overflow-x-auto" aria-label="Scrollable brain graph">
+        <section className="panel min-w-0 space-y-4" aria-label="Page connections">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-3">
+            <p className="meta" aria-live="polite">
+              {layout.nodes.length} pages · {layout.edges.length} connections. Scroll horizontally
+              to explore the graph on smaller screens.
+            </p>
+            <ul
+              className="flex flex-wrap gap-4 text-xs font-medium text-slate-600"
+              aria-label="Connection strength legend"
+            >
+              {(["weak", "medium", "strong"] as const).map((strength) => (
+                <li key={strength} className="flex items-center gap-1.5">
+                  <svg width="28" height="12" aria-hidden="true">
+                    <line
+                      x1="0"
+                      y1="6"
+                      x2="28"
+                      y2="6"
+                      stroke="currentColor"
+                      className="text-slate-500"
+                      strokeWidth={strengths[strength]}
+                    />
+                  </svg>
+                  <span className="capitalize">{strength}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <section
+            className="overflow-x-auto rounded-lg border border-slate-200 bg-slate-50/50 p-4"
+            aria-label="Scrollable brain graph"
+          >
             <svg
               width={layout.width}
               height={layout.height}
@@ -73,7 +88,7 @@ export function GraphScreen() {
                   x2={edge.x2}
                   y2={edge.y2}
                   stroke="currentColor"
-                  className="text-slate-400"
+                  className="text-slate-300"
                   strokeWidth={strengths[edge.strength]}
                 >
                   <title>{edge.strength} connection</title>
@@ -94,18 +109,24 @@ export function GraphScreen() {
                     rx="8"
                     className={
                       node.status === "contested"
-                        ? "fill-amber-50 stroke-amber-600"
-                        : "fill-white stroke-slate-400"
+                        ? "fill-amber-50 stroke-amber-500 stroke-2"
+                        : "fill-white stroke-slate-200 stroke-1 shadow-xs"
                     }
                   />
                   <foreignObject x={node.x - 108} y={node.y - 24} width="216" height="24">
-                    <div className="truncate text-center text-sm text-indigo-700">{node.title}</div>
+                    <div className="truncate text-center text-sm font-semibold text-slate-900">
+                      {node.title}
+                    </div>
                   </foreignObject>
                   <text
                     x={node.x}
                     y={node.y + 20}
                     textAnchor="middle"
-                    className="fill-slate-700 text-xs"
+                    className={`text-xs font-medium ${
+                      node.status === "contested"
+                        ? "fill-amber-900 font-semibold"
+                        : "fill-slate-500"
+                    }`}
                   >
                     {node.status === "contested" ? "Disputed · contested" : node.status}
                     {node.pinned ? " · pinned" : ""}

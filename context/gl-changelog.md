@@ -9,6 +9,8 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-11** — Inspector design pass: grouped sidebar (menu disclosure on phones), text-bearing status badges, compact page cards under 768 px, body-first page detail with a metadata aside, `lib/format` dates, a consistent card/button system across all 14 screens. No horizontal scroll at 390 px. Presentation only.
+
 - **2026-11-11** — Keyword search reaches its GIN index under RLS: `search_pages_keyword` (migration 0017), a definer function repeating the `tenant_isolation` predicate plus the transaction subject. One index scan per query; RLS unchanged.
 
 - **2026-11-11** — Inspector settings: health on 0–100 (was clamped to 0–1) with factors, 30-day trend and linked suggestions; profile suggestions on demand with one-click apply; `/settings` with API keys and webhooks (secret shown once, never cached), members, memory mode, export and deletion progress; pages list pages through `getIndex`.
