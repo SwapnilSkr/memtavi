@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:tes
 import { createApp } from "@memtavi/api/app";
 import type { ExtractedFact } from "@memtavi/core/compile/schemas";
 import { createFakeProvider } from "@memtavi/llm/fake";
-import type { ChatProvider } from "@memtavi/llm/provider";
+import { type ChatProvider, ProviderError } from "@memtavi/llm/provider";
 import { newId } from "@memtavi/shared/ids";
 import { createFakeStore } from "@memtavi/storage/fake";
 import type { ObjectBody, ObjectStore } from "@memtavi/storage/types";
@@ -453,5 +453,59 @@ describe.skipIf(!ownerUrl || !appUrl)("retrying an ingest source", () => {
     const deletingBefore = await sourceRow(deleting.id);
     expect((await retry(deletingBrain, deleting.id)).status).toBe(404);
     expect(await sourceRow(deleting.id)).toEqual(deletingBefore);
+  });
+
+  test("a manual retry during backoff answers 409 and enqueues no second compile", async () => {
+    const source = await capture(brainA, "waiting for its own retry");
+    await finishIngest(source.id);
+    await fail(source.id);
+    expect((await retry(brainA, source.id)).status).toBe(202);
+    await owner.query(
+      `UPDATE jobs SET status = 'completed'
+       WHERE tenant_id = $1 AND type = 'capture.compile' AND status = 'pending'
+         AND payload->>'sourceId' <> $2`,
+      [tenantA, source.id],
+    );
+    const worker = createWorker({
+      withTenant: db.withTenant,
+      tenantIds: [tenantA],
+      store,
+      compiler: {
+        chatProvider: {
+          chat: async () => {
+            throw new ProviderError("rate_limited", true, "private detail", 429);
+          },
+        },
+        embeddingProvider: createFakeProvider(),
+        chatModel: "fake-chat",
+        embeddingModel: "fake-embedding",
+      },
+      handlers: { "capture.compile": compileCapture },
+      random: () => 0,
+    });
+    expect(await worker.runOnce()).toBe(true);
+
+    const backoff = await sourceRow(source.id);
+    expect(backoff).toMatchObject({
+      status: "pending",
+      last_error: "Compiler provider failed",
+    });
+    const compiles = await owner.query<{ total: number }>(
+      `SELECT count(*)::int AS total FROM jobs
+       WHERE tenant_id = $1 AND type = 'capture.compile' AND payload->>'sourceId' = $2`,
+      [tenantA, source.id],
+    );
+    expect(compiles.rows[0]?.total).toBe(1);
+
+    const response = await retry(brainA, source.id);
+    expect(response.status).toBe(409);
+
+    expect(await sourceRow(source.id)).toEqual(backoff);
+    const after = await owner.query<{ total: number }>(
+      `SELECT count(*)::int AS total FROM jobs
+       WHERE tenant_id = $1 AND type = 'capture.compile' AND payload->>'sourceId' = $2`,
+      [tenantA, source.id],
+    );
+    expect(after.rows[0]?.total).toBe(1);
   });
 });

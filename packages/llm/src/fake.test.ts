@@ -78,6 +78,48 @@ test("a queued ChatResult is returned as queued", async () => {
   });
 });
 
+test("a queued chat failure throws the exact error once and leaves later responses queued", async () => {
+  const fake = createFakeProvider();
+  const failure = new ProviderError("rate_limited", true, "slow down", 429);
+  fake.queueChat(failure, "recovered");
+
+  const first = await fake.chat({ model: "m", messages: [] }).catch((cause: unknown) => cause);
+  expect(first).toBe(failure);
+  expect(first).toMatchObject({ code: "rate_limited", transient: true, status: 429 });
+
+  expect((await fake.chat({ model: "m", messages: [] })).text).toBe("recovered");
+  expect(fake.calls).toHaveLength(2);
+});
+
+test("chat failures can be seeded at construction", async () => {
+  const failure = new ProviderError("server_error", true, "upstream", 503);
+  const fake = createFakeProvider({ chatResponses: [failure, "ok"] });
+
+  expect(await fake.chat({ model: "m", messages: [] }).catch((cause: unknown) => cause)).toBe(
+    failure,
+  );
+  expect((await fake.chat({ model: "m", messages: [] })).text).toBe("ok");
+});
+
+test("a queued embedding failure throws after recording its inputs and keeps the queue ordered", async () => {
+  const fake = createFakeProvider({ dimensions: 4 });
+  const failure = new ProviderError("timeout", true, "embedding timed out");
+  fake.queueEmbed(failure, "ok");
+
+  const error = await fake.embed(["one"]).catch((cause: unknown) => cause);
+  expect(error).toBe(failure);
+  expect(fake.calls).toEqual([{ kind: "embed", texts: ["one"] }]);
+
+  const result = await fake.embed(["two"]);
+  expect(result.dimensions).toBe(4);
+  expect(result.vectors[0]).toHaveLength(4);
+});
+
+test("embedding succeeds by default with an empty embedding queue", async () => {
+  const fake = createFakeProvider({ dimensions: 4 });
+  expect((await fake.embed(["one"])).vectors).toHaveLength(1);
+});
+
 test("chat responses can be seeded at construction", async () => {
   const fake = createFakeProvider({ chatResponses: ["seeded"] });
   expect((await fake.chat({ model: "m", messages: [] })).text).toBe("seeded");

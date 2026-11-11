@@ -9,6 +9,8 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-11** — Provider drills: `FakeProvider` queues `ProviderError`s for chat and embed; five drills (429, timeout, 5xx at embedding, malformed output, transient forever) prove retry, dead letter and nothing partial. Fixed: a source is `pending` during a queued transient retry and `failed` only when the job dies, so Retry cannot double-compile. `docs/operations.md`.
+
 - **2026-11-11** — Retention: a source uncited for 90 days (clock kept by triggers on `page_sources`, fresh grace on backfill) loses its body, chunks text, previews and objects; keeps summary, hash and row. `retention.sweep` per tenant, 50 per batch, crash-safe deletion manifest. Migration 0015. Needs a storage stack update for prefix-scoped `s3:ListBucket`.
 
 - **2026-11-11** — Memory modes enforced: `GET`/`PUT /v1/memory-settings` per subject (default `auto`, audited); `ask` holds captures (`awaitingApproval`) until `approveIngestSource`; `off` answers `202 stored:false` and writes nothing. REST, MCP `remember` and the client all respect it. Migration 0014.
