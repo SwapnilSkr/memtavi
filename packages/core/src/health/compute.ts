@@ -87,6 +87,14 @@ function cappedPenalty(value: number, perUnit: number, cap: number): number {
   return Math.min(cap, Math.max(0, value) * perUnit);
 }
 
+function raisingTone(value: number): FactorTone {
+  return value > 0 ? "positive" : "neutral";
+}
+
+function loweringTone(value: number): FactorTone {
+  return value > 0 ? "negative" : "neutral";
+}
+
 function lastInputAt(metrics: HealthMetrics): string | null {
   const capture = metrics.lastCaptureAt === null ? Number.NaN : Date.parse(metrics.lastCaptureAt);
   const change =
@@ -144,7 +152,7 @@ export function computeHealth(metrics: HealthMetrics): HealthScore {
         description: "Completed captures from the last seven days keep the brain current.",
         value: metrics.recentCaptures,
         unit: "count",
-        tone: "positive",
+        tone: raisingTone(metrics.recentCaptures),
       },
       {
         key: "recent_page_changes",
@@ -152,7 +160,7 @@ export function computeHealth(metrics: HealthMetrics): HealthScore {
         description: "Page changes from the last seven days keep the brain current.",
         value: metrics.recentPageChanges,
         unit: "count",
-        tone: "positive",
+        tone: raisingTone(metrics.recentPageChanges),
       },
       {
         key: "days_since_input",
@@ -170,7 +178,7 @@ export function computeHealth(metrics: HealthMetrics): HealthScore {
         description: "More pages give the brain more to answer from.",
         value: metrics.pageCount,
         unit: "pages",
-        tone: "positive",
+        tone: raisingTone(metrics.pageCount),
       },
       {
         key: "searchable_pages",
@@ -178,7 +186,7 @@ export function computeHealth(metrics: HealthMetrics): HealthScore {
         description: "Active pages with an embedding can be found by search.",
         value: metrics.searchablePages,
         unit: "pages",
-        tone: "positive",
+        tone: raisingTone(metrics.searchablePages),
       },
       {
         key: "profile_completeness",
@@ -186,7 +194,7 @@ export function computeHealth(metrics: HealthMetrics): HealthScore {
         description: "A filled profile tells the brain who it serves.",
         value: metrics.profileFields,
         unit: "fields",
-        tone: "positive",
+        tone: raisingTone(metrics.profileFields),
       },
       {
         key: "failed_sources",
@@ -194,7 +202,7 @@ export function computeHealth(metrics: HealthMetrics): HealthScore {
         description: "Sources that failed to compile leave knowledge missing.",
         value: metrics.failedSources,
         unit: "count",
-        tone: "negative",
+        tone: loweringTone(metrics.failedSources),
       },
       {
         key: "contested_pages",
@@ -202,7 +210,7 @@ export function computeHealth(metrics: HealthMetrics): HealthScore {
         description: "Unresolved contested pages need a human decision.",
         value: metrics.contestedPages,
         unit: "pages",
-        tone: "negative",
+        tone: loweringTone(metrics.contestedPages),
       },
     ],
     strain: [
@@ -212,7 +220,7 @@ export function computeHealth(metrics: HealthMetrics): HealthScore {
         description: "Every failed source is work that must be retried or discarded.",
         value: metrics.failedSources,
         unit: "count",
-        tone: "negative",
+        tone: loweringTone(metrics.failedSources),
       },
       {
         key: "compile_backlog",
@@ -220,7 +228,7 @@ export function computeHealth(metrics: HealthMetrics): HealthScore {
         description: "Pending and compiling sources are queued work.",
         value: metrics.backlogSources,
         unit: "count",
-        tone: "negative",
+        tone: loweringTone(metrics.backlogSources),
       },
       {
         key: "contested_pages",
@@ -228,7 +236,7 @@ export function computeHealth(metrics: HealthMetrics): HealthScore {
         description: "Contested pages await resolution.",
         value: metrics.contestedPages,
         unit: "pages",
-        tone: "negative",
+        tone: loweringTone(metrics.contestedPages),
       },
       {
         key: "deprecated_pages",
@@ -236,7 +244,7 @@ export function computeHealth(metrics: HealthMetrics): HealthScore {
         description: "Deprecated pages await cleanup.",
         value: metrics.deprecatedPages,
         unit: "pages",
-        tone: "negative",
+        tone: loweringTone(metrics.deprecatedPages),
       },
       {
         key: "unacked_changes",
@@ -244,7 +252,7 @@ export function computeHealth(metrics: HealthMetrics): HealthScore {
         description: "Unacknowledged change events accumulate review debt.",
         value: metrics.unackedChanges,
         unit: "count",
-        tone: "negative",
+        tone: loweringTone(metrics.unackedChanges),
       },
       {
         key: "unacked_connections",
@@ -252,7 +260,7 @@ export function computeHealth(metrics: HealthMetrics): HealthScore {
         description: "Unacknowledged connections accumulate review debt.",
         value: metrics.unackedConnections,
         unit: "count",
-        tone: "negative",
+        tone: loweringTone(metrics.unackedConnections),
       },
     ],
   };
