@@ -21,6 +21,8 @@ packages/db/*              schema, queries, transactions
 packages/llm/*             provider interface + implementations
 ```
 
+Cross a package or app boundary only through a `@memtavi/*` export; add one to that package's `exports` rather than importing `../../packages/x/src` or another app's source. Shared queries belong in `packages/db`.
+
 ## Errors
 
 - One error type per domain concern, carrying `code`, `status`, and a client-safe `message`.

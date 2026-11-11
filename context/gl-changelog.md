@@ -9,6 +9,8 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-11** — Score history and suggestions: `getScoreHistory` (one point per UTC day over 7/30/90 days, plus delta) and `getScoreSuggestions` (deterministic rules in `@memtavi/core/health/suggestions`, `generatedBy: "rules"`).
+
 - **2026-11-11** — `POST /pages/{slug}/resolve` (`resolvePage`): a contested page goes back to `active` with a note on an `updated` change event; an edited body writes a user version and re-embeds. `listPages` takes `status` (the contested queue). User page edits now fan out webhooks.
 
 - **2026-11-11** — Page versions: `listPageVersions`, `getPageVersion` and `diffPageVersions` (line diff, 3 lines of context, `diff@9.0.0`, 5000-line cap). Reading versions never bumps `lastReferencedAt`.

@@ -5,6 +5,9 @@ import typing
 from ..core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from ..core.request_options import RequestOptions
 from ..types.score import Score
+from ..types.score_history import ScoreHistory
+from ..types.score_range import ScoreRange
+from ..types.score_suggestions import ScoreSuggestions
 from .raw_client import AsyncRawScoreClient, RawScoreClient
 
 
@@ -53,6 +56,84 @@ class ScoreClient:
         )
         """
         _response = self._raw_client.get_score(brain_id, request_options=request_options)
+        return _response.data
+
+    def get_score_history(
+        self,
+        brain_id: str,
+        *,
+        range: typing.Optional[ScoreRange] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> ScoreHistory:
+        """
+        Returns at most one snapshot per UTC day, keeping the latest snapshot of each day,
+        oldest first. `delta` is the last point minus the first point and is `null` when
+        fewer than two points fall inside the range.
+
+        Parameters
+        ----------
+        brain_id : str
+            Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+
+        range : typing.Optional[ScoreRange]
+            The window to summarise, in whole days back from now.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        ScoreHistory
+            Daily score snapshots and their delta.
+
+        Examples
+        --------
+        from memtavi import MemtaviApi
+
+        client = MemtaviApi(
+            subject_id="YOUR_SUBJECT_ID",
+            api_key="YOUR_API_KEY",
+        )
+        client.score.get_score_history(
+            brain_id="brainId",
+        )
+        """
+        _response = self._raw_client.get_score_history(brain_id, range=range, request_options=request_options)
+        return _response.data
+
+    def get_score_suggestions(
+        self, brain_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> ScoreSuggestions:
+        """
+        Applies a deterministic rule set to the latest snapshot, computing one when the brain
+        has none. Items are ordered by priority and then by key. Requires viewer or higher.
+
+        Parameters
+        ----------
+        brain_id : str
+            Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        ScoreSuggestions
+            Rule-based suggestions for the brain.
+
+        Examples
+        --------
+        from memtavi import MemtaviApi
+
+        client = MemtaviApi(
+            subject_id="YOUR_SUBJECT_ID",
+            api_key="YOUR_API_KEY",
+        )
+        client.score.get_score_suggestions(
+            brain_id="brainId",
+        )
+        """
+        _response = self._raw_client.get_score_suggestions(brain_id, request_options=request_options)
         return _response.data
 
 
@@ -109,4 +190,98 @@ class AsyncScoreClient:
         asyncio.run(main())
         """
         _response = await self._raw_client.get_score(brain_id, request_options=request_options)
+        return _response.data
+
+    async def get_score_history(
+        self,
+        brain_id: str,
+        *,
+        range: typing.Optional[ScoreRange] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> ScoreHistory:
+        """
+        Returns at most one snapshot per UTC day, keeping the latest snapshot of each day,
+        oldest first. `delta` is the last point minus the first point and is `null` when
+        fewer than two points fall inside the range.
+
+        Parameters
+        ----------
+        brain_id : str
+            Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+
+        range : typing.Optional[ScoreRange]
+            The window to summarise, in whole days back from now.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        ScoreHistory
+            Daily score snapshots and their delta.
+
+        Examples
+        --------
+        import asyncio
+
+        from memtavi import AsyncMemtaviApi
+
+        client = AsyncMemtaviApi(
+            subject_id="YOUR_SUBJECT_ID",
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.score.get_score_history(
+                brain_id="brainId",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.get_score_history(brain_id, range=range, request_options=request_options)
+        return _response.data
+
+    async def get_score_suggestions(
+        self, brain_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> ScoreSuggestions:
+        """
+        Applies a deterministic rule set to the latest snapshot, computing one when the brain
+        has none. Items are ordered by priority and then by key. Requires viewer or higher.
+
+        Parameters
+        ----------
+        brain_id : str
+            Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        ScoreSuggestions
+            Rule-based suggestions for the brain.
+
+        Examples
+        --------
+        import asyncio
+
+        from memtavi import AsyncMemtaviApi
+
+        client = AsyncMemtaviApi(
+            subject_id="YOUR_SUBJECT_ID",
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.score.get_score_suggestions(
+                brain_id="brainId",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.get_score_suggestions(brain_id, request_options=request_options)
         return _response.data

@@ -23,6 +23,10 @@ export const indexLimit = t.Object({
   limit: t.Optional(t.Numeric({ minimum: 1, maximum: 200, multipleOf: 1, default: 40 })),
 });
 
+export const scoreHistoryQuery = t.Object({
+  range: t.Optional(t.Union([t.Literal("7d"), t.Literal("30d"), t.Literal("90d")])),
+});
+
 export const diffQuery = t.Object({
   from: t.Numeric({ minimum: 1, multipleOf: 1 }),
   to: t.Optional(t.Numeric({ minimum: 1, multipleOf: 1 })),

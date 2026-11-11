@@ -459,6 +459,22 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
       200,
     );
     await callSuccess(
+      "getScoreHistory",
+      "/v1/brains/{brainId}/score/history",
+      "GET",
+      `/v1/brains/${brainId}/score/history`,
+      {},
+      200,
+    );
+    await callSuccess(
+      "getScoreSuggestions",
+      "/v1/brains/{brainId}/score/suggestions",
+      "POST",
+      `/v1/brains/${brainId}/score/suggestions`,
+      { method: "POST" },
+      200,
+    );
+    await callSuccess(
       "getProfile",
       "/v1/brains/{brainId}/profile",
       "GET",

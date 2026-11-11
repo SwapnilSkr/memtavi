@@ -6,8 +6,8 @@ file by hand; run `bun run spec:docs`.
 - OpenAPI: 3.1.0
 - Version: 1.0.0
 - Server: https://api.memtavi.com
-- Endpoints: 38 operations across 29 paths
-- Schemas: 48 component schemas
+- Endpoints: 40 operations across 31 paths
+- Schemas: 53 component schemas
 
 ## Authentication
 
@@ -39,6 +39,8 @@ Subject routes (require `x-subject-id`):
 - `/v1/brains/{brainId}/pages/{slug}/versions/{version}`
 - `/v1/brains/{brainId}/profile`
 - `/v1/brains/{brainId}/score`
+- `/v1/brains/{brainId}/score/history`
+- `/v1/brains/{brainId}/score/suggestions`
 - `/v1/brains/{brainId}/search`
 - `/v1/brains/{brainId}/sources`
 - `/v1/brains/{brainId}/sources/{sourceId}`
@@ -83,6 +85,8 @@ Tenant routes (do not accept `x-subject-id`):
 - [`GET /v1/brains/{brainId}/profile`](#get-v1brainsbrainidprofile) — Profile
 - [`PATCH /v1/brains/{brainId}/profile`](#patch-v1brainsbrainidprofile) — Profile
 - [`GET /v1/brains/{brainId}/score`](#get-v1brainsbrainidscore) — Score
+- [`GET /v1/brains/{brainId}/score/history`](#get-v1brainsbrainidscorehistory) — Score
+- [`POST /v1/brains/{brainId}/score/suggestions`](#post-v1brainsbrainidscoresuggestions) — Score
 - [`GET /v1/brains/{brainId}/search`](#get-v1brainsbrainidsearch) — Search
 - [`GET /v1/brains/{brainId}/sources`](#get-v1brainsbrainidsources) — Sources
 - [`GET /v1/brains/{brainId}/sources/{sourceId}`](#get-v1brainsbrainidsourcessourceid) — Sources
@@ -136,6 +140,11 @@ Tenant routes (do not accept `x-subject-id`):
   - [`Profile`](#profile)
   - [`ProfileUpdate`](#profileupdate)
   - [`Score`](#score)
+  - [`ScoreHistory`](#scorehistory)
+  - [`ScorePoint`](#scorepoint)
+  - [`ScoreRange`](#scorerange)
+  - [`ScoreSuggestion`](#scoresuggestion)
+  - [`ScoreSuggestions`](#scoresuggestions)
   - [`SearchHit`](#searchhit)
   - [`SourceContentUrl`](#sourcecontenturl)
   - [`SourceStatus`](#sourcestatus)
@@ -928,6 +937,64 @@ Returns the latest score snapshot for the brain.
 | Status | Description | Schema |
 | --- | --- | --- |
 | 200 | The latest score snapshot. | `Score` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
+| 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
+| 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
+| 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
+| 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
+
+### GET /v1/brains/{brainId}/score/history
+
+`getScoreHistory` · Tags: Score
+
+Get score history
+
+Returns at most one snapshot per UTC day, keeping the latest snapshot of each day,
+oldest first. `delta` is the last point minus the first point and is `null` when
+fewer than two points fall inside the range.
+
+**Security:** `x-api-key` + `x-subject-id`
+
+**Parameters**
+
+| Name | In | Required | Type | Notes |
+| --- | --- | --- | --- | --- |
+| `brainId` | path | yes | `string` | Prefixed brain id, `brn_` followed by 32 lowercase hex characters. Matches `^brn_[0-9a-f]{32}$`. |
+| `range` | query | no | [`ScoreRange`](#scorerange) | The window to summarise, in whole days back from now. |
+
+**Responses**
+
+| Status | Description | Schema |
+| --- | --- | --- |
+| 200 | Daily score snapshots and their delta. | `ScoreHistory` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
+| 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
+| 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
+| 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
+| 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
+
+### POST /v1/brains/{brainId}/score/suggestions
+
+`getScoreSuggestions` · Tags: Score
+
+Suggest score improvements
+
+Applies a deterministic rule set to the latest snapshot, computing one when the brain
+has none. Items are ordered by priority and then by key. Requires viewer or higher.
+
+**Security:** `x-api-key` + `x-subject-id`
+
+**Parameters**
+
+| Name | In | Required | Type | Notes |
+| --- | --- | --- | --- | --- |
+| `brainId` | path | yes | `string` | Prefixed brain id, `brn_` followed by 32 lowercase hex characters. Matches `^brn_[0-9a-f]{32}$`. |
+
+**Responses**
+
+| Status | Description | Schema |
+| --- | --- | --- |
+| 200 | Rule-based suggestions for the brain. | `ScoreSuggestions` |
 | 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
@@ -1745,6 +1812,64 @@ Required: `brainId`, `computedAt`, `freshness`, `readiness`, `strain`, `factors`
 | `readiness` | `number` | yes |  |
 | `strain` | `number` | yes |  |
 | `factors` | `object` | yes | Free-form object. |
+
+### ScoreHistory
+
+Daily health snapshots for a brain, oldest first.
+
+Required: `range`, `points`, `delta`
+
+| Property | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `range` | [`ScoreRange`](#scorerange) | yes |  |
+| `points` | `ScorePoint[]` | yes |  |
+| `delta` | `object { freshness: number, readiness: number, strain: number }` | yes | The last point minus the first point, or `null` when fewer than two points fall inside the range. |
+
+### ScorePoint
+
+One day's health snapshot.
+
+Required: `computedAt`, `freshness`, `readiness`, `strain`
+
+| Property | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `computedAt` | `string (date-time)` | yes |  |
+| `freshness` | `number` | yes |  |
+| `readiness` | `number` | yes |  |
+| `strain` | `number` | yes |  |
+
+### ScoreRange
+
+Type: `string`
+
+One of `7d`, `30d`, `90d`.
+
+### ScoreSuggestion
+
+One deterministic rule-based recommendation.
+
+Required: `key`, `title`, `description`, `action`, `actionLabel`, `priority`
+
+| Property | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `key` | `string` | yes |  |
+| `title` | `string` | yes |  |
+| `description` | `string` | yes |  |
+| `action` | `string` | yes |  |
+| `actionLabel` | `string` | yes |  |
+| `priority` | `string` | yes | One of `high`, `medium`, `low`. |
+
+### ScoreSuggestions
+
+Rule-based suggestions derived from one score snapshot.
+
+Required: `generatedBy`, `basedOn`, `items`
+
+| Property | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `generatedBy` | `string` | yes | Must be `rules`. |
+| `basedOn` | `string (date-time)` | yes |  |
+| `items` | `ScoreSuggestion[]` | yes |  |
 
 ### SearchHit
 
