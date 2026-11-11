@@ -42,6 +42,9 @@ const REVIEW_OPERATIONS = new Set([
   "listRoutingReviews",
   "resolveRoutingReview",
   "dismissRoutingReview",
+  "getMemorySettings",
+  "updateMemorySettings",
+  "approveIngestSource",
 ]);
 const UNKNOWN_BRAIN = `brn_${"0".repeat(32)}`;
 const UNKNOWN_UUID = "00000000-0000-4000-8000-000000000000";
@@ -245,6 +248,66 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
       `INSERT INTO score_snapshots (tenant_id, brain_id, freshness, readiness, strain, factors)
        VALUES ($1, $2, 0.5, 0.6, 0.1, '{"seeded": true}')`,
       [harness.tenants.a, brainId],
+    );
+
+    await callSuccess(
+      "getMemorySettings",
+      "/v1/memory-settings",
+      "GET",
+      "/v1/memory-settings",
+      {},
+      200,
+    );
+    await callSuccess(
+      "updateMemorySettings",
+      "/v1/memory-settings",
+      "PUT",
+      "/v1/memory-settings",
+      { method: "PUT", body: { mode: "off" } },
+      200,
+    );
+    await callSuccess(
+      "createCapture",
+      "/v1/brains/{brainId}/captures",
+      "POST",
+      `/v1/brains/${brainId}/captures`,
+      { method: "POST", body: { kind: "note", content: "Discard" } },
+      202,
+    );
+    await callSuccess(
+      "updateMemorySettings",
+      "/v1/memory-settings",
+      "PUT",
+      "/v1/memory-settings",
+      { method: "PUT", body: { mode: "ask" } },
+      200,
+    );
+    const held = await harness.request(`/v1/brains/${brainId}/captures`, {
+      method: "POST",
+      body: { kind: "note", content: "Approve contract" },
+    });
+    const heldBody = (await held.json()) as { id: string; awaitingApproval: boolean };
+    expect(held.status).toBe(201);
+    expect(heldBody.awaitingApproval).toBe(true);
+    contract.expectContract(held, heldBody, {
+      method: "POST",
+      path: "/v1/brains/{brainId}/captures",
+    });
+    await callSuccess(
+      "approveIngestSource",
+      "/v1/brains/{brainId}/sources/{sourceId}/approve",
+      "POST",
+      `/v1/brains/${brainId}/sources/${heldBody.id}/approve`,
+      { method: "POST" },
+      202,
+    );
+    await callSuccess(
+      "updateMemorySettings",
+      "/v1/memory-settings",
+      "PUT",
+      "/v1/memory-settings",
+      { method: "PUT", body: { mode: "auto" } },
+      200,
     );
 
     await callSuccess(
@@ -643,6 +706,16 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
   test("a viewer key is forbidden from every privileged operation", async () => {
     const cases: Array<{ operationId: string; path: string; options: RequestOptions }> = [
       {
+        operationId: "updateMemorySettings",
+        path: "/v1/memory-settings",
+        options: { method: "PUT", body: { mode: "off" } },
+      },
+      {
+        operationId: "approveIngestSource",
+        path: `/v1/brains/${brainId}/sources/${sourceId}/approve`,
+        options: { method: "POST" },
+      },
+      {
         operationId: "createBrain",
         path: "/v1/brains",
         options: { method: "POST", body: { name: "Forbidden", slug: "forbidden-contract" } },
@@ -711,7 +784,11 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
   });
 
   test("every reachable documented 409 validates", async () => {
-    for (const operationId of ["resolveRoutingReview", "dismissRoutingReview"]) {
+    for (const operationId of [
+      "resolveRoutingReview",
+      "dismissRoutingReview",
+      "approveIngestSource",
+    ]) {
       const probe = probes.get(operationId);
       expect(probe).toBeDefined();
       if (probe) await callVariant(probe, probe.path, probe.options, 409);
@@ -784,7 +861,7 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
     });
   });
 
-  test("review operations validate rate limiting and internal errors without exemptions", async () => {
+  test("review and memory operations validate rate limiting and internal errors without exemptions", async () => {
     const limited = await createHarness();
     try {
       for (let count = 0; count < 300; count += 1) {

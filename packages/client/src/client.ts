@@ -151,6 +151,8 @@ export interface IngestSource {
   bucket: Bucket;
   metadata: Record<string, unknown>;
   status: SourceStatus;
+  awaitingApproval?: boolean | undefined;
+  stored?: boolean | undefined;
   attempts: number;
   lastError: string | null;
   affectedPageIds: string[];
@@ -459,6 +461,8 @@ const sourceSchema = z.object({
   bucket: bucketSchema,
   metadata: z.record(z.string(), z.unknown()),
   status: sourceStatusSchema,
+  awaitingApproval: z.boolean().optional(),
+  stored: z.boolean().optional(),
   attempts: z.number(),
   lastError: z.string().nullable(),
   affectedPageIds: z.array(z.string()),

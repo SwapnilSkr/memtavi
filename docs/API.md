@@ -6,8 +6,8 @@ file by hand; run `bun run spec:docs`.
 - OpenAPI: 3.1.0
 - Version: 1.0.0
 - Server: https://api.memtavi.com
-- Endpoints: 43 operations across 34 paths
-- Schemas: 61 component schemas
+- Endpoints: 46 operations across 36 paths
+- Schemas: 63 component schemas
 
 ## Authentication
 
@@ -47,8 +47,10 @@ Subject routes (require `x-subject-id`):
 - `/v1/brains/{brainId}/search`
 - `/v1/brains/{brainId}/sources`
 - `/v1/brains/{brainId}/sources/{sourceId}`
+- `/v1/brains/{brainId}/sources/{sourceId}/approve`
 - `/v1/brains/{brainId}/sources/{sourceId}/content`
 - `/v1/brains/{brainId}/sources/{sourceId}/retry`
+- `/v1/memory-settings`
 - `/v1/webhooks`
 - `/v1/webhooks/{webhookId}`
 
@@ -97,9 +99,12 @@ Tenant routes (do not accept `x-subject-id`):
 - [`GET /v1/brains/{brainId}/sources`](#get-v1brainsbrainidsources) — Sources
 - [`GET /v1/brains/{brainId}/sources/{sourceId}`](#get-v1brainsbrainidsourcessourceid) — Sources
 - [`DELETE /v1/brains/{brainId}/sources/{sourceId}`](#delete-v1brainsbrainidsourcessourceid) — Sources
+- [`POST /v1/brains/{brainId}/sources/{sourceId}/approve`](#post-v1brainsbrainidsourcessourceidapprove) — Sources
 - [`GET /v1/brains/{brainId}/sources/{sourceId}/content`](#get-v1brainsbrainidsourcessourceidcontent) — Sources
 - [`POST /v1/brains/{brainId}/sources/{sourceId}/retry`](#post-v1brainsbrainidsourcessourceidretry) — Sources
 - [`GET /v1/members`](#get-v1members) — Members
+- [`GET /v1/memory-settings`](#get-v1memory-settings) — Profile
+- [`PUT /v1/memory-settings`](#put-v1memory-settings) — Profile
 - [`GET /v1/tenant`](#get-v1tenant) — Tenant
 - [`GET /v1/webhooks`](#get-v1webhooks) — Webhooks
 - [`POST /v1/webhooks`](#post-v1webhooks) — Webhooks
@@ -132,6 +137,8 @@ Tenant routes (do not accept `x-subject-id`):
   - [`IngestSource`](#ingestsource)
   - [`Member`](#member)
   - [`MemberRole`](#memberrole)
+  - [`MemorySettings`](#memorysettings)
+  - [`MemorySettingsUpdate`](#memorysettingsupdate)
   - [`Page`](#page)
   - [`PageResolve`](#pageresolve)
   - [`PageStatus`](#pagestatus)
@@ -393,7 +400,11 @@ Accepts an asynchronous deletion of the brain and everything under it.
 Capture material
 
 Submits one capture for compilation. Supply exactly one of `content` or `fetchUrl`;
-supplying both returns `400`. The capture is queued, not compiled in the request.
+supplying both returns `400`. In `auto` mode the capture is queued for compilation.
+In `ask` mode it is stored with `awaitingApproval: true` and no job until approved.
+In `off` mode it returns `202` with `stored: false`: the id is a receipt id only,
+content fields are empty, and no source, body, job, usage or idempotency record is stored.
+Off-mode receipts are stateless and are not persisted for idempotency replay.
 
 **Security:** `x-api-key` + `x-subject-id`
 
@@ -413,7 +424,8 @@ supplying both returns `400`. The capture is queued, not compiled in the request
 | Status | Description | Schema |
 | --- | --- | --- |
 | 200 | A source with the same `originRef` already exists and is returned. | `IngestSource` |
-| 201 | The capture was accepted and queued. | `IngestSource` |
+| 201 | The capture was stored, queued in auto mode or awaiting approval in ask mode. | `IngestSource` |
+| 202 | Memory is off; a stateless receipt with stored false and no captured data. | `IngestSource` |
 | 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
@@ -1225,6 +1237,39 @@ Deletes the source. Pages derived from it stay in place.
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
 | 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
 
+### POST /v1/brains/{brainId}/sources/{sourceId}/approve
+
+`approveIngestSource` · Tags: Sources
+
+Approve a held ingest source
+
+Requires developer or higher. Atomically releases a source awaiting human approval and
+queues its normal ingest job exactly once. Returns 409 when it is not awaiting approval.
+Reject a held capture with deleteIngestSource. Explicit approval releases the held capture
+even if the subject mode has changed since capture.
+
+**Security:** `x-api-key` + `x-subject-id`
+
+**Parameters**
+
+| Name | In | Required | Type | Notes |
+| --- | --- | --- | --- | --- |
+| `brainId` | path | yes | `string` | Prefixed brain id, `brn_` followed by 32 lowercase hex characters. Matches `^brn_[0-9a-f]{32}$`. |
+| `sourceId` | path | yes | `string` | Prefixed ingest source id, `src_` followed by 32 lowercase hex characters. Matches `^src_[0-9a-f]{32}$`. |
+
+**Responses**
+
+| Status | Description | Schema |
+| --- | --- | --- |
+| 202 | The source was approved with awaitingApproval false and queued with status pending. | `IngestSource` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
+| 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
+| 403 | The key role does not permit this operation or granting a higher role. | `ErrorEnvelope` |
+| 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
+| 409 | Conflict with the current state, such as a page version conflict or a duplicate slug. | `ErrorEnvelope` |
+| 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
+| 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
+
 ### GET /v1/brains/{brainId}/sources/{sourceId}/content
 
 `getSourceContent` · Tags: Sources
@@ -1309,6 +1354,51 @@ List members
 | Status | Description | Schema |
 | --- | --- | --- |
 | 200 | Members of the tenant. | `object { items: Member[], total: integer, limit: integer, offset: integer }` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
+| 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
+| 403 | The key role does not permit this operation or granting a higher role. | `ErrorEnvelope` |
+| 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
+| 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
+
+### GET /v1/memory-settings
+
+`getMemorySettings` · Tags: Profile
+
+Read the subject memory mode
+
+Requires viewer or higher. Scoped to `x-subject-id`; an unset subject returns `auto` with `updatedAt` null without writing a row.
+
+**Security:** `x-api-key` + `x-subject-id`
+
+**Responses**
+
+| Status | Description | Schema |
+| --- | --- | --- |
+| 200 | The subject memory settings. | `MemorySettings` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
+| 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
+| 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
+| 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
+
+### PUT /v1/memory-settings
+
+`updateMemorySettings` · Tags: Profile
+
+Update the subject memory mode
+
+Requires developer or higher. Updates only the tenant and subject in the request headers and audits the creating user of the API key. Existing captures are unchanged.
+
+**Security:** `x-api-key` + `x-subject-id`
+
+**Request body** (required)
+
+`MemorySettingsUpdate` (`application/json`)
+
+**Responses**
+
+| Status | Description | Schema |
+| --- | --- | --- |
+| 200 | The updated subject memory settings. | `MemorySettings` |
 | 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 403 | The key role does not permit this operation or granting a higher role. | `ErrorEnvelope` |
@@ -1687,7 +1777,7 @@ Required: `slug`, `title`, `summary`, `pageType`, `pinned`
 
 ### IngestSource
 
-A stored capture and its compilation status.
+A stored capture and its compilation status, or a stateless off-mode receipt when stored is false.
 
 Required: `id`, `brainId`, `kind`, `contentPreview`, `contentUrl`, `contentHash`, `originRef`, `label`, `bucket`, `metadata`, `status`, `attempts`, `lastError`, `affectedPageIds`, `originalBytes`, `createdAt`, `compiledAt`, `deletedAt`
 
@@ -1704,6 +1794,8 @@ Required: `id`, `brainId`, `kind`, `contentPreview`, `contentUrl`, `contentHash`
 | `bucket` | [`Bucket`](#bucket) | yes |  |
 | `metadata` | `object` | yes | Free-form object. |
 | `status` | [`SourceStatus`](#sourcestatus) | yes |  |
+| `awaitingApproval` | `boolean` | no | True when held for human approval; status remains pending and no job is queued. |
+| `stored` | `boolean` | no | False only for an off-mode stateless receipt. Its source id cannot be retrieved. Omitted means stored. |
 | `attempts` | `integer` | yes | Minimum 0. |
 | `lastError` | `string \| null` | yes |  |
 | `affectedPageIds` | `string[]` | yes |  |
@@ -1730,6 +1822,23 @@ Required: `id`, `email`, `name`, `image`, `role`, `createdAt`
 Type: `string`
 
 One of `owner`, `admin`, `developer`, `viewer`.
+
+### MemorySettings
+
+Required: `mode`, `updatedAt`
+
+| Property | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `mode` | `string` | yes | One of `auto`, `ask`, `off`. |
+| `updatedAt` | `string (date-time) \| null` | yes | Null when the subject has never saved settings. |
+
+### MemorySettingsUpdate
+
+Required: `mode`
+
+| Property | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `mode` | `string` | yes | One of `auto`, `ask`, `off`. |
 
 ### Page
 

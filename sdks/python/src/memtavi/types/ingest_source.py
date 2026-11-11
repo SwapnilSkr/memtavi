@@ -14,7 +14,7 @@ from .source_status import SourceStatus
 
 class IngestSource(UniversalBaseModel):
     """
-    A stored capture and its compilation status.
+    A stored capture and its compilation status, or a stateless off-mode receipt when stored is false.
     """
 
     id: str = pydantic.Field()
@@ -40,6 +40,19 @@ class IngestSource(UniversalBaseModel):
     bucket: Bucket
     metadata: typing.Dict[str, typing.Any]
     status: SourceStatus
+    awaiting_approval: typing_extensions.Annotated[
+        typing.Optional[bool],
+        FieldMetadata(alias="awaitingApproval"),
+        pydantic.Field(
+            alias="awaitingApproval",
+            description="True when held for human approval; status remains pending and no job is queued.",
+        ),
+    ] = None
+    stored: typing.Optional[bool] = pydantic.Field(default=None)
+    """
+    False only for an off-mode stateless receipt. Its source id cannot be retrieved. Omitted means stored.
+    """
+
     attempts: int
     last_error: typing_extensions.Annotated[
         typing.Optional[str], FieldMetadata(alias="lastError"), pydantic.Field(alias="lastError")

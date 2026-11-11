@@ -225,7 +225,14 @@ export function createTools(client: ApiClient, resolver: BrainResolver): Tools {
           sourceId: source.id,
           brainId: source.brainId,
           status: source.status,
-          note: "Compilation is asynchronous. Call source_status with this sourceId to see when the derived pages are ready.",
+          stored: source.stored ?? true,
+          awaitingApproval: source.awaitingApproval ?? false,
+          note:
+            source.stored === false
+              ? "Memory is off. Nothing was stored; this receipt cannot be queried with source_status."
+              : source.awaitingApproval
+                ? "This capture is awaiting human approval. Compilation starts after approval."
+                : "Compilation is asynchronous. Call source_status with this sourceId to see when the derived pages are ready.",
         });
       } catch (error) {
         return failure(error);
@@ -248,6 +255,7 @@ export function createTools(client: ApiClient, resolver: BrainResolver): Tools {
           attempts: source.attempts,
           lastError: source.lastError,
           affectedPageIds: source.affectedPageIds,
+          awaitingApproval: source.awaitingApproval ?? false,
         });
       } catch (error) {
         return failure(error);

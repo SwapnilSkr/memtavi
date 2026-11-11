@@ -3,7 +3,7 @@
 import type * as MemtaviApi from "../index.js";
 
 /**
- * A stored capture and its compilation status.
+ * A stored capture and its compilation status, or a stateless off-mode receipt when stored is false.
  */
 export interface IngestSource {
     /** Prefixed source id, `src_...`. */
@@ -18,6 +18,10 @@ export interface IngestSource {
     bucket: MemtaviApi.Bucket;
     metadata: Record<string, unknown>;
     status: MemtaviApi.SourceStatus;
+    /** True when held for human approval; status remains pending and no job is queued. */
+    awaitingApproval?: boolean | undefined;
+    /** False only for an off-mode stateless receipt. Its source id cannot be retrieved. Omitted means stored. */
+    stored?: boolean | undefined;
     attempts: number;
     lastError: string | null;
     affectedPageIds: string[];

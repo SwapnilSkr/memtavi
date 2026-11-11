@@ -1,3 +1,4 @@
+export type { ApproveIngestSourceRequest } from "./ApproveIngestSourceRequest.js";
 export type { DeleteIngestSourceRequest } from "./DeleteIngestSourceRequest.js";
 export type { GetIngestSourceRequest } from "./GetIngestSourceRequest.js";
 export type { GetSourceContentRequest } from "./GetSourceContentRequest.js";

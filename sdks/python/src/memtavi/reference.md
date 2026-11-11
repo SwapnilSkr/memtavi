@@ -1,4 +1,327 @@
 # Reference
+## Profile
+<details><summary><code>client.profile.<a href="src/memtavi/profile/client.py">get_memory_settings</a>() -> MemorySettings</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Requires viewer or higher. Scoped to `x-subject-id`; an unset subject returns `auto` with `updatedAt` null without writing a row.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```python
+from memtavi import MemtaviApi
+from memtavi.environment import MemtaviApiEnvironment
+
+client = MemtaviApi(
+    api_key="<value>",
+    subject_id="<x-subject-id>",
+    environment=MemtaviApiEnvironment.DEFAULT,
+)
+
+client.profile.get_memory_settings()
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request_options:** `typing.Optional[RequestOptions]` — Request-specific configuration.
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.profile.<a href="src/memtavi/profile/client.py">update_memory_settings</a>(...) -> MemorySettings</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Requires developer or higher. Updates only the tenant and subject in the request headers and audits the creating user of the API key. Existing captures are unchanged.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```python
+from memtavi import MemtaviApi
+from memtavi.environment import MemtaviApiEnvironment
+
+client = MemtaviApi(
+    api_key="<value>",
+    subject_id="<x-subject-id>",
+    environment=MemtaviApiEnvironment.DEFAULT,
+)
+
+client.profile.update_memory_settings(
+    mode="ask",
+)
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**mode:** `MemorySettingsUpdateMode` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**request_options:** `typing.Optional[RequestOptions]` — Request-specific configuration.
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.profile.<a href="src/memtavi/profile/client.py">get_profile</a>(...) -> Profile</code></summary>
+<dl>
+<dd>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```python
+from memtavi import MemtaviApi
+from memtavi.environment import MemtaviApiEnvironment
+
+client = MemtaviApi(
+    api_key="<value>",
+    subject_id="<x-subject-id>",
+    environment=MemtaviApiEnvironment.DEFAULT,
+)
+
+client.profile.get_profile(
+    brain_id="brainId",
+)
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**brain_id:** `str` — Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**request_options:** `typing.Optional[RequestOptions]` — Request-specific configuration.
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.profile.<a href="src/memtavi/profile/client.py">update_profile</a>(...) -> Profile</code></summary>
+<dl>
+<dd>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```python
+from memtavi import MemtaviApi
+from memtavi.environment import MemtaviApiEnvironment
+
+client = MemtaviApi(
+    api_key="<value>",
+    subject_id="<x-subject-id>",
+    environment=MemtaviApiEnvironment.DEFAULT,
+)
+
+client.profile.update_profile(
+    brain_id="brainId",
+)
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**brain_id:** `str` — Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**who_they_are:** `typing.Optional[str]` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**what_they_do:** `typing.Optional[str]` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**focus:** `typing.Optional[str]` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**goals:** `typing.Optional[str]` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**current_projects:** `typing.Optional[str]` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**stuck_on:** `typing.Optional[str]` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**vault_organization:** `typing.Optional[str]` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**directives:** `typing.Optional[typing.Dict[str, typing.Any]]` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**request_options:** `typing.Optional[RequestOptions]` — Request-specific configuration.
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
 ## Brains
 <details><summary><code>client.brains.<a href="src/memtavi/brains/client.py">list_brains</a>(...) -> ListBrainsResponse</code></summary>
 <dl>
@@ -426,7 +749,11 @@ client.brains.update_brain(
 <dd>
 
 Submits one capture for compilation. Supply exactly one of `content` or `fetchUrl`;
-supplying both returns `400`. The capture is queued, not compiled in the request.
+supplying both returns `400`. In `auto` mode the capture is queued for compilation.
+In `ask` mode it is stored with `awaitingApproval: true` and no job until approved.
+In `off` mode it returns `202` with `stored: false`: the id is a receipt id only,
+content fields are empty, and no source, body, job, usage or idempotency record is stored.
+Off-mode receipts are stateless and are not persisted for idempotency replay.
 </dd>
 </dl>
 </dd>
@@ -911,6 +1238,92 @@ client = MemtaviApi(
 )
 
 client.sources.retry_ingest_source(
+    brain_id="brainId",
+    source_id="sourceId",
+)
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**brain_id:** `str` — Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**source_id:** `str` — Prefixed ingest source id, `src_` followed by 32 lowercase hex characters.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**request_options:** `typing.Optional[RequestOptions]` — Request-specific configuration.
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.sources.<a href="src/memtavi/sources/client.py">approve_ingest_source</a>(...) -> IngestSource</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Requires developer or higher. Atomically releases a source awaiting human approval and
+queues its normal ingest job exactly once. Returns 409 when it is not awaiting approval.
+Reject a held capture with deleteIngestSource. Explicit approval releases the held capture
+even if the subject mode has changed since capture.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```python
+from memtavi import MemtaviApi
+from memtavi.environment import MemtaviApiEnvironment
+
+client = MemtaviApi(
+    api_key="<value>",
+    subject_id="<x-subject-id>",
+    environment=MemtaviApiEnvironment.DEFAULT,
+)
+
+client.sources.approve_ingest_source(
     brain_id="brainId",
     source_id="sourceId",
 )
@@ -2892,191 +3305,6 @@ client.score.get_score_suggestions(
 <dd>
 
 **brain_id:** `str` — Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
-    
-</dd>
-</dl>
-
-<dl>
-<dd>
-
-**request_options:** `typing.Optional[RequestOptions]` — Request-specific configuration.
-    
-</dd>
-</dl>
-</dd>
-</dl>
-
-
-</dd>
-</dl>
-</details>
-
-## Profile
-<details><summary><code>client.profile.<a href="src/memtavi/profile/client.py">get_profile</a>(...) -> Profile</code></summary>
-<dl>
-<dd>
-
-#### 🔌 Usage
-
-<dl>
-<dd>
-
-<dl>
-<dd>
-
-```python
-from memtavi import MemtaviApi
-from memtavi.environment import MemtaviApiEnvironment
-
-client = MemtaviApi(
-    api_key="<value>",
-    subject_id="<x-subject-id>",
-    environment=MemtaviApiEnvironment.DEFAULT,
-)
-
-client.profile.get_profile(
-    brain_id="brainId",
-)
-
-```
-</dd>
-</dl>
-</dd>
-</dl>
-
-#### ⚙️ Parameters
-
-<dl>
-<dd>
-
-<dl>
-<dd>
-
-**brain_id:** `str` — Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
-    
-</dd>
-</dl>
-
-<dl>
-<dd>
-
-**request_options:** `typing.Optional[RequestOptions]` — Request-specific configuration.
-    
-</dd>
-</dl>
-</dd>
-</dl>
-
-
-</dd>
-</dl>
-</details>
-
-<details><summary><code>client.profile.<a href="src/memtavi/profile/client.py">update_profile</a>(...) -> Profile</code></summary>
-<dl>
-<dd>
-
-#### 🔌 Usage
-
-<dl>
-<dd>
-
-<dl>
-<dd>
-
-```python
-from memtavi import MemtaviApi
-from memtavi.environment import MemtaviApiEnvironment
-
-client = MemtaviApi(
-    api_key="<value>",
-    subject_id="<x-subject-id>",
-    environment=MemtaviApiEnvironment.DEFAULT,
-)
-
-client.profile.update_profile(
-    brain_id="brainId",
-)
-
-```
-</dd>
-</dl>
-</dd>
-</dl>
-
-#### ⚙️ Parameters
-
-<dl>
-<dd>
-
-<dl>
-<dd>
-
-**brain_id:** `str` — Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
-    
-</dd>
-</dl>
-
-<dl>
-<dd>
-
-**who_they_are:** `typing.Optional[str]` 
-    
-</dd>
-</dl>
-
-<dl>
-<dd>
-
-**what_they_do:** `typing.Optional[str]` 
-    
-</dd>
-</dl>
-
-<dl>
-<dd>
-
-**focus:** `typing.Optional[str]` 
-    
-</dd>
-</dl>
-
-<dl>
-<dd>
-
-**goals:** `typing.Optional[str]` 
-    
-</dd>
-</dl>
-
-<dl>
-<dd>
-
-**current_projects:** `typing.Optional[str]` 
-    
-</dd>
-</dl>
-
-<dl>
-<dd>
-
-**stuck_on:** `typing.Optional[str]` 
-    
-</dd>
-</dl>
-
-<dl>
-<dd>
-
-**vault_organization:** `typing.Optional[str]` 
-    
-</dd>
-</dl>
-
-<dl>
-<dd>
-
-**directives:** `typing.Optional[typing.Dict[str, typing.Any]]` 
     
 </dd>
 </dl>

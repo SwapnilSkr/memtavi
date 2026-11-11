@@ -1,0 +1,1 @@
+ALTER TABLE "ingest_sources" ADD COLUMN "awaiting_approval" boolean DEFAULT false NOT NULL;

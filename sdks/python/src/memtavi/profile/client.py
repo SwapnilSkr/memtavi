@@ -4,8 +4,10 @@ import typing
 
 from ..core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from ..core.request_options import RequestOptions
+from ..types.memory_settings import MemorySettings
 from ..types.profile import Profile
 from .raw_client import AsyncRawProfileClient, RawProfileClient
+from .types.memory_settings_update_mode import MemorySettingsUpdateMode
 
 # this is used as the default value for optional parameters
 OMIT = typing.cast(typing.Any, ...)
@@ -25,6 +27,66 @@ class ProfileClient:
         RawProfileClient
         """
         return self._raw_client
+
+    def get_memory_settings(self, *, request_options: typing.Optional[RequestOptions] = None) -> MemorySettings:
+        """
+        Requires viewer or higher. Scoped to `x-subject-id`; an unset subject returns `auto` with `updatedAt` null without writing a row.
+
+        Parameters
+        ----------
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        MemorySettings
+            The subject memory settings.
+
+        Examples
+        --------
+        from memtavi import MemtaviApi
+
+        client = MemtaviApi(
+            subject_id="YOUR_SUBJECT_ID",
+            api_key="YOUR_API_KEY",
+        )
+        client.profile.get_memory_settings()
+        """
+        _response = self._raw_client.get_memory_settings(request_options=request_options)
+        return _response.data
+
+    def update_memory_settings(
+        self, *, mode: MemorySettingsUpdateMode, request_options: typing.Optional[RequestOptions] = None
+    ) -> MemorySettings:
+        """
+        Requires developer or higher. Updates only the tenant and subject in the request headers and audits the creating user of the API key. Existing captures are unchanged.
+
+        Parameters
+        ----------
+        mode : MemorySettingsUpdateMode
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        MemorySettings
+            The updated subject memory settings.
+
+        Examples
+        --------
+        from memtavi import MemtaviApi
+
+        client = MemtaviApi(
+            subject_id="YOUR_SUBJECT_ID",
+            api_key="YOUR_API_KEY",
+        )
+        client.profile.update_memory_settings(
+            mode="ask",
+        )
+        """
+        _response = self._raw_client.update_memory_settings(mode=mode, request_options=request_options)
+        return _response.data
 
     def get_profile(self, brain_id: str, *, request_options: typing.Optional[RequestOptions] = None) -> Profile:
         """
@@ -141,6 +203,82 @@ class AsyncProfileClient:
         AsyncRawProfileClient
         """
         return self._raw_client
+
+    async def get_memory_settings(self, *, request_options: typing.Optional[RequestOptions] = None) -> MemorySettings:
+        """
+        Requires viewer or higher. Scoped to `x-subject-id`; an unset subject returns `auto` with `updatedAt` null without writing a row.
+
+        Parameters
+        ----------
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        MemorySettings
+            The subject memory settings.
+
+        Examples
+        --------
+        import asyncio
+
+        from memtavi import AsyncMemtaviApi
+
+        client = AsyncMemtaviApi(
+            subject_id="YOUR_SUBJECT_ID",
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.profile.get_memory_settings()
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.get_memory_settings(request_options=request_options)
+        return _response.data
+
+    async def update_memory_settings(
+        self, *, mode: MemorySettingsUpdateMode, request_options: typing.Optional[RequestOptions] = None
+    ) -> MemorySettings:
+        """
+        Requires developer or higher. Updates only the tenant and subject in the request headers and audits the creating user of the API key. Existing captures are unchanged.
+
+        Parameters
+        ----------
+        mode : MemorySettingsUpdateMode
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        MemorySettings
+            The updated subject memory settings.
+
+        Examples
+        --------
+        import asyncio
+
+        from memtavi import AsyncMemtaviApi
+
+        client = AsyncMemtaviApi(
+            subject_id="YOUR_SUBJECT_ID",
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.profile.update_memory_settings(
+                mode="ask",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.update_memory_settings(mode=mode, request_options=request_options)
+        return _response.data
 
     async def get_profile(self, brain_id: str, *, request_options: typing.Optional[RequestOptions] = None) -> Profile:
         """

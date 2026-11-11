@@ -1,5 +1,6 @@
 import { Elysia } from "elysia";
 import {
+  approveSource,
   createCapture,
   deleteSource,
   getSource,
@@ -32,7 +33,7 @@ export function captureRoutes(config: RouteConfig) {
         const subject = subjectId(request);
         const key = idempotencyKey(request);
         const result = await scope(config, auth, subject, (client) =>
-          createCapture(client, config.store, auth, subject, params.brainId, body, key),
+          createCapture(client, config.store, auth, subject, params.brainId, body, key, config.now),
         );
         set.status = result.status;
         return result.body;
@@ -76,6 +77,18 @@ export function captureRoutes(config: RouteConfig) {
         ),
       );
     })
+    .post(
+      "/v1/brains/:brainId/sources/:sourceId/approve",
+      async ({ auth, request, params, set }) => {
+        const subject = subjectId(request);
+        requireRole(auth.role, "developer");
+        const source = await scope(config, auth, subject, (client) =>
+          approveSource(client, auth.tenantId, subject, params.brainId, params.sourceId),
+        );
+        set.status = 202;
+        return source;
+      },
+    )
     .post("/v1/brains/:brainId/sources/:sourceId/retry", async ({ auth, request, params, set }) => {
       const subject = subjectId(request);
       requireRole(auth.role, "developer");

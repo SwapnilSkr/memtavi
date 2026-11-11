@@ -555,4 +555,122 @@ export class SourcesClient {
             "/v1/brains/{brainId}/sources/{sourceId}/retry",
         );
     }
+
+    /**
+     * Requires developer or higher. Atomically releases a source awaiting human approval and
+     * queues its normal ingest job exactly once. Returns 409 when it is not awaiting approval.
+     * Reject a held capture with deleteIngestSource. Explicit approval releases the held capture
+     * even if the subject mode has changed since capture.
+     *
+     * @param {MemtaviApi.ApproveIngestSourceRequest} request
+     * @param {SourcesClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link MemtaviApi.BadRequestError}
+     * @throws {@link MemtaviApi.UnauthorizedError}
+     * @throws {@link MemtaviApi.ForbiddenError}
+     * @throws {@link MemtaviApi.NotFoundError}
+     * @throws {@link MemtaviApi.ConflictError}
+     * @throws {@link MemtaviApi.TooManyRequestsError}
+     * @throws {@link MemtaviApi.InternalServerError}
+     * @throws {@link errors.MemtaviApiError}
+     * @throws {@link errors.MemtaviApiTimeoutError}
+     *
+     * @example
+     *     await client.sources.approveIngestSource({
+     *         brainId: "brainId",
+     *         sourceId: "sourceId"
+     *     })
+     */
+    public approveIngestSource(
+        request: MemtaviApi.ApproveIngestSourceRequest,
+        requestOptions?: SourcesClient.RequestOptions,
+    ): core.HttpResponsePromise<MemtaviApi.IngestSource> {
+        return core.HttpResponsePromise.fromPromise(this.__approveIngestSource(request, requestOptions));
+    }
+
+    private async __approveIngestSource(
+        request: MemtaviApi.ApproveIngestSourceRequest,
+        requestOptions?: SourcesClient.RequestOptions,
+    ): Promise<core.WithRawResponse<MemtaviApi.IngestSource>> {
+        const { brainId, sourceId } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({ "x-subject-id": requestOptions?.subjectId ?? this._options?.subjectId }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.MemtaviApiEnvironment.Default,
+                `v1/brains/${core.url.encodePathParam(brainId, errors.MemtaviApiError)}/sources/${core.url.encodePathParam(sourceId, errors.MemtaviApiError)}/approve`,
+            ),
+            method: "POST",
+            headers: _headers,
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as MemtaviApi.IngestSource, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new MemtaviApi.BadRequestError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 401:
+                    throw new MemtaviApi.UnauthorizedError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 403:
+                    throw new MemtaviApi.ForbiddenError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 404:
+                    throw new MemtaviApi.NotFoundError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 409:
+                    throw new MemtaviApi.ConflictError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 429:
+                    throw new MemtaviApi.TooManyRequestsError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 500:
+                    throw new MemtaviApi.InternalServerError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                default:
+                    throw new errors.MemtaviApiError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "POST",
+            "/v1/brains/{brainId}/sources/{sourceId}/approve",
+        );
+    }
 }

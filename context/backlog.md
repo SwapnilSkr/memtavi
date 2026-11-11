@@ -19,7 +19,6 @@ Ordered by product value per unit of risk. Remove items as they land.
 
 ## Product gaps
 
-- **Memory modes**: `memory_settings` exists but is unenforced. Wire `auto`/`ask`/`off` into capture and `remember`.
 - **Retention**: sources and chunks never expire; add the citation-aware 90-day body drop.
 - **Webhooks UI**: API and CLI exist; the inspector has no webhooks screen.
 - **Inspector read cost**: the pages table fetches full bodies; switch to `/index` and add pagination.

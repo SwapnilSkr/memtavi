@@ -30,6 +30,8 @@ if typing.TYPE_CHECKING:
     from .ingest_source import IngestSource
     from .member import Member
     from .member_role import MemberRole
+    from .memory_settings import MemorySettings
+    from .memory_settings_mode import MemorySettingsMode
     from .page import Page
     from .page_status import PageStatus
     from .page_type import PageType
@@ -100,6 +102,8 @@ _dynamic_imports: typing.Dict[str, str] = {
     "IngestSource": ".ingest_source",
     "Member": ".member",
     "MemberRole": ".member_role",
+    "MemorySettings": ".memory_settings",
+    "MemorySettingsMode": ".memory_settings_mode",
     "Page": ".page",
     "PageStatus": ".page_status",
     "PageType": ".page_type",
@@ -194,6 +198,8 @@ __all__ = [
     "IngestSource",
     "Member",
     "MemberRole",
+    "MemorySettings",
+    "MemorySettingsMode",
     "Page",
     "PageStatus",
     "PageType",
