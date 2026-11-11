@@ -15,7 +15,6 @@ Ordered by product value per unit of risk. Remove items as they land.
 
 ## Product gaps
 
-- **Inspector presentation**: screens use plain accessible markup; one UI pass for layout, hierarchy and mobile (390 px) across all 14 screens.
 
 - **Eval quality**: 15% exact / 0.205 F1 on a 20-question slice, 37 reviews; run full LoCoMo before tuning prompts.
 

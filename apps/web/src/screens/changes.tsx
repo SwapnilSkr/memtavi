@@ -2,9 +2,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import { EmptyState, ErrorBanner, Loading } from "../components/feedback";
 import { PageReference } from "../components/page-reference";
-import { relativeTime, versionTransition } from "../lib/activity";
+import { StatusBadge } from "../components/status-badge";
+import { versionTransition } from "../lib/activity";
 import type { ChangeEvent, ListResponse, Page } from "../lib/api";
 import { useApi } from "../lib/api-context";
+import { formatDateTime, formatRelative } from "../lib/format";
 
 const params = { limit: 50, offset: 0 };
 
@@ -37,31 +39,41 @@ function ChangeRow({
       await queryClient.invalidateQueries({ queryKey, exact: true });
     },
   });
+
   return (
     <li className="panel min-w-0 space-y-3 break-words">
-      <h2>
-        <PageReference brainId={brainId} pageId={change.pageId} pages={pages} />
-      </h2>
-      <p className="text-sm text-slate-600">
-        Action: {change.action} · Version: {versionTransition(change.fromVersion, change.toVersion)}
-      </p>
-      <p>{change.changeSummary || "No change summary"}</p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-base font-semibold">
+          <PageReference brainId={brainId} pageId={change.pageId} pages={pages} />
+        </h2>
+        <StatusBadge
+          status={change.ackedAt ? "completed" : "pending"}
+          label={change.ackedAt ? "Acknowledged" : "Unacknowledged"}
+        />
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+        <span className="badge badge-neutral">Action: {change.action}</span>
+        <span className="badge badge-info">
+          Version: {versionTransition(change.fromVersion, change.toVersion)}
+        </span>
+        <time dateTime={change.createdAt} title={formatDateTime(change.createdAt)}>
+          {formatRelative(change.createdAt, now)}
+        </time>
+      </div>
+      <p className="text-sm text-slate-800">{change.changeSummary || "No change summary"}</p>
       {change.contradictions.length > 0 ? (
-        <p className="font-semibold text-amber-950">
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs font-semibold text-amber-950">
           Contradictions: {change.contradictions.length}
-        </p>
+        </div>
       ) : null}
-      <time
-        className="block text-sm text-slate-600"
-        dateTime={change.createdAt}
-        title={new Date(change.createdAt).toLocaleString()}
-      >
-        {relativeTime(change.createdAt, now)}
-      </time>
-      <div className="flex flex-wrap items-center gap-3" aria-live="polite">
-        <span>{change.ackedAt ? "Acknowledged" : "Unacknowledged"}</span>
+      <div className="flex flex-wrap items-center gap-3 pt-1" aria-live="polite">
         {!change.ackedAt ? (
-          <button type="button" disabled={ack.isPending} onClick={() => ack.mutate()}>
+          <button
+            type="button"
+            className="btn-secondary text-xs"
+            disabled={ack.isPending}
+            onClick={() => ack.mutate()}
+          >
             {ack.isPending ? "Acknowledging…" : "Acknowledge"}
           </button>
         ) : null}
@@ -84,10 +96,15 @@ export function Changes() {
   });
   const now = Date.now();
   const base = `/brains/${encodeURIComponent(brainId)}`;
+
   return (
     <>
-      <h1>Changes</h1>
-      <p className="text-slate-600">Review the latest changes to this brain, newest first.</p>
+      <div>
+        <h1>Changes</h1>
+        <p className="mt-1 text-slate-600">
+          Review the latest changes to this brain, newest first.
+        </p>
+      </div>
       <ErrorBanner error={changes.error} />
       {pages.error ? (
         <p role="status" className="help">
@@ -98,8 +115,11 @@ export function Changes() {
       {changes.data?.items.length === 0 ? (
         <EmptyState>
           <p>
-            No changes yet. <Link to={`${base}/capture`}>Capture a note or URL</Link> to get
-            started.
+            No changes yet.{" "}
+            <Link to={`${base}/capture`} className="font-medium text-indigo-700 hover:underline">
+              Capture a note or URL
+            </Link>{" "}
+            to get started.
           </p>
         </EmptyState>
       ) : null}

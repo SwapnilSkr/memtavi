@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import { EmptyState, ErrorBanner, Loading } from "../components/feedback";
 import { PageReference } from "../components/page-reference";
+import { StatusBadge } from "../components/status-badge";
 import type { Connection, ListResponse, Page } from "../lib/api";
 import { useApi } from "../lib/api-context";
 
@@ -34,25 +35,43 @@ function ConnectionRow({
       await queryClient.invalidateQueries({ queryKey, exact: true });
     },
   });
+
   return (
     <li className="panel min-w-0 space-y-3 break-words">
-      <h2>
-        <PageReference brainId={brainId} pageId={connection.pageAId} pages={pages} />
-        <span className="mx-2" aria-hidden="true">
-          ↔
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-base font-semibold">
+          <PageReference brainId={brainId} pageId={connection.pageAId} pages={pages} />
+          <span className="mx-2 text-slate-400" aria-hidden="true">
+            ↔
+          </span>
+          <span className="sr-only"> connected to </span>
+          <PageReference brainId={brainId} pageId={connection.pageBId} pages={pages} />
+        </h2>
+        <StatusBadge
+          status={connection.ackedAt ? "completed" : "pending"}
+          label={connection.ackedAt ? "Acknowledged" : "Unacknowledged"}
+        />
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+        <span className="badge badge-neutral">Strength: {connection.strength}</span>
+        <span className="badge badge-info font-mono">
+          Similarity: {connection.similarity.toFixed(3)}
         </span>
-        <span className="sr-only"> connected to </span>
-        <PageReference brainId={brainId} pageId={connection.pageBId} pages={pages} />
-      </h2>
-      <p className="text-sm text-slate-600">
-        Strength: {connection.strength} · Similarity: {connection.similarity.toFixed(3)} · Source:{" "}
-        {connection.source}
-      </p>
-      {connection.reasoning ? <p>{connection.reasoning}</p> : null}
-      <div className="flex flex-wrap items-center gap-3" aria-live="polite">
-        <span>{connection.ackedAt ? "Acknowledged" : "Unacknowledged"}</span>
+        <span>Source: {connection.source}</span>
+      </div>
+      {connection.reasoning ? (
+        <p className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+          {connection.reasoning}
+        </p>
+      ) : null}
+      <div className="flex flex-wrap items-center gap-3 pt-1" aria-live="polite">
         {!connection.ackedAt ? (
-          <button type="button" disabled={ack.isPending} onClick={() => ack.mutate()}>
+          <button
+            type="button"
+            className="btn-secondary text-xs"
+            disabled={ack.isPending}
+            onClick={() => ack.mutate()}
+          >
             {ack.isPending ? "Acknowledging…" : "Acknowledge"}
           </button>
         ) : null}
@@ -74,13 +93,19 @@ export function Connections() {
     queryFn: () => api.listPages(brainId, params),
   });
   const base = `/brains/${encodeURIComponent(brainId)}`;
+
   return (
     <>
-      <h1>Connections</h1>
-      <p className="text-slate-600">
-        Review connections by similarity, or <Link to={`${base}/graph`}>open the Graph</Link> for a
-        visual view.
-      </p>
+      <div>
+        <h1>Connections</h1>
+        <p className="mt-1 text-slate-600">
+          Review connections by similarity, or{" "}
+          <Link to={`${base}/graph`} className="font-medium text-indigo-700 hover:underline">
+            open the Graph
+          </Link>{" "}
+          for a visual view.
+        </p>
+      </div>
       <ErrorBanner error={connections.error} />
       {pages.error ? (
         <p role="status" className="help">
@@ -91,8 +116,11 @@ export function Connections() {
       {connections.data?.items.length === 0 ? (
         <EmptyState>
           <p>
-            No connections yet. <Link to={`${base}/capture`}>Capture more knowledge</Link> to
-            connect related pages.
+            No connections yet.{" "}
+            <Link to={`${base}/capture`} className="font-medium text-indigo-700 hover:underline">
+              Capture more knowledge
+            </Link>{" "}
+            to connect related pages.
           </p>
         </EmptyState>
       ) : null}

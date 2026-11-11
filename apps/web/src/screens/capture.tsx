@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 import { EmptyState, ErrorBanner, Loading, Pagination } from "../components/feedback";
+import { StatusBadge } from "../components/status-badge";
 import type { CaptureInput, IngestSource, ListResponse } from "../lib/api";
 import { useApi } from "../lib/api-context";
 import {
@@ -62,35 +63,53 @@ function SourceRow({
   const busy = retry.isPending || approve.isPending;
   return (
     <li className="panel min-w-0 space-y-3">
-      <h3 className="break-words text-base font-semibold">{name}</h3>
-      <p className="break-all text-sm text-slate-600">Source {source.id}</p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="break-words text-base font-semibold text-slate-900">{name}</h3>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <StatusBadge status={source.status} />
+          {source.awaitingApproval ? (
+            <StatusBadge status="awaiting_approval" label="Awaiting approval" />
+          ) : null}
+        </div>
+      </div>
+      <p className="break-all font-mono text-xs text-slate-500">Source {source.id}</p>
       {source.contentPreview ? (
-        <p className="line-clamp-3 break-words text-slate-700">{source.contentPreview}</p>
+        <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+          <p className="line-clamp-3 break-words text-sm text-slate-700 font-mono">
+            {source.contentPreview}
+          </p>
+        </div>
       ) : null}
-      <div aria-live="polite" aria-atomic="true" className="space-y-2">
-        <p>
-          Status: {source.status}
-          {source.awaitingApproval ? " · Awaiting approval" : ""}
-        </p>
+      <div aria-live="polite" aria-atomic="true" className="space-y-1.5 text-xs text-slate-600">
         <p>Attempts: {source.attempts}</p>
         {source.lastError ? <p className="error-banner">{source.lastError}</p> : null}
         {source.status === "completed" ? (
-          <p>
+          <p className="text-emerald-800">
             {source.affectedPageIds.length} affected pages.{" "}
-            <Link to={`/brains/${encodeURIComponent(brainId)}/pages`}>Open pages</Link>
+            <Link
+              to={`/brains/${encodeURIComponent(brainId)}/pages`}
+              className="font-medium underline hover:text-emerald-950"
+            >
+              Open pages
+            </Link>
           </p>
         ) : null}
       </div>
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-2 pt-1">
         {source.status === "failed" ? (
-          <button type="button" disabled={busy} onClick={() => retry.mutate()}>
+          <button
+            type="button"
+            className="btn-secondary text-xs"
+            disabled={busy}
+            onClick={() => retry.mutate()}
+          >
             {retry.isPending ? "Retrying…" : `Retry ${name}`}
           </button>
         ) : null}
         {source.awaitingApproval ? (
           <button
             type="button"
-            className="primary"
+            className="btn-primary text-xs"
             disabled={busy}
             onClick={() => approve.mutate()}
           >
@@ -185,17 +204,27 @@ function CaptureComposer({ brainId }: { brainId: string }) {
       }
     }
   }, [brainId, queryClient, sources.data]);
+
   return (
     <>
-      <h1>Capture</h1>
-      <p className="text-slate-600">
-        Add a note or URL. The queue slows its checks while a source is still processing, and pauses
-        after {SOURCE_POLL_LIMIT_MS / 60_000} minutes without a status change.
-      </p>
+      <div>
+        <h1>Capture</h1>
+        <p className="mt-1 text-slate-600">
+          Add a note or URL. The queue slows its checks while a source is still processing, and
+          pauses after {SOURCE_POLL_LIMIT_MS / 60_000} minutes without a status change.
+        </p>
+      </div>
       <ErrorBanner error={capture.error} />
-      {unstored ? <p role="status">Memory is off, so this capture was not stored.</p> : null}
+      {unstored ? (
+        <div
+          role="status"
+          className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs sm:text-sm text-amber-900"
+        >
+          Memory is off, so this capture was not stored.
+        </div>
+      ) : null}
       <form
-        className="panel space-y-5"
+        className="panel space-y-4"
         onSubmit={(event) => {
           event.preventDefault();
           if (capture.isPending || !(kind === "note" ? content.trim() : fetchUrl.trim())) return;
@@ -206,27 +235,41 @@ function CaptureComposer({ brainId }: { brainId: string }) {
           });
         }}
       >
-        <fieldset disabled={capture.isPending} className="min-w-0 space-y-5">
-          <legend className="sr-only">Capture content</legend>
-          <div>
-            <label htmlFor="capture-kind">Kind</label>
-            <select
-              id="capture-kind"
-              value={kind}
-              onChange={(event) => setKind(event.target.value === "url" ? "url" : "note")}
-            >
-              <option value="note">Note</option>
-              <option value="url">URL</option>
-            </select>
+        <fieldset disabled={capture.isPending} className="min-w-0 space-y-4">
+          <legend className="section-title">New capture</legend>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="capture-kind">Kind</label>
+              <select
+                id="capture-kind"
+                value={kind}
+                onChange={(event) => setKind(event.target.value === "url" ? "url" : "note")}
+              >
+                <option value="note">Note</option>
+                <option value="url">URL</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="capture-label">
+                Label <span className="font-normal text-slate-400">(optional)</span>
+              </label>
+              <input
+                id="capture-label"
+                placeholder="Reference title or tag"
+                value={label}
+                onChange={(event) => setLabel(event.target.value)}
+              />
+            </div>
           </div>
           {kind === "note" ? (
             <div>
-              <label htmlFor="capture-note">Note</label>
+              <label htmlFor="capture-note">Note content</label>
               <textarea
                 id="capture-note"
                 required
                 maxLength={50000}
-                rows={8}
+                rows={6}
+                placeholder="Paste research, meeting notes, transcripts, or facts…"
                 value={content}
                 onChange={(event) => setContent(event.target.value)}
               />
@@ -238,21 +281,14 @@ function CaptureComposer({ brainId }: { brainId: string }) {
                 id="capture-url"
                 type="url"
                 required
+                placeholder="https://example.com/article"
                 value={fetchUrl}
                 onChange={(event) => setFetchUrl(event.target.value)}
               />
             </div>
           )}
-          <div>
-            <label htmlFor="capture-label">Label (optional)</label>
-            <input
-              id="capture-label"
-              value={label}
-              onChange={(event) => setLabel(event.target.value)}
-            />
-          </div>
           <button
-            className="primary"
+            className="btn-primary"
             type="submit"
             disabled={capture.isPending || !(kind === "note" ? content.trim() : fetchUrl.trim())}
           >
@@ -261,18 +297,20 @@ function CaptureComposer({ brainId }: { brainId: string }) {
         </fieldset>
       </form>
       <section aria-labelledby="sources-heading" className="space-y-4">
-        <h2 id="sources-heading">Queue</h2>
-        {pollStalled ? (
-          <p role="status">
-            <button type="button" onClick={restartPolling}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 id="sources-heading" className="section-title">
+            Queue
+          </h2>
+          {pollStalled ? (
+            <button type="button" className="btn-secondary text-xs" onClick={restartPolling}>
               Still processing — Refresh
             </button>
-          </p>
-        ) : null}
+          ) : null}
+        </div>
         <ErrorBanner error={sources.error} />
         {sources.isPending ? <Loading label="Loading sources" /> : null}
         {sources.data && sources.data.total > sources.data.items.length ? (
-          <p className="help" role="status">
+          <p className="meta" role="status">
             Showing the newest {sources.data.items.length} of {sources.data.total}. Polling follows
             this window.
           </p>

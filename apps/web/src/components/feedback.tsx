@@ -1,3 +1,4 @@
+import type React from "react";
 import { Link } from "react-router";
 
 export function ErrorBanner({ error }: { error: Error | null }) {
@@ -16,7 +17,7 @@ export function Loading({ label }: { label: string }) {
       {[1, 2, 3].map((row) => (
         <div
           key={row}
-          className="skeleton h-20 rounded-lg bg-slate-200 motion-safe:animate-pulse"
+          className="h-20 rounded-xl border border-slate-200 bg-slate-100 motion-safe:animate-pulse"
           aria-hidden="true"
         />
       ))}
@@ -25,7 +26,7 @@ export function Loading({ label }: { label: string }) {
 }
 
 export function EmptyState({ children }: { children: React.ReactNode }) {
-  return <div className="panel py-10 text-center text-slate-600">{children}</div>;
+  return <div className="empty-state">{children}</div>;
 }
 
 export function Pagination({
@@ -42,24 +43,31 @@ export function Pagination({
   pending: boolean;
 }) {
   return (
-    <nav aria-label="Pagination" className="flex flex-wrap items-center gap-3 py-4">
-      <button
-        type="button"
-        disabled={offset === 0 || pending}
-        onClick={() => onChange(Math.max(0, offset - limit))}
-      >
-        Previous
-      </button>
-      <p aria-live="polite">
+    <nav
+      aria-label="Pagination"
+      className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4"
+    >
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          className="btn-secondary text-xs"
+          disabled={offset === 0 || pending}
+          onClick={() => onChange(Math.max(0, offset - limit))}
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          className="btn-secondary text-xs"
+          disabled={offset + limit >= total || pending}
+          onClick={() => onChange(offset + limit)}
+        >
+          Next
+        </button>
+      </div>
+      <p aria-live="polite" className="meta">
         {total === 0 ? "0 results" : `${offset + 1}–${Math.min(offset + limit, total)} of ${total}`}
       </p>
-      <button
-        type="button"
-        disabled={offset + limit >= total || pending}
-        onClick={() => onChange(offset + limit)}
-      >
-        Next
-      </button>
     </nav>
   );
 }
@@ -67,8 +75,13 @@ export function Pagination({
 export function NotFound() {
   return (
     <EmptyState>
-      <h1>Page not found</h1>
-      <Link to="/">Go to brains</Link>
+      <h1 className="text-xl">Page not found</h1>
+      <p className="mt-2 text-slate-600">The page you requested could not be found.</p>
+      <div className="mt-4">
+        <Link to="/" className="btn-primary inline-flex text-sm">
+          Go to brains
+        </Link>
+      </div>
     </EmptyState>
   );
 }

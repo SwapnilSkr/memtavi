@@ -2,9 +2,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { EmptyState, ErrorBanner, Loading, Pagination } from "../components/feedback";
+import { StatusBadge } from "../components/status-badge";
 import type { ChangeEvent, Page } from "../lib/api";
 import { useApi } from "../lib/api-context";
 import { latestContradiction, readClaims } from "../lib/contradictions";
+import { formatDateTime, formatRelative } from "../lib/format";
 import { applyCacheEffect } from "../lib/invalidation";
 import { listSearchParams, parseOffset } from "../lib/list-params";
 import { pageResolveBody } from "../lib/resolve-form";
@@ -21,18 +23,35 @@ function ClaimPairView({
   quote?: string;
 }) {
   return (
-    <div className="space-y-3">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <section className="min-w-0" aria-label="Existing claim">
-          <h4 className="text-sm font-semibold text-slate-500">Existing claim</h4>
-          <p className="mt-1 break-words">{existingClaim}</p>
+    <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+      {/* Side by side on desktop, stacked on phone */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <section
+          className="min-w-0 rounded-md border border-slate-200 bg-white p-3.5 shadow-xs"
+          aria-label="Existing claim"
+        >
+          <div className="flex items-center gap-1.5">
+            <span className="badge badge-neutral">Existing claim</span>
+          </div>
+          <p className="mt-2 break-words text-sm text-slate-800">{existingClaim}</p>
         </section>
-        <section className="min-w-0" aria-label="New claim">
-          <h4 className="text-sm font-semibold text-slate-500">New claim</h4>
-          <p className="mt-1 break-words">{newClaim}</p>
+        <section
+          className="min-w-0 rounded-md border border-amber-200 bg-amber-50/50 p-3.5 shadow-xs"
+          aria-label="New claim"
+        >
+          <div className="flex items-center gap-1.5">
+            <span className="badge badge-warning">New claim</span>
+          </div>
+          <p className="mt-2 break-words text-sm text-slate-800">{newClaim}</p>
         </section>
       </div>
-      {quote ? <p className="break-words text-sm text-slate-600">Evidence quote: {quote}</p> : null}
+      {quote ? (
+        <div className="rounded-md border-l-2 border-indigo-400 bg-white px-3 py-2 text-xs">
+          <p className="break-words text-slate-600">
+            <span className="font-semibold text-slate-700">Evidence quote:</span> {quote}
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -67,28 +86,40 @@ function ConflictCard({
     },
   });
   const payload = pageResolveBody(note, body);
+
   return (
     <li className="panel min-w-0 space-y-4">
-      <h2 className="break-words">
-        <Link to={`/brains/${encodeURIComponent(brainId)}/pages/${encodeURIComponent(page.slug)}`}>
-          {page.title}
-        </Link>
-      </h2>
-      <p className="disputed" role="status">
-        Disputed · contested
-      </p>
-      <p className="break-words text-slate-600">{page.summary || "No summary"}</p>
-      {events === undefined ? <p>Loading contradiction events…</p> : null}
-      {events === null ? <p>Contradiction events are unavailable.</p> : null}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="break-words text-base font-semibold">
+          <Link
+            to={`/brains/${encodeURIComponent(brainId)}/pages/${encodeURIComponent(page.slug)}`}
+            className="text-slate-900 hover:text-indigo-700"
+          >
+            {page.title}
+          </Link>
+        </h2>
+        <StatusBadge status="contested" className="disputed" />
+      </div>
+      <p className="break-words text-sm text-slate-600">{page.summary || "No summary"}</p>
+      {events === undefined ? (
+        <p className="text-xs text-slate-500">Loading contradiction events…</p>
+      ) : null}
+      {events === null ? (
+        <p className="text-xs text-slate-500">Contradiction events are unavailable.</p>
+      ) : null}
       {event ? (
-        <div className="space-y-3">
-          <p className="text-sm text-slate-600">
+        <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+          <p className="text-xs text-slate-500">
             Latest contradiction ·{" "}
-            <time dateTime={event.createdAt}>{new Date(event.createdAt).toLocaleString()}</time>
+            <time dateTime={event.createdAt} title={formatDateTime(event.createdAt)}>
+              {formatRelative(event.createdAt)}
+            </time>
           </p>
-          {event.changeSummary ? <p className="break-words">{event.changeSummary}</p> : null}
+          {event.changeSummary ? (
+            <p className="break-words text-sm font-medium text-slate-800">{event.changeSummary}</p>
+          ) : null}
           {claims.length > 0 ? (
-            <ol className="space-y-4">
+            <ol className="space-y-3">
               {claims.map((claim) => (
                 <li key={`${claim.existingClaim}:${claim.newClaim}`}>
                   <ClaimPairView {...claim} />
@@ -96,19 +127,24 @@ function ConflictCard({
               ))}
             </ol>
           ) : (
-            <p>This contradiction is not in a readable claim pair.</p>
+            <p className="text-xs text-slate-500">
+              This contradiction is not in a readable claim pair.
+            </p>
           )}
         </div>
       ) : null}
-      {events && !event ? <p>No contradiction event in the latest 200 changes.</p> : null}
+      {events && !event ? (
+        <p className="text-xs text-slate-500">No contradiction event in the latest 200 changes.</p>
+      ) : null}
       <form
-        className="space-y-4"
+        className="space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4"
         onSubmit={(event) => {
           event.preventDefault();
           if (!payload || resolve.isPending) return;
           resolve.mutate();
         }}
       >
+        <h3 className="section-title">Resolve conflict</h3>
         <div>
           <label htmlFor={`note-${page.id}`}>Resolution note</label>
           <textarea
@@ -116,24 +152,30 @@ function ConflictCard({
             required
             maxLength={2000}
             rows={3}
+            placeholder="Explain how this conflict was settled…"
             value={note}
             onChange={(change) => setNote(change.target.value)}
           />
         </div>
         <div>
           <label htmlFor={`body-${page.id}`}>
-            Edited body <span className="font-normal">(optional)</span>
+            Edited body <span className="font-normal text-slate-400">(optional)</span>
           </label>
           <textarea
             id={`body-${page.id}`}
-            className="font-mono text-sm"
-            rows={8}
+            className="font-mono text-xs sm:text-sm"
+            rows={6}
+            placeholder="Leave blank to keep the current page body…"
             value={body}
             onChange={(change) => setBody(change.target.value)}
           />
           <p className="help">Leave this blank to keep the current body.</p>
         </div>
-        <button className="primary" type="submit" disabled={!payload || resolve.isPending}>
+        <button
+          className="btn-primary text-xs"
+          type="submit"
+          disabled={!payload || resolve.isPending}
+        >
           {resolve.isPending ? "Resolving…" : `Resolve ${page.title}`}
         </button>
       </form>
@@ -159,17 +201,24 @@ export function Conflicts() {
     queryKey: ["changes", brainId, { limit: 200, offset: 0 }],
     queryFn: () => api.listChanges(brainId, { limit: 200, offset: 0 }),
   });
+
   return (
     <>
-      <h1>Conflicts</h1>
-      <p className="text-slate-600">
-        Contested pages and the newest contradiction for each one. Resolve with a note.
-      </p>
+      <div>
+        <h1>Conflicts</h1>
+        <p className="mt-1 text-slate-600">
+          Contested pages and the newest contradiction for each one. Resolve with a note.
+        </p>
+      </div>
       <div aria-live="polite" className="space-y-2">
         {resolved.map((item) => (
-          <p key={item.id} role="status">
+          <div
+            key={item.id}
+            role="status"
+            className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs sm:text-sm text-emerald-900"
+          >
             Resolved “{item.title}”. The page is active again.
-          </p>
+          </div>
         ))}
       </div>
       <ErrorBanner error={pages.error} />
@@ -183,8 +232,19 @@ export function Conflicts() {
         <EmptyState>
           <p>
             No contested pages.{" "}
-            <Link to={`/brains/${encodeURIComponent(brainId)}/pages`}>Browse pages</Link> or{" "}
-            <Link to={`/brains/${encodeURIComponent(brainId)}/capture`}>capture a note or URL</Link>
+            <Link
+              to={`/brains/${encodeURIComponent(brainId)}/pages`}
+              className="font-medium text-indigo-700 hover:underline"
+            >
+              Browse pages
+            </Link>{" "}
+            or{" "}
+            <Link
+              to={`/brains/${encodeURIComponent(brainId)}/capture`}
+              className="font-medium text-indigo-700 hover:underline"
+            >
+              capture a note or URL
+            </Link>
             .
           </p>
         </EmptyState>

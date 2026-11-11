@@ -4,6 +4,7 @@ import { Link, useParams, useSearchParams } from "react-router";
 import { EmptyState, ErrorBanner, Loading, Pagination } from "../components/feedback";
 import type { RoutingReview } from "../lib/api";
 import { useApi } from "../lib/api-context";
+import { formatDateTime, formatRelative } from "../lib/format";
 import { applyCacheEffect } from "../lib/invalidation";
 import { listSearchParams, parseOffset } from "../lib/list-params";
 import { reviewDismissBody, reviewResolveBody } from "../lib/reviews";
@@ -49,24 +50,46 @@ function ReviewCard({
     },
   });
   const busy = resolve.isPending || dismiss.isPending;
+
   return (
     <li className="panel min-w-0 space-y-4">
-      <h2 className="break-words">{review.fact.claim}</h2>
-      <p className="break-all text-sm text-slate-600">Source {review.sourceId}</p>
-      <p className="break-words text-sm text-slate-600">
-        Entities: {review.fact.entities.join(", ") || "None"}
-      </p>
-      {review.bestGap !== null ? (
-        <p className="text-sm text-slate-600">Gap: {review.bestGap}</p>
+      <div className="space-y-1">
+        <h2 className="break-words text-base font-semibold text-slate-900">{review.fact.claim}</h2>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+          <span className="font-mono">Source {review.sourceId}</span>
+          <span aria-hidden="true">·</span>
+          <time dateTime={review.createdAt} title={formatDateTime(review.createdAt)}>
+            {formatRelative(review.createdAt)}
+          </time>
+          {review.bestGap !== null ? (
+            <>
+              <span aria-hidden="true">·</span>
+              <span>Gap: {review.bestGap}</span>
+            </>
+          ) : null}
+        </div>
+      </div>
+
+      {review.fact.entities.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="meta">Entities:</span>
+          {review.fact.entities.map((entity) => (
+            <span key={entity} className="badge badge-neutral">
+              {entity}
+            </span>
+          ))}
+        </div>
       ) : null}
-      <p className="break-words text-sm text-slate-600">
-        Evidence quote: {review.fact.evidence.quote}
-      </p>
-      <time className="block text-sm text-slate-600" dateTime={review.createdAt}>
-        {new Date(review.createdAt).toLocaleString()}
-      </time>
+
+      <div className="rounded-md border-l-2 border-indigo-400 bg-slate-50 p-3 text-xs">
+        <p className="break-words text-slate-700">
+          <span className="font-semibold text-slate-800">Evidence quote:</span>{" "}
+          {review.fact.evidence.quote}
+        </p>
+      </div>
+
       <form
-        className="space-y-4"
+        className="space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4"
         onSubmit={(event) => {
           event.preventDefault();
           if (!resolveBody || busy) return;
@@ -74,65 +97,72 @@ function ReviewCard({
         }}
       >
         <fieldset className="min-w-0 space-y-3" disabled={busy}>
-          <legend>Place this fact</legend>
-          {review.candidates.map((candidate) => (
-            <div key={candidate.pageId} className="flex items-start gap-3">
+          <legend className="section-title">Place this fact</legend>
+          <div className="space-y-2">
+            {review.candidates.map((candidate) => (
+              <label
+                key={candidate.pageId}
+                className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white p-3 text-sm cursor-pointer hover:bg-slate-50"
+              >
+                <input
+                  className="mt-1 size-4 shrink-0"
+                  id={`placement-${review.id}-${candidate.pageId}`}
+                  type="radio"
+                  name={`placement-${review.id}`}
+                  value={candidate.pageId}
+                  checked={placement === candidate.pageId}
+                  onChange={() => setPlacement(candidate.pageId)}
+                />
+                <span className="min-w-0 flex-1 font-normal text-slate-800">
+                  <span className="font-semibold">{candidate.title}</span>
+                  <span className="text-xs text-slate-500 font-mono"> · {candidate.slug}</span>
+                </span>
+                <Link
+                  to={`/brains/${encodeURIComponent(brainId)}/pages/${encodeURIComponent(candidate.slug)}`}
+                  className="text-xs text-indigo-700 hover:underline"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open ↗
+                </Link>
+              </label>
+            ))}
+            <label className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white p-3 text-sm cursor-pointer hover:bg-slate-50">
               <input
                 className="mt-1 size-4 shrink-0"
-                id={`placement-${review.id}-${candidate.pageId}`}
+                id={`placement-${review.id}-new`}
                 type="radio"
                 name={`placement-${review.id}`}
-                value={candidate.pageId}
-                checked={placement === candidate.pageId}
-                onChange={() => setPlacement(candidate.pageId)}
+                value="new"
+                checked={placement === "new"}
+                onChange={() => setPlacement("new")}
               />
-              <label
-                className="min-w-0 font-normal"
-                htmlFor={`placement-${review.id}-${candidate.pageId}`}
-              >
-                {candidate.title}
-                <span className="text-slate-600"> · {candidate.slug}</span>
-              </label>
-              <Link
-                to={`/brains/${encodeURIComponent(brainId)}/pages/${encodeURIComponent(candidate.slug)}`}
-              >
-                Open
-              </Link>
-            </div>
-          ))}
-          <div className="flex items-start gap-3">
-            <input
-              className="mt-1 size-4 shrink-0"
-              id={`placement-${review.id}-new`}
-              type="radio"
-              name={`placement-${review.id}`}
-              value="new"
-              checked={placement === "new"}
-              onChange={() => setPlacement("new")}
-            />
-            <label className="font-normal" htmlFor={`placement-${review.id}-new`}>
-              New page
+              <span className="font-medium text-slate-800">Create a new page</span>
             </label>
           </div>
         </fieldset>
+
         <div>
           <label htmlFor={`review-note-${review.id}`}>
-            Note <span className="font-normal">(optional)</span>
+            Note <span className="font-normal text-slate-400">(optional)</span>
           </label>
           <textarea
             id={`review-note-${review.id}`}
             maxLength={2000}
-            rows={3}
+            rows={2}
+            placeholder="Add context or rationale for this placement…"
             value={note}
             onChange={(event) => setNote(event.target.value)}
           />
         </div>
-        <div className="flex flex-wrap gap-3">
-          <button className="primary" type="submit" disabled={!resolveBody || busy}>
+
+        <div className="flex flex-wrap gap-2 pt-1">
+          <button className="btn-primary text-xs" type="submit" disabled={!resolveBody || busy}>
             {resolve.isPending ? "Resolving…" : "Resolve"}
           </button>
           <button
             type="button"
+            className="btn-secondary text-xs"
             disabled={busy}
             onClick={() => {
               if (!busy) dismiss.mutate();
@@ -164,17 +194,24 @@ export function Reviews() {
     queryKey: ["routing-reviews", brainId, reviewParams],
     queryFn: () => api.listRoutingReviews(brainId, reviewParams),
   });
+
   return (
     <>
-      <h1>Reviews</h1>
-      <p className="text-slate-600">
-        Open routing reviews. Resolve a fact onto a candidate or a new page, or dismiss it.
-      </p>
+      <div>
+        <h1>Reviews</h1>
+        <p className="mt-1 text-slate-600">
+          Open routing reviews. Resolve a fact onto a candidate or a new page, or dismiss it.
+        </p>
+      </div>
       <div aria-live="polite" className="space-y-2">
         {settled.map((item) => (
-          <p key={item.id} role="status">
+          <div
+            key={item.id}
+            role="status"
+            className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs sm:text-sm text-emerald-900"
+          >
             {item.message}
-          </p>
+          </div>
         ))}
       </div>
       <ErrorBanner error={reviews.error} />
@@ -183,7 +220,12 @@ export function Reviews() {
         <EmptyState>
           <p>
             No open routing reviews.{" "}
-            <Link to={`/brains/${encodeURIComponent(brainId)}/capture`}>Capture a note or URL</Link>{" "}
+            <Link
+              to={`/brains/${encodeURIComponent(brainId)}/capture`}
+              className="font-medium text-indigo-700 hover:underline"
+            >
+              Capture a note or URL
+            </Link>{" "}
             to compile new facts.
           </p>
         </EmptyState>
