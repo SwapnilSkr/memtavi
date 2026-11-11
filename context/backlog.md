@@ -18,7 +18,7 @@ Ordered by product value per unit of risk. Remove items as they land.
 ## Product gaps
 
 - **Webhooks UI**: API and CLI exist; the inspector has no webhooks screen.
-- **Inspector read cost**: the pages table fetches full bodies; switch to `/index` and add pagination.
+- **Index paging**: `getIndex` has no `offset`, so the inspector's unfiltered pages list stops at 200; add `offset` to the spec and route, then page the list.
 - **Eval quality**: 15% exact / 0.205 F1 on a 20-question slice, 37 reviews; run full LoCoMo before tuning prompts.
 
 - **Missing v1 endpoints**: profile suggestions.

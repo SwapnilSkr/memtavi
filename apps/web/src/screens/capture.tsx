@@ -1,61 +1,104 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
-import { EmptyState, ErrorBanner, Loading } from "../components/feedback";
-import type { CaptureInput, Page } from "../lib/api";
+import { EmptyState, ErrorBanner, Loading, Pagination } from "../components/feedback";
+import type { CaptureInput, IngestSource, ListResponse } from "../lib/api";
 import { useApi } from "../lib/api-context";
-import { sourcePollingInterval } from "../lib/capture";
+import {
+  newlyCompleted,
+  SOURCE_POLL_LIMIT_MS,
+  sourcePollingInterval,
+  sourceStatusKey,
+  sourcesPollingInterval,
+  upsertSource,
+} from "../lib/capture";
+import { applyCacheEffect, captureSettledEffect } from "../lib/invalidation";
 
-function SourceStatus({ brainId, sourceId }: { brainId: string; sourceId: string }) {
+const pageSize = 50;
+const queueLimit = 200;
+
+function cachedPageId(data: unknown): string | undefined {
+  if (!data || typeof data !== "object" || !("id" in data)) return undefined;
+  return typeof data.id === "string" ? data.id : undefined;
+}
+
+function SourceRow({
+  brainId,
+  source,
+  listKey,
+}: {
+  brainId: string;
+  source: IngestSource;
+  listKey: readonly unknown[];
+}) {
   const api = useApi();
   const queryClient = useQueryClient();
-  const source = useQuery({
-    queryKey: ["source", brainId, { sourceId }],
-    queryFn: () => api.getSource(brainId, sourceId),
-    refetchInterval: (query) => sourcePollingInterval(query.state.data?.status),
+  const name = source.label || source.id;
+  function store(updated: IngestSource) {
+    queryClient.setQueryData<ListResponse<IngestSource>>(listKey, (current) =>
+      upsertSource(current, updated),
+    );
+  }
+  const retry = useMutation({
+    mutationFn: () => api.retryIngestSource(brainId, source.id),
+    onSuccess: async (updated) => {
+      store(updated);
+      await applyCacheEffect(queryClient, "retryIngestSource", {
+        brainId,
+        sourceId: updated.id,
+      });
+    },
   });
-  const data = source.data;
-  useEffect(() => {
-    if (data?.status !== "completed") return;
-    for (const query of queryClient.getQueryCache().findAll()) {
-      const [resource, cachedBrainId] = query.queryKey;
-      if (cachedBrainId !== brainId) continue;
-      if (
-        resource === "pages" ||
-        resource === "search" ||
-        (resource === "page" && data.affectedPageIds.includes((query.state.data as Page)?.id))
-      ) {
-        void queryClient.invalidateQueries({ queryKey: query.queryKey, exact: true });
-      }
-    }
-  }, [brainId, data, queryClient]);
+  const approve = useMutation({
+    mutationFn: () => api.approveIngestSource(brainId, source.id),
+    onSuccess: async (updated) => {
+      store(updated);
+      await applyCacheEffect(queryClient, "approveIngestSource", {
+        brainId,
+        sourceId: updated.id,
+      });
+    },
+  });
+  const busy = retry.isPending || approve.isPending;
   return (
     <li className="panel min-w-0 space-y-3">
-      <h2 className="break-words">{data?.label || sourceId}</h2>
-      <ErrorBanner error={source.error} />
-      {source.error ? (
-        <button type="button" disabled={source.isFetching} onClick={() => void source.refetch()}>
-          Retry status check
-        </button>
+      <h3 className="break-words text-base font-semibold">{name}</h3>
+      <p className="break-all text-sm text-slate-600">Source {source.id}</p>
+      {source.contentPreview ? (
+        <p className="line-clamp-3 break-words text-slate-700">{source.contentPreview}</p>
       ) : null}
-      {source.isPending ? <Loading label="Loading source" /> : null}
       <div aria-live="polite" aria-atomic="true" className="space-y-2">
-        {data ? (
-          <>
-            <p>Status: {data.status}</p>
-            <p>Attempts: {data.attempts}</p>
-            {data.status === "failed" ? (
-              <p className="error-banner">{data.lastError || "Compilation failed."}</p>
-            ) : null}
-            {data.status === "completed" ? (
-              <p>
-                {data.affectedPageIds.length} affected pages.{" "}
-                <Link to={`/brains/${encodeURIComponent(brainId)}/pages`}>Open pages</Link>
-              </p>
-            ) : null}
-          </>
+        <p>
+          Status: {source.status}
+          {source.awaitingApproval ? " · Awaiting approval" : ""}
+        </p>
+        <p>Attempts: {source.attempts}</p>
+        {source.lastError ? <p className="error-banner">{source.lastError}</p> : null}
+        {source.status === "completed" ? (
+          <p>
+            {source.affectedPageIds.length} affected pages.{" "}
+            <Link to={`/brains/${encodeURIComponent(brainId)}/pages`}>Open pages</Link>
+          </p>
         ) : null}
       </div>
+      <div className="flex flex-wrap gap-3">
+        {source.status === "failed" ? (
+          <button type="button" disabled={busy} onClick={() => retry.mutate()}>
+            {retry.isPending ? "Retrying…" : `Retry ${name}`}
+          </button>
+        ) : null}
+        {source.awaitingApproval ? (
+          <button
+            type="button"
+            className="primary"
+            disabled={busy}
+            onClick={() => approve.mutate()}
+          >
+            {approve.isPending ? "Approving…" : `Approve ${name}`}
+          </button>
+        ) : null}
+      </div>
+      <ErrorBanner error={retry.error ?? approve.error} />
     </li>
   );
 }
@@ -67,22 +110,90 @@ function CaptureComposer({ brainId }: { brainId: string }) {
   const [content, setContent] = useState("");
   const [fetchUrl, setFetchUrl] = useState("");
   const [label, setLabel] = useState("");
-  const [sourceIds, setSourceIds] = useState<string[]>([]);
+  const [offset, setOffset] = useState(0);
+  const [unstored, setUnstored] = useState(false);
+  const previous = useRef(new Map<string, IngestSource["status"]>());
+  const pollClock = useRef<{ key: string; at: number } | null>(null);
+  function elapsedSinceStatusChange(items: readonly IngestSource[] | undefined): number {
+    const key = sourceStatusKey(items);
+    const now = Date.now();
+    if (pollClock.current?.key !== key) {
+      pollClock.current = { key, at: now };
+      return 0;
+    }
+    return now - pollClock.current.at;
+  }
+  const listParams = { limit: queueLimit, offset: 0 };
+  const listKey = ["sources", brainId, listParams] as const;
+  const sources = useQuery({
+    queryKey: listKey,
+    queryFn: () => api.listIngestSources(brainId, listParams),
+    refetchInterval: (query) => {
+      const items = query.state.data?.items;
+      return sourcesPollingInterval(items, elapsedSinceStatusChange(items));
+    },
+  });
+  const elapsed = elapsedSinceStatusChange(sources.data?.items);
+  const pollStalled =
+    sourcesPollingInterval(sources.data?.items, elapsed) === false &&
+    sources.data?.items.some((source) => sourcePollingInterval(source) !== false) === true;
+  function restartPolling() {
+    pollClock.current = { key: sourceStatusKey(sources.data?.items), at: Date.now() };
+    void sources.refetch();
+  }
+  const visible = sources.data?.items.slice(offset, offset + pageSize) ?? [];
   const capture = useMutation({
     mutationFn: (input: CaptureInput) => api.capture(brainId, input),
-    onSuccess: (source) => {
-      queryClient.setQueryData(["source", brainId, { sourceId: source.id }], source);
-      setSourceIds((current) => [source.id, ...current.filter((id) => id !== source.id)]);
+    onSuccess: async (source) => {
       setContent("");
       setFetchUrl("");
       setLabel("");
+      if (source.stored === false) {
+        setUnstored(true);
+        return;
+      }
+      setUnstored(false);
+      setOffset(0);
+      queryClient.setQueryData<ListResponse<IngestSource>>(listKey, (current) => {
+        return (
+          upsertSource(current, source) ?? {
+            items: [source],
+            total: 1,
+            limit: queueLimit,
+            offset: 0,
+          }
+        );
+      });
+      await applyCacheEffect(queryClient, "createCapture", { brainId });
     },
   });
+  useEffect(() => {
+    const items = sources.data?.items;
+    if (!items) return;
+    const finished = newlyCompleted(previous.current, items);
+    for (const source of items) previous.current.set(source.id, source.status);
+    if (finished.length === 0) return;
+    const affectedPageIds = finished.flatMap((source) => source.affectedPageIds);
+    for (const query of queryClient.getQueryCache().findAll()) {
+      if (
+        captureSettledEffect(query.queryKey, cachedPageId(query.state.data), {
+          brainId,
+          affectedPageIds,
+        })
+      ) {
+        void queryClient.invalidateQueries({ queryKey: query.queryKey, exact: true });
+      }
+    }
+  }, [brainId, queryClient, sources.data]);
   return (
     <>
       <h1>Capture</h1>
-      <p className="text-slate-600">Add a note or URL, then watch its compilation status below.</p>
+      <p className="text-slate-600">
+        Add a note or URL. The queue slows its checks while a source is still processing, and pauses
+        after {SOURCE_POLL_LIMIT_MS / 60_000} minutes without a status change.
+      </p>
       <ErrorBanner error={capture.error} />
+      {unstored ? <p role="status">Memory is off, so this capture was not stored.</p> : null}
       <form
         className="panel space-y-5"
         onSubmit={(event) => {
@@ -150,16 +261,41 @@ function CaptureComposer({ brainId }: { brainId: string }) {
         </fieldset>
       </form>
       <section aria-labelledby="sources-heading" className="space-y-4">
-        <h2 id="sources-heading">Captured this visit</h2>
-        {sourceIds.length === 0 ? (
+        <h2 id="sources-heading">Queue</h2>
+        {pollStalled ? (
+          <p role="status">
+            <button type="button" onClick={restartPolling}>
+              Still processing — Refresh
+            </button>
+          </p>
+        ) : null}
+        <ErrorBanner error={sources.error} />
+        {sources.isPending ? <Loading label="Loading sources" /> : null}
+        {sources.data && sources.data.total > sources.data.items.length ? (
+          <p className="help" role="status">
+            Showing the newest {sources.data.items.length} of {sources.data.total}. Polling follows
+            this window.
+          </p>
+        ) : null}
+        {sources.data?.items.length === 0 ? (
           <EmptyState>Add a note or URL above to start compiling pages.</EmptyState>
-        ) : (
+        ) : null}
+        {visible.length > 0 ? (
           <ul className="space-y-4">
-            {sourceIds.map((sourceId) => (
-              <SourceStatus key={sourceId} brainId={brainId} sourceId={sourceId} />
+            {visible.map((source) => (
+              <SourceRow key={source.id} brainId={brainId} source={source} listKey={listKey} />
             ))}
           </ul>
-        )}
+        ) : null}
+        {sources.data ? (
+          <Pagination
+            total={sources.data.items.length}
+            limit={pageSize}
+            offset={offset}
+            pending={sources.isFetching}
+            onChange={setOffset}
+          />
+        ) : null}
       </section>
     </>
   );

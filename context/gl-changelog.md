@@ -9,6 +9,8 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-11** — Inspector loop: brain rename/delete, capture retry/approve with backed-off polling (stops after 10 min idle), pages status filter (`/index` for the unfiltered list, since `listPages` must return bodies), version history and diff, new `/conflicts` (side-by-side claims, resolve with note) and `/reviews` (resolve onto a candidate or dismiss). Per-mutation invalidation map.
+
 - **2026-11-11** — OpenTelemetry: off unless `OTEL_EXPORTER_OTLP_ENDPOINT` is set. Server span per request, a span per job attempt, a span per provider call; no bodies, keys, subject ids or prompt text. `jobs.trace_context` (migration 0016) is filled by trigger from `app.traceparent`, which `withTenant` sets, so a job joins the request trace. Request logs carry `traceId`. `docs/operations.md`.
 
 - **2026-11-11** — Provider drills: `FakeProvider` queues `ProviderError`s for chat and embed; five drills (429, timeout, 5xx at embedding, malformed output, transient forever) prove retry, dead letter and nothing partial. Fixed: a source is `pending` during a queued transient retry and `failed` only when the job dies, so Retry cannot double-compile. `docs/operations.md`.

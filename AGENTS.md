@@ -77,7 +77,7 @@ bun run eval:smoke       bun run bench:search
 | [conv-tests](./context/conv-tests.md) | 2.6 | writing a test, choosing a Done when, re-running verification | What each suite must prove, the commands, and what is forbidden |
 | [conv-web](./context/conv-web.md) | 3.0 | touching apps/web | Inspector stack, state boundaries, evidence UI, accessibility |
 | [gl-changelog-archive](./context/gl-changelog-archive.md) | 6.0 | looking up an older shipped change | Shipped changes before the current phase, newest first |
-| [gl-changelog](./context/gl-changelog.md) | 4.9 | recording or checking what shipped | Shipped changes, newest first, dated |
+| [gl-changelog](./context/gl-changelog.md) | 5.3 | recording or checking what shipped | Shipped changes, newest first, dated |
 | [gl-decisions-archive](./context/gl-decisions-archive.md) | 4.0 | researching why a foundational choice was made | Settled decisions that no longer need loading per task, newest last |
 | [gl-decisions](./context/gl-decisions.md) | 5.7 | checking or recording a decision | Accepted decisions, newest last, dated |
 | [status](./context/status.md) | 2.0 | resuming work, deciding what to do next | What is complete, what is blocked, and the next slice |

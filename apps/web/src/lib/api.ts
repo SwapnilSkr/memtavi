@@ -25,6 +25,13 @@ export interface BrainCreate {
   briefSettings?: Record<string, unknown>;
 }
 
+export interface BrainUpdate {
+  name?: string;
+  description?: string;
+  projectId?: string | null;
+  briefSettings?: Record<string, unknown>;
+}
+
 export interface Page {
   id: string;
   subjectId: string;
@@ -85,6 +92,8 @@ export interface IngestSource {
   bucket: Page["bucket"];
   metadata: Record<string, unknown>;
   status: SourceStatus;
+  awaitingApproval?: boolean;
+  stored?: boolean;
   attempts: number;
   lastError: string | null;
   affectedPageIds: string[];
@@ -115,6 +124,61 @@ export interface PageVersion {
   ingestSourceId: string | null;
   actor: "compiler" | "user";
   createdAt: string;
+}
+
+export interface PageVersionSummary {
+  version: number;
+  title: string;
+  summary: string;
+  actor: "compiler" | "user";
+  ingestSourceId: string | null;
+  createdAt: string;
+}
+
+export interface PageVersionDetail extends PageVersionSummary {
+  body: string;
+}
+
+export interface PageVersionField {
+  from: string;
+  to: string;
+}
+
+export interface PageVersionDiffLine {
+  op: "context" | "add" | "remove";
+  text: string;
+}
+
+export interface PageVersionHunk {
+  oldStart: number;
+  oldLines: number;
+  newStart: number;
+  newLines: number;
+  lines: PageVersionDiffLine[];
+}
+
+export interface PageVersionDiff {
+  from: number;
+  to: number;
+  title: PageVersionField;
+  summary: PageVersionField;
+  hunks: PageVersionHunk[];
+}
+
+export interface PageResolve {
+  note: string;
+  title?: string;
+  summary?: string;
+  body?: string;
+}
+
+export interface IndexEntry {
+  slug: string;
+  title: string;
+  summary: string;
+  pageType: PageType;
+  pinned: boolean;
+  updatedAt?: string;
 }
 
 export interface Connection {
@@ -176,6 +240,48 @@ export interface ListResponse<T> {
 export interface Pagination {
   limit?: number;
   offset?: number;
+}
+
+export interface PageListParams extends Pagination {
+  status?: PageStatus;
+}
+
+export interface RoutingReviewCandidate {
+  pageId: string;
+  slug: string;
+  title: string;
+}
+
+export interface RoutingReview {
+  id: string;
+  sourceId: string;
+  fact: {
+    claim: string;
+    entities: string[];
+    evidence: {
+      chunkUuid: string;
+      charStart: number;
+      charEnd: number;
+      quote: string;
+    };
+  };
+  candidates: RoutingReviewCandidate[];
+  bestGap: number | null;
+  status: "open" | "resolved" | "dismissed";
+  resolution: string | null;
+  createdAt: string;
+}
+
+export type RoutingReviewResolve =
+  | { pageId: string; note?: string }
+  | { newPage: true; note?: string };
+
+export interface RoutingReviewDismiss {
+  note?: string;
+}
+
+export interface RoutingReviewListParams extends Pagination {
+  status?: RoutingReview["status"];
 }
 
 export interface SearchParams {
@@ -332,6 +438,14 @@ export function createApi(session: Session, fetcher: Fetcher = fetch) {
     createBrain(body: BrainCreate) {
       return request<Brain>("/brains", { body });
     },
+    updateBrain(brainId: string, body: BrainUpdate) {
+      return request<Brain>(`/brains/${encodeURIComponent(brainId)}`, { method: "PATCH", body });
+    },
+    deleteBrain(brainId: string) {
+      return request<DeletionReceipt>(`/brains/${encodeURIComponent(brainId)}`, {
+        method: "DELETE",
+      });
+    },
     capture(brainId: string, body: CaptureInput) {
       return request<IngestSource>(`/brains/${encodeURIComponent(brainId)}/captures`, { body });
     },
@@ -340,18 +454,95 @@ export function createApi(session: Session, fetcher: Fetcher = fetch) {
         `/brains/${encodeURIComponent(brainId)}/sources/${encodeURIComponent(sourceId)}`,
       );
     },
+    listIngestSources(brainId: string, params: Pagination = {}) {
+      const query = new URLSearchParams({
+        limit: String(params.limit ?? 50),
+        offset: String(params.offset ?? 0),
+      });
+      return request<ListResponse<IngestSource>>(
+        `/brains/${encodeURIComponent(brainId)}/sources?${query}`,
+      );
+    },
+    retryIngestSource(brainId: string, sourceId: string) {
+      return request<IngestSource>(
+        `/brains/${encodeURIComponent(brainId)}/sources/${encodeURIComponent(sourceId)}/retry`,
+        { method: "POST" },
+      );
+    },
+    approveIngestSource(brainId: string, sourceId: string) {
+      return request<IngestSource>(
+        `/brains/${encodeURIComponent(brainId)}/sources/${encodeURIComponent(sourceId)}/approve`,
+        { method: "POST" },
+      );
+    },
     updatePage(brainId: string, slug: string, body: PageUpdate) {
       return request<Page>(
         `/brains/${encodeURIComponent(brainId)}/pages/${encodeURIComponent(slug)}`,
         { method: "PATCH", body },
       );
     },
-    listPages(brainId: string, params: Pagination = {}) {
+    listPages(brainId: string, params: PageListParams = {}) {
       const query = new URLSearchParams({
         limit: String(params.limit ?? 50),
         offset: String(params.offset ?? 0),
       });
+      if (params.status) query.set("status", params.status);
       return request<ListResponse<Page>>(`/brains/${encodeURIComponent(brainId)}/pages?${query}`);
+    },
+    getIndex(brainId: string, params: { limit?: number } = {}) {
+      const query = new URLSearchParams({ limit: String(params.limit ?? 40) });
+      return request<ListResponse<IndexEntry>>(
+        `/brains/${encodeURIComponent(brainId)}/index?${query}`,
+      );
+    },
+    listPageVersions(brainId: string, slug: string, params: Pagination = {}) {
+      const query = new URLSearchParams({
+        limit: String(params.limit ?? 50),
+        offset: String(params.offset ?? 0),
+      });
+      return request<ListResponse<PageVersionSummary>>(
+        `/brains/${encodeURIComponent(brainId)}/pages/${encodeURIComponent(slug)}/versions?${query}`,
+      );
+    },
+    getPageVersion(brainId: string, slug: string, version: number) {
+      return request<PageVersionDetail>(
+        `/brains/${encodeURIComponent(brainId)}/pages/${encodeURIComponent(slug)}/versions/${version}`,
+      );
+    },
+    diffPageVersions(brainId: string, slug: string, params: { from: number; to?: number }) {
+      const query = new URLSearchParams({ from: String(params.from) });
+      if (params.to !== undefined) query.set("to", String(params.to));
+      return request<PageVersionDiff>(
+        `/brains/${encodeURIComponent(brainId)}/pages/${encodeURIComponent(slug)}/diff?${query}`,
+      );
+    },
+    resolvePage(brainId: string, slug: string, body: PageResolve) {
+      return request<Page>(
+        `/brains/${encodeURIComponent(brainId)}/pages/${encodeURIComponent(slug)}/resolve`,
+        { method: "POST", body },
+      );
+    },
+    listRoutingReviews(brainId: string, params: RoutingReviewListParams = {}) {
+      const query = new URLSearchParams({
+        limit: String(params.limit ?? 50),
+        offset: String(params.offset ?? 0),
+      });
+      if (params.status) query.set("status", params.status);
+      return request<ListResponse<RoutingReview>>(
+        `/brains/${encodeURIComponent(brainId)}/routing-reviews?${query}`,
+      );
+    },
+    resolveRoutingReview(brainId: string, reviewId: string, body: RoutingReviewResolve) {
+      return request<RoutingReview>(
+        `/brains/${encodeURIComponent(brainId)}/routing-reviews/${encodeURIComponent(reviewId)}/resolve`,
+        { method: "POST", body },
+      );
+    },
+    dismissRoutingReview(brainId: string, reviewId: string, body?: RoutingReviewDismiss) {
+      return request<RoutingReview>(
+        `/brains/${encodeURIComponent(brainId)}/routing-reviews/${encodeURIComponent(reviewId)}/dismiss`,
+        body ? { method: "POST", body } : { method: "POST" },
+      );
     },
     listConnections(brainId: string, params: Pagination = {}) {
       const query = new URLSearchParams({
