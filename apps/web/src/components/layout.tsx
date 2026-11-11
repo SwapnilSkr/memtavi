@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useParams } from "react-router";
 import { useApi } from "../lib/api-context";
 import { ErrorBanner } from "./feedback";
@@ -6,6 +7,11 @@ import { ErrorBanner } from "./feedback";
 export function Layout({ onDisconnect }: { onDisconnect: () => void }) {
   const { brainId } = useParams();
   const api = useApi();
+  const [lastBrainId, setLastBrainId] = useState<string | null>(null);
+  useEffect(() => {
+    if (brainId) setLastBrainId(brainId);
+  }, [brainId]);
+  const activeBrainId = brainId ?? lastBrainId;
   const brain = useQuery({
     queryKey: ["brain", brainId, {}],
     queryFn: () => api.getBrain(brainId ?? ""),
@@ -40,6 +46,7 @@ export function Layout({ onDisconnect }: { onDisconnect: () => void }) {
           <NavLink to="/" end>
             Brains
           </NavLink>
+          <NavLink to="/settings">Settings</NavLink>
           {brainId ? (
             <>
               <NavLink to={`${base}/capture`}>Capture</NavLink>
@@ -50,7 +57,7 @@ export function Layout({ onDisconnect }: { onDisconnect: () => void }) {
               <NavLink to={`${base}/graph`}>Graph</NavLink>
               <NavLink to={`${base}/connections`}>Connections</NavLink>
               <NavLink to={`${base}/changes`}>Changes</NavLink>
-              <NavLink to={`${base}/score`}>Score</NavLink>
+              <NavLink to={`${base}/health`}>Health</NavLink>
               <NavLink to={`${base}/profile`}>Profile</NavLink>
             </>
           ) : null}
@@ -58,7 +65,7 @@ export function Layout({ onDisconnect }: { onDisconnect: () => void }) {
       </header>
       <main id="main" className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
         <ErrorBanner error={brain.error} />
-        <Outlet />
+        <Outlet context={{ activeBrainId }} />
       </main>
     </>
   );

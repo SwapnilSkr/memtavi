@@ -17,6 +17,7 @@ import { ProfileScreen } from "./screens/profile";
 import { Reviews } from "./screens/reviews";
 import { ScoreScreen } from "./screens/score";
 import { Search } from "./screens/search";
+import { SettingsScreen } from "./screens/settings";
 import { Setup } from "./screens/setup";
 
 const PageDetail = lazy(() =>
@@ -69,6 +70,8 @@ function Inspector({ session, onDisconnect }: { session: Session; onDisconnect: 
             <Route path="brains/:brainId/graph" element={<GraphScreen />} />
             <Route path="brains/:brainId/connections" element={<Connections />} />
             <Route path="brains/:brainId/changes" element={<Changes />} />
+            <Route path="settings" element={<SettingsScreen subjectId={session.subjectId} />} />
+            <Route path="brains/:brainId/health" element={<ScoreScreen />} />
             <Route path="brains/:brainId/score" element={<ScoreScreen />} />
             <Route path="brains/:brainId/profile" element={<ProfileScreen />} />
             <Route path="*" element={<NotFound />} />

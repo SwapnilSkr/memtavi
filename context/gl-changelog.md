@@ -9,6 +9,8 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-11** — Inspector settings: health on 0–100 (was clamped to 0–1) with factors, 30-day trend and linked suggestions; profile suggestions on demand with one-click apply; `/settings` with API keys and webhooks (secret shown once, never cached), members, memory mode, export and deletion progress; pages list pages through `getIndex`.
+
 - **2026-11-11** — `POST /profile/suggestions` (`suggestProfile`, developer): prompt v1 over the top 40 index entries plus the current profile, no bodies; fewer than 3 pages returns `[]` with no call. Drops unknown fields, unchanged values and slugs not in the input. Shared `budgetExceeded` policy with the worker, usage recorded once against a completed `profile.suggest` job. `503` (+`Retry-After`) when unconfigured or the provider is transiently down, `502` on a permanent provider error. Never auto-applied.
 
 - **2026-11-11** — `getIndex` pages (`offset`), filters (`status`) and returns each entry's `status` (optional in the spec, so 0 breaking); `total` counts the filtered set. SDKs regenerated.

@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { useParams } from "react-router";
+import { Link, useParams } from "react-router";
 import { ErrorBanner, Loading } from "../components/feedback";
-import type { Profile, ProfileFields } from "../lib/api";
+import type { Profile, ProfileFields, ProfileSuggestion } from "../lib/api";
 import { useApi } from "../lib/api-context";
-import { parseDirectives } from "../lib/profile";
+import { parseDirectives, profileSuggestionError } from "../lib/profile";
 
 const fields = [
   ["whoTheyAre", "Who they are"],
@@ -32,6 +32,7 @@ function ProfileForm({ profile, brainId }: { profile: Profile; brainId: string }
     JSON.stringify(profile.directives ?? {}, null, 2),
   );
   const [saved, setSaved] = useState(false);
+  const [applying, setApplying] = useState(false);
   const parsed = parseDirectives(directives);
   const update = useMutation({
     mutationFn: (body: ProfileFields) => api.updateProfile(brainId, body),
@@ -47,69 +48,89 @@ function ProfileForm({ profile, brainId }: { profile: Profile; brainId: string }
     return () => window.clearTimeout(timeout);
   }, [saved]);
   return (
-    <form
-      className="panel space-y-5"
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (parsed.valid && !update.isPending) {
+    <>
+      <ProfileSuggestionsPanel
+        brainId={brainId}
+        saving={update.isPending}
+        onApplyingChange={setApplying}
+        onApplied={(item) => {
           setSaved(false);
-          update.mutate({ ...draft, directives: parsed.value });
-        }
-      }}
-    >
-      <ErrorBanner error={update.error} />
-      <fieldset className="grid min-w-0 gap-5 sm:grid-cols-2" disabled={update.isPending}>
-        <legend className="sr-only">Subject profile</legend>
-        {fields.map(([field, label]) => (
-          <div key={field} className="min-w-0">
-            <label htmlFor={`profile-${field}`}>{label}</label>
+          setDraft((current) => ({ ...current, [item.field]: item.value }));
+        }}
+      />
+      <form
+        className="panel space-y-5"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (parsed.valid && !update.isPending && !applying) {
+            setSaved(false);
+            update.mutate({ ...draft, directives: parsed.value });
+          }
+        }}
+      >
+        <ErrorBanner error={update.error} />
+        <fieldset
+          className="grid min-w-0 gap-5 sm:grid-cols-2"
+          disabled={update.isPending || applying}
+        >
+          <legend className="sr-only">Subject profile</legend>
+          {fields.map(([field, label]) => (
+            <div key={field} className="min-w-0">
+              <label htmlFor={`profile-${field}`}>{label}</label>
+              <textarea
+                id={`profile-${field}`}
+                rows={3}
+                value={draft[field]}
+                onChange={(event) => {
+                  setSaved(false);
+                  setDraft({ ...draft, [field]: event.target.value });
+                }}
+              />
+            </div>
+          ))}
+          <div className="min-w-0 sm:col-span-2">
+            <label htmlFor="profile-directives">Directives (JSON object)</label>
             <textarea
-              id={`profile-${field}`}
-              rows={3}
-              value={draft[field]}
+              id="profile-directives"
+              className="font-mono text-sm"
+              rows={8}
+              spellCheck={false}
+              value={directives}
+              aria-invalid={!parsed.valid}
+              aria-describedby={
+                parsed.valid ? "directives-help" : "directives-help directives-error"
+              }
               onChange={(event) => {
                 setSaved(false);
-                setDraft({ ...draft, [field]: event.target.value });
+                setDirectives(event.target.value);
               }}
             />
+            <p id="directives-help" className="help">
+              Enter a JSON object. Leave empty to save an empty object.
+            </p>
+            <div aria-live="polite">
+              {!parsed.valid ? (
+                <p id="directives-error" className="mt-2 text-sm text-red-800">
+                  {parsed.message}
+                </p>
+              ) : null}
+            </div>
           </div>
-        ))}
-        <div className="min-w-0 sm:col-span-2">
-          <label htmlFor="profile-directives">Directives (JSON object)</label>
-          <textarea
-            id="profile-directives"
-            className="font-mono text-sm"
-            rows={8}
-            spellCheck={false}
-            value={directives}
-            aria-invalid={!parsed.valid}
-            aria-describedby={parsed.valid ? "directives-help" : "directives-help directives-error"}
-            onChange={(event) => {
-              setSaved(false);
-              setDirectives(event.target.value);
-            }}
-          />
-          <p id="directives-help" className="help">
-            Enter a JSON object. Leave empty to save an empty object.
+        </fieldset>
+        <div className="flex flex-wrap items-center gap-4">
+          <button
+            type="submit"
+            className="primary"
+            disabled={update.isPending || applying || !parsed.valid}
+          >
+            {update.isPending ? "Saving…" : "Save profile"}
+          </button>
+          <p role="status" aria-live="polite">
+            {saved ? "Profile saved." : ""}
           </p>
-          <div aria-live="polite">
-            {!parsed.valid ? (
-              <p id="directives-error" className="mt-2 text-sm text-red-800">
-                {parsed.message}
-              </p>
-            ) : null}
-          </div>
         </div>
-      </fieldset>
-      <div className="flex flex-wrap items-center gap-4">
-        <button type="submit" className="primary" disabled={update.isPending || !parsed.valid}>
-          {update.isPending ? "Saving…" : "Save profile"}
-        </button>
-        <p role="status" aria-live="polite">
-          {saved ? "Profile saved." : ""}
-        </p>
-      </div>
-    </form>
+      </form>
+    </>
   );
 }
 
@@ -130,5 +151,98 @@ export function ProfileScreen() {
       {profile.isPending ? <Loading label="Loading subject profile" /> : null}
       {profile.data ? <ProfileForm key={brainId} profile={profile.data} brainId={brainId} /> : null}
     </>
+  );
+}
+
+function ProfileSuggestionsPanel({
+  brainId,
+  saving,
+  onApplied,
+  onApplyingChange,
+}: {
+  brainId: string;
+  saving: boolean;
+  onApplied: (item: ProfileSuggestion) => void;
+  onApplyingChange: (pending: boolean) => void;
+}) {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  const [applied, setApplied] = useState<string[]>([]);
+  const suggestions = useMutation({
+    mutationFn: () => api.suggestProfile(brainId),
+    retry: false,
+    onSuccess: () => setApplied([]),
+  });
+  const apply = useMutation({
+    mutationFn: (item: ProfileSuggestion) =>
+      api.updateProfile(brainId, { [item.field]: item.value }),
+    onMutate: () => onApplyingChange(true),
+    onSettled: () => onApplyingChange(false),
+    onSuccess: async (updated, item) => {
+      queryClient.setQueryData(["profile", brainId, {}], updated);
+      setApplied((current) => [...current, item.field]);
+      onApplied(item);
+      await queryClient.invalidateQueries({ queryKey: ["profile", brainId, {}], exact: true });
+    },
+  });
+  const message = profileSuggestionError(suggestions.error);
+  return (
+    <section className="panel space-y-4" aria-labelledby="profile-suggestions-heading">
+      <h2 id="profile-suggestions-heading">Inferred suggestions</h2>
+      <p>
+        Generate suggestions from page summaries. This uses a paid model call. Nothing is applied
+        automatically. Applying a suggestion saves that field and updates it in the editor; other
+        drafts are kept.
+      </p>
+      <button
+        type="button"
+        disabled={suggestions.isPending || apply.isPending || saving}
+        onClick={() => suggestions.mutate()}
+      >
+        {suggestions.isPending ? "Generating…" : "Generate profile suggestions"}
+      </button>
+      {message ? <p role="alert">{message}</p> : null}
+      <ErrorBanner error={apply.error} />
+      {suggestions.isPending ? <Loading label="Generating profile suggestions" /> : null}
+      {suggestions.data?.items.length === 0 ? (
+        <p>
+          No suggestions yet.{" "}
+          <Link to={`/brains/${encodeURIComponent(brainId)}/capture`}>Capture more knowledge</Link>{" "}
+          or edit the profile below.
+        </p>
+      ) : null}
+      <ul className="space-y-4">
+        {suggestions.data?.items.map((item) => (
+          <li key={item.field} className="break-words">
+            <h3>{fields.find(([field]) => field === item.field)?.[1] ?? item.field}</h3>
+            <p className="whitespace-pre-wrap">{item.value}</p>
+            <p>Confidence: {(item.confidence * 100).toFixed(0)}%</p>
+            <ul aria-label="Evidence pages">
+              {item.evidence.map((page) => (
+                <li key={page.slug}>
+                  <Link
+                    to={`/brains/${encodeURIComponent(brainId)}/pages/${encodeURIComponent(page.slug)}`}
+                  >
+                    {page.title}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              disabled={
+                saving || apply.isPending || suggestions.isPending || applied.includes(item.field)
+              }
+              onClick={() => apply.mutate(item)}
+            >
+              {applied.includes(item.field)
+                ? "Applied"
+                : `Apply ${fields.find(([field]) => field === item.field)?.[1] ?? item.field}`}
+            </button>
+          </li>
+        ))}
+      </ul>
+      {applied.length ? <p role="status">Suggestions applied to the saved profile.</p> : null}
+    </section>
   );
 }
