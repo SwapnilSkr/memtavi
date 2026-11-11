@@ -121,4 +121,218 @@ export class ScoreClient {
 
         return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/v1/brains/{brainId}/score");
     }
+
+    /**
+     * Returns at most one snapshot per UTC day, keeping the latest snapshot of each day,
+     * oldest first. `delta` is the last point minus the first point and is `null` when
+     * fewer than two points fall inside the range.
+     *
+     * @param {MemtaviApi.GetScoreHistoryRequest} request
+     * @param {ScoreClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link MemtaviApi.BadRequestError}
+     * @throws {@link MemtaviApi.UnauthorizedError}
+     * @throws {@link MemtaviApi.NotFoundError}
+     * @throws {@link MemtaviApi.TooManyRequestsError}
+     * @throws {@link MemtaviApi.InternalServerError}
+     * @throws {@link errors.MemtaviApiError}
+     * @throws {@link errors.MemtaviApiTimeoutError}
+     *
+     * @example
+     *     await client.score.getScoreHistory({
+     *         brainId: "brainId"
+     *     })
+     */
+    public getScoreHistory(
+        request: MemtaviApi.GetScoreHistoryRequest,
+        requestOptions?: ScoreClient.RequestOptions,
+    ): core.HttpResponsePromise<MemtaviApi.ScoreHistory> {
+        return core.HttpResponsePromise.fromPromise(this.__getScoreHistory(request, requestOptions));
+    }
+
+    private async __getScoreHistory(
+        request: MemtaviApi.GetScoreHistoryRequest,
+        requestOptions?: ScoreClient.RequestOptions,
+    ): Promise<core.WithRawResponse<MemtaviApi.ScoreHistory>> {
+        const { brainId, range } = request;
+        const _queryParams: Record<string, unknown> = {
+            range: range != null ? range : undefined,
+        };
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({ "x-subject-id": requestOptions?.subjectId ?? this._options?.subjectId }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.MemtaviApiEnvironment.Default,
+                `v1/brains/${core.url.encodePathParam(brainId, errors.MemtaviApiError)}/score/history`,
+            ),
+            method: "GET",
+            headers: _headers,
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as MemtaviApi.ScoreHistory, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new MemtaviApi.BadRequestError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 401:
+                    throw new MemtaviApi.UnauthorizedError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 404:
+                    throw new MemtaviApi.NotFoundError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 429:
+                    throw new MemtaviApi.TooManyRequestsError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 500:
+                    throw new MemtaviApi.InternalServerError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                default:
+                    throw new errors.MemtaviApiError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "GET",
+            "/v1/brains/{brainId}/score/history",
+        );
+    }
+
+    /**
+     * Applies a deterministic rule set to the latest snapshot, computing one when the brain
+     * has none. Items are ordered by priority and then by key. Requires viewer or higher.
+     *
+     * @param {MemtaviApi.GetScoreSuggestionsRequest} request
+     * @param {ScoreClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link MemtaviApi.BadRequestError}
+     * @throws {@link MemtaviApi.UnauthorizedError}
+     * @throws {@link MemtaviApi.NotFoundError}
+     * @throws {@link MemtaviApi.TooManyRequestsError}
+     * @throws {@link MemtaviApi.InternalServerError}
+     * @throws {@link errors.MemtaviApiError}
+     * @throws {@link errors.MemtaviApiTimeoutError}
+     *
+     * @example
+     *     await client.score.getScoreSuggestions({
+     *         brainId: "brainId"
+     *     })
+     */
+    public getScoreSuggestions(
+        request: MemtaviApi.GetScoreSuggestionsRequest,
+        requestOptions?: ScoreClient.RequestOptions,
+    ): core.HttpResponsePromise<MemtaviApi.ScoreSuggestions> {
+        return core.HttpResponsePromise.fromPromise(this.__getScoreSuggestions(request, requestOptions));
+    }
+
+    private async __getScoreSuggestions(
+        request: MemtaviApi.GetScoreSuggestionsRequest,
+        requestOptions?: ScoreClient.RequestOptions,
+    ): Promise<core.WithRawResponse<MemtaviApi.ScoreSuggestions>> {
+        const { brainId } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({ "x-subject-id": requestOptions?.subjectId ?? this._options?.subjectId }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.MemtaviApiEnvironment.Default,
+                `v1/brains/${core.url.encodePathParam(brainId, errors.MemtaviApiError)}/score/suggestions`,
+            ),
+            method: "POST",
+            headers: _headers,
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as MemtaviApi.ScoreSuggestions, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new MemtaviApi.BadRequestError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 401:
+                    throw new MemtaviApi.UnauthorizedError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 404:
+                    throw new MemtaviApi.NotFoundError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 429:
+                    throw new MemtaviApi.TooManyRequestsError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 500:
+                    throw new MemtaviApi.InternalServerError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                default:
+                    throw new errors.MemtaviApiError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "POST",
+            "/v1/brains/{brainId}/score/suggestions",
+        );
+    }
 }

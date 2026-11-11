@@ -12,6 +12,7 @@
     "bootstrap": "bun src/bin/bootstrap.ts"
   },
   "dependencies": {
+    "@memtavi/core": "workspace:*",
     "@memtavi/db": "workspace:*",
     "@memtavi/llm": "workspace:*",
     "@memtavi/shared": "workspace:*",

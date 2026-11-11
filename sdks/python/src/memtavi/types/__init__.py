@@ -42,6 +42,14 @@ if typing.TYPE_CHECKING:
     from .page_version_summary import PageVersionSummary
     from .profile import Profile
     from .score import Score
+    from .score_history import ScoreHistory
+    from .score_history_delta import ScoreHistoryDelta
+    from .score_point import ScorePoint
+    from .score_range import ScoreRange
+    from .score_suggestion import ScoreSuggestion
+    from .score_suggestion_priority import ScoreSuggestionPriority
+    from .score_suggestions import ScoreSuggestions
+    from .score_suggestions_generated_by import ScoreSuggestionsGeneratedBy
     from .search_hit import SearchHit
     from .source_content_url import SourceContentUrl
     from .source_status import SourceStatus
@@ -85,6 +93,14 @@ _dynamic_imports: typing.Dict[str, str] = {
     "PageVersionSummary": ".page_version_summary",
     "Profile": ".profile",
     "Score": ".score",
+    "ScoreHistory": ".score_history",
+    "ScoreHistoryDelta": ".score_history_delta",
+    "ScorePoint": ".score_point",
+    "ScoreRange": ".score_range",
+    "ScoreSuggestion": ".score_suggestion",
+    "ScoreSuggestionPriority": ".score_suggestion_priority",
+    "ScoreSuggestions": ".score_suggestions",
+    "ScoreSuggestionsGeneratedBy": ".score_suggestions_generated_by",
     "SearchHit": ".search_hit",
     "SourceContentUrl": ".source_content_url",
     "SourceStatus": ".source_status",
@@ -152,6 +168,14 @@ __all__ = [
     "PageVersionSummary",
     "Profile",
     "Score",
+    "ScoreHistory",
+    "ScoreHistoryDelta",
+    "ScorePoint",
+    "ScoreRange",
+    "ScoreSuggestion",
+    "ScoreSuggestionPriority",
+    "ScoreSuggestions",
+    "ScoreSuggestionsGeneratedBy",
     "SearchHit",
     "SourceContentUrl",
     "SourceStatus",

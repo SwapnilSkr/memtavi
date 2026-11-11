@@ -1721,6 +1721,139 @@ await client.score.getScore({
 </dl>
 </details>
 
+<details><summary><code>client.score.<a href="/src/api/resources/score/client/Client.ts">getScoreHistory</a>({ ...params }) -> MemtaviApi.ScoreHistory</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Returns at most one snapshot per UTC day, keeping the latest snapshot of each day,
+oldest first. `delta` is the last point minus the first point and is `null` when
+fewer than two points fall inside the range.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.score.getScoreHistory({
+    brainId: "brainId"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `MemtaviApi.GetScoreHistoryRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `ScoreClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.score.<a href="/src/api/resources/score/client/Client.ts">getScoreSuggestions</a>({ ...params }) -> MemtaviApi.ScoreSuggestions</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Applies a deterministic rule set to the latest snapshot, computing one when the brain
+has none. Items are ordered by priority and then by key. Requires viewer or higher.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.score.getScoreSuggestions({
+    brainId: "brainId"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `MemtaviApi.GetScoreSuggestionsRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `ScoreClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
 ## Profile
 <details><summary><code>client.profile.<a href="/src/api/resources/profile/client/Client.ts">getProfile</a>({ ...params }) -> MemtaviApi.Profile</code></summary>
 <dl>

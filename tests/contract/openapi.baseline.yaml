@@ -1172,6 +1172,73 @@ paths:
         "500":
           $ref: "#/components/responses/Error500"
 
+  /v1/brains/{brainId}/score/history:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+    get:
+      operationId: getScoreHistory
+      tags:
+        - Score
+      summary: Get score history
+      description: |
+        Returns at most one snapshot per UTC day, keeping the latest snapshot of each day,
+        oldest first. `delta` is the last point minus the first point and is `null` when
+        fewer than two points fall inside the range.
+      parameters:
+        - $ref: "#/components/parameters/HistoryRange"
+      responses:
+        "200":
+          description: Daily score snapshots and their delta.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScoreHistory"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/brains/{brainId}/score/suggestions:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+    post:
+      operationId: getScoreSuggestions
+      tags:
+        - Score
+      summary: Suggest score improvements
+      description: |
+        Applies a deterministic rule set to the latest snapshot, computing one when the brain
+        has none. Items are ordered by priority and then by key. Requires viewer or higher.
+      responses:
+        "200":
+          description: Rule-based suggestions for the brain.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScoreSuggestions"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
   /v1/brains/{brainId}/profile:
     parameters:
       - $ref: "#/components/parameters/BrainId"
@@ -1714,6 +1781,13 @@ components:
       schema:
         type: string
         format: uuid
+    HistoryRange:
+      name: range
+      in: query
+      required: false
+      description: The window to summarise, in whole days back from now.
+      schema:
+        $ref: "#/components/schemas/ScoreRange"
 
   headers:
     RequestId:
@@ -2634,6 +2708,112 @@ components:
         factors:
           type: object
           additionalProperties: true
+
+    ScoreRange:
+      type: string
+      enum:
+        - 7d
+        - 30d
+        - 90d
+
+    ScorePoint:
+      type: object
+      description: One day's health snapshot.
+      required:
+        - computedAt
+        - freshness
+        - readiness
+        - strain
+      properties:
+        computedAt:
+          type: string
+          format: date-time
+        freshness:
+          type: number
+        readiness:
+          type: number
+        strain:
+          type: number
+
+    ScoreHistory:
+      type: object
+      description: Daily health snapshots for a brain, oldest first.
+      required:
+        - range
+        - points
+        - delta
+      properties:
+        range:
+          $ref: "#/components/schemas/ScoreRange"
+        points:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScorePoint"
+        delta:
+          type:
+            - object
+            - "null"
+          description: >-
+            The last point minus the first point, or `null` when fewer than two points fall
+            inside the range.
+          required:
+            - freshness
+            - readiness
+            - strain
+          properties:
+            freshness:
+              type: number
+            readiness:
+              type: number
+            strain:
+              type: number
+
+    ScoreSuggestion:
+      type: object
+      description: One deterministic rule-based recommendation.
+      required:
+        - key
+        - title
+        - description
+        - action
+        - actionLabel
+        - priority
+      properties:
+        key:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        action:
+          type: string
+        actionLabel:
+          type: string
+        priority:
+          type: string
+          enum:
+            - high
+            - medium
+            - low
+
+    ScoreSuggestions:
+      type: object
+      description: Rule-based suggestions derived from one score snapshot.
+      required:
+        - generatedBy
+        - basedOn
+        - items
+      properties:
+        generatedBy:
+          type: string
+          const: rules
+        basedOn:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScoreSuggestion"
 
     SearchHit:
       type: object

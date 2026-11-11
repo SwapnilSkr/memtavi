@@ -11,7 +11,8 @@
     "./compile/policies/pfs": "./src/compile/policies/pfs.ts",
     "./compile/patch": "./src/compile/patch.ts",
     "./compile/prompts": "./src/compile/prompts.ts",
-    "./health/compute": "./src/health/compute.ts"
+    "./health/compute": "./src/health/compute.ts",
+    "./health/suggestions": "./src/health/suggestions.ts"
   },
   "dependencies": {
     "@memtavi/llm": "workspace:*",
