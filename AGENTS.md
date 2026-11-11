@@ -80,5 +80,5 @@ bun run eval:smoke       bun run bench:search
 | [gl-changelog](./context/gl-changelog.md) | 5.8 | recording or checking what shipped | Shipped changes, newest first, dated |
 | [gl-decisions-archive](./context/gl-decisions-archive.md) | 4.0 | researching why a foundational choice was made | Settled decisions that no longer need loading per task, newest last |
 | [gl-decisions](./context/gl-decisions.md) | 5.9 | checking or recording a decision | Accepted decisions, newest last, dated |
-| [status](./context/status.md) | 2.0 | resuming work, deciding what to do next | What is complete, what is blocked, and the next slice |
+| [status](./context/status.md) | 1.7 | resuming work, deciding what to do next | What is complete, what is blocked, and the next slice |
 <!-- nodes:end -->

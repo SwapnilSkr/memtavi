@@ -13,9 +13,10 @@ Ordered by product value per unit of risk. Remove items as they land.
 
 - **FTS under RLS**: the GIN index is unreachable because `ts_match_vq` is not leakproof; scans are sequential (`docs/benchmarks.md`).
 - ~~Backup/restore rehearsal~~ (schema-only pass, 0.38 s RTO); still run it against the 10k-page shape for a real production RTO.
-- ~~Contract diff~~ (`spec:compat`, baseline in `tests/contract`); response validation against the spec is still missing and `test:contract` remains a placeholder.
 
 ## Product gaps
+
+- **Inspector presentation**: screens use plain accessible markup; one UI pass for layout, hierarchy and mobile (390 px) across all 14 screens.
 
 - **Eval quality**: 15% exact / 0.205 F1 on a 20-question slice, 37 reviews; run full LoCoMo before tuning prompts.
 
