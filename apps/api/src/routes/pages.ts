@@ -11,7 +11,7 @@ import { resolvePage } from "../lib/resolve";
 import { requireRole } from "../lib/roles";
 import {
   diffQuery,
-  indexLimit,
+  indexQuery,
   pageListQuery,
   pageResolve,
   pageUpdate,
@@ -159,10 +159,18 @@ export function pageRoutes(config: RouteConfig) {
       ({ auth, request, params, query }) => {
         const subject = subjectId(request);
         return scope(config, auth, subject, (client) =>
-          getIndex(client, auth.tenantId, subject, params.brainId, query.limit ?? 40, 0),
+          getIndex(
+            client,
+            auth.tenantId,
+            subject,
+            params.brainId,
+            query.status ?? null,
+            query.limit ?? 40,
+            query.offset ?? 0,
+          ),
         );
       },
-      { query: indexLimit },
+      { query: indexQuery },
     )
     .get(
       "/v1/brains/:brainId/search",

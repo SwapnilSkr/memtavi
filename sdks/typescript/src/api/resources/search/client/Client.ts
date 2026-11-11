@@ -163,9 +163,11 @@ export class SearchClient {
         request: MemtaviApi.GetIndexRequest,
         requestOptions?: SearchClient.RequestOptions,
     ): Promise<core.WithRawResponse<MemtaviApi.GetIndexResponse>> {
-        const { brainId, limit } = request;
+        const { brainId, limit, offset, status } = request;
         const _queryParams: Record<string, unknown> = {
             limit,
+            offset,
+            status: status != null ? status : undefined,
         };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(

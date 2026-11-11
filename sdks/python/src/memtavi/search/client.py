@@ -5,6 +5,7 @@ import typing
 from ..core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from ..core.request_options import RequestOptions
 from ..types.graph import Graph
+from ..types.page_status import PageStatus
 from .raw_client import AsyncRawSearchClient, RawSearchClient
 from .types.get_index_response import GetIndexResponse
 from .types.search_brain_response import SearchBrainResponse
@@ -83,6 +84,8 @@ class SearchClient:
         brain_id: str,
         *,
         limit: typing.Optional[int] = None,
+        offset: typing.Optional[int] = None,
+        status: typing.Optional[PageStatus] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> GetIndexResponse:
         """
@@ -95,6 +98,12 @@ class SearchClient:
 
         limit : typing.Optional[int]
             Maximum number of index entries to return.
+
+        offset : typing.Optional[int]
+            Number of items to skip before collecting the page.
+
+        status : typing.Optional[PageStatus]
+            Only return pages with this status.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -116,7 +125,9 @@ class SearchClient:
             brain_id="brainId",
         )
         """
-        _response = self._raw_client.get_index(brain_id, limit=limit, request_options=request_options)
+        _response = self._raw_client.get_index(
+            brain_id, limit=limit, offset=offset, status=status, request_options=request_options
+        )
         return _response.data
 
     def get_graph(self, brain_id: str, *, request_options: typing.Optional[RequestOptions] = None) -> Graph:
@@ -233,6 +244,8 @@ class AsyncSearchClient:
         brain_id: str,
         *,
         limit: typing.Optional[int] = None,
+        offset: typing.Optional[int] = None,
+        status: typing.Optional[PageStatus] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> GetIndexResponse:
         """
@@ -245,6 +258,12 @@ class AsyncSearchClient:
 
         limit : typing.Optional[int]
             Maximum number of index entries to return.
+
+        offset : typing.Optional[int]
+            Number of items to skip before collecting the page.
+
+        status : typing.Optional[PageStatus]
+            Only return pages with this status.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -274,7 +293,9 @@ class AsyncSearchClient:
 
         asyncio.run(main())
         """
-        _response = await self._raw_client.get_index(brain_id, limit=limit, request_options=request_options)
+        _response = await self._raw_client.get_index(
+            brain_id, limit=limit, offset=offset, status=status, request_options=request_options
+        )
         return _response.data
 
     async def get_graph(self, brain_id: str, *, request_options: typing.Optional[RequestOptions] = None) -> Graph:

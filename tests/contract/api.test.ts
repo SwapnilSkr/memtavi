@@ -476,7 +476,7 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
       "getIndex",
       "/v1/brains/{brainId}/index",
       "GET",
-      `/v1/brains/${brainId}/index`,
+      `/v1/brains/${brainId}/index?offset=0&status=active`,
       {},
       200,
     );

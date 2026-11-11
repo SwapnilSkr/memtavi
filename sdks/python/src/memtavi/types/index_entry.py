@@ -7,6 +7,7 @@ import pydantic
 import typing_extensions
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 from ..core.serialization import FieldMetadata
+from .page_status import PageStatus
 from .page_type import PageType
 
 
@@ -20,6 +21,7 @@ class IndexEntry(UniversalBaseModel):
     summary: str
     page_type: typing_extensions.Annotated[PageType, FieldMetadata(alias="pageType"), pydantic.Field(alias="pageType")]
     pinned: bool
+    status: typing.Optional[PageStatus] = None
     updated_at: typing_extensions.Annotated[
         typing.Optional[dt.datetime], FieldMetadata(alias="updatedAt"), pydantic.Field(alias="updatedAt")
     ] = None

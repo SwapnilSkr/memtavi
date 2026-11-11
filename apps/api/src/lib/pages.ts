@@ -200,25 +200,28 @@ export async function getIndex(
   tenantId: string,
   subjectId: string,
   brainId: string,
+  status: string | null,
   limit: number,
   offset: number,
 ) {
   await requireBrain(client, tenantId, subjectId, brainId);
   const total = await client.query<{ total: number }>(
     `SELECT count(*)::int AS total FROM pages
-     WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND deletion_state = 'active'`,
-    [tenantId, subjectId, brainId],
+     WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND deletion_state = 'active'
+     AND ($4::page_status IS NULL OR status = $4::page_status)`,
+    [tenantId, subjectId, brainId, status],
   );
   const items = await client.query(
-    `SELECT slug, title, summary, page_type AS "pageType", pinned,
+    `SELECT slug, title, summary, page_type AS "pageType", pinned, status,
        COALESCE(last_compiled_at, last_referenced_at, to_timestamp(0)) AS "updatedAt"
      FROM pages
      WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND deletion_state = 'active'
+     AND ($4::page_status IS NULL OR status = $4::page_status)
      ORDER BY pinned DESC,
        COALESCE(last_compiled_at, last_referenced_at, to_timestamp(0)) DESC,
        slug, id
-     LIMIT $4 OFFSET $5`,
-    [tenantId, subjectId, brainId, limit, offset],
+     LIMIT $5 OFFSET $6`,
+    [tenantId, subjectId, brainId, status, limit, offset],
   );
   return { items: items.rows, total: total.rows[0]?.total ?? 0, limit, offset };
 }

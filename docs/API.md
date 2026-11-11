@@ -621,6 +621,8 @@ Returns the compact index of pages in the brain.
 | --- | --- | --- | --- | --- |
 | `brainId` | path | yes | `string` | Prefixed brain id, `brn_` followed by 32 lowercase hex characters. Matches `^brn_[0-9a-f]{32}$`. |
 | `limit` | query | no | `integer` | Maximum number of index entries to return. Default `40`. Minimum 1. Maximum 200. |
+| `offset` | query | no | `integer` | Number of items to skip before collecting the page. Default `0`. Minimum 0. |
+| `status` | query | no | [`PageStatus`](#pagestatus) | Only return pages with this status. |
 
 **Responses**
 
@@ -1773,6 +1775,7 @@ Required: `slug`, `title`, `summary`, `pageType`, `pinned`
 | `summary` | `string` | yes |  |
 | `pageType` | [`PageType`](#pagetype) | yes |  |
 | `pinned` | `boolean` | yes |  |
+| `status` | [`PageStatus`](#pagestatus) | no |  |
 | `updatedAt` | `string (date-time)` | no |  |
 
 ### IngestSource
