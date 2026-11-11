@@ -17,6 +17,7 @@ from ..errors.too_many_requests_error import TooManyRequestsError
 from ..errors.unauthorized_error import UnauthorizedError
 from ..types.error_envelope import ErrorEnvelope
 from ..types.graph import Graph
+from ..types.page_status import PageStatus
 from .types.get_index_response import GetIndexResponse
 from .types.search_brain_response import SearchBrainResponse
 from pydantic import ValidationError
@@ -150,6 +151,8 @@ class RawSearchClient:
         brain_id: str,
         *,
         limit: typing.Optional[int] = None,
+        offset: typing.Optional[int] = None,
+        status: typing.Optional[PageStatus] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[GetIndexResponse]:
         """
@@ -162,6 +165,12 @@ class RawSearchClient:
 
         limit : typing.Optional[int]
             Maximum number of index entries to return.
+
+        offset : typing.Optional[int]
+            Number of items to skip before collecting the page.
+
+        status : typing.Optional[PageStatus]
+            Only return pages with this status.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -176,6 +185,8 @@ class RawSearchClient:
             method="GET",
             params={
                 "limit": limit,
+                "offset": offset,
+                "status": status,
             },
             request_options=request_options,
         )
@@ -480,6 +491,8 @@ class AsyncRawSearchClient:
         brain_id: str,
         *,
         limit: typing.Optional[int] = None,
+        offset: typing.Optional[int] = None,
+        status: typing.Optional[PageStatus] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[GetIndexResponse]:
         """
@@ -492,6 +505,12 @@ class AsyncRawSearchClient:
 
         limit : typing.Optional[int]
             Maximum number of index entries to return.
+
+        offset : typing.Optional[int]
+            Number of items to skip before collecting the page.
+
+        status : typing.Optional[PageStatus]
+            Only return pages with this status.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -506,6 +525,8 @@ class AsyncRawSearchClient:
             method="GET",
             params={
                 "limit": limit,
+                "offset": offset,
+                "status": status,
             },
             request_options=request_options,
         )

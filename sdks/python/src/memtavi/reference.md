@@ -2381,6 +2381,22 @@ client.search.get_index(
 <dl>
 <dd>
 
+**offset:** `typing.Optional[int]` — Number of items to skip before collecting the page.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**status:** `typing.Optional[PageStatus]` — Only return pages with this status.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
 **request_options:** `typing.Optional[RequestOptions]` — Request-specific configuration.
     
 </dd>

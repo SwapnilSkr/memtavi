@@ -1020,6 +1020,13 @@ paths:
       description: Returns the compact index of pages in the brain.
       parameters:
         - $ref: "#/components/parameters/IndexLimit"
+        - $ref: "#/components/parameters/Offset"
+        - name: status
+          in: query
+          required: false
+          description: Only return pages with this status.
+          schema:
+            $ref: "#/components/schemas/PageStatus"
       responses:
         "200":
           description: Index entries for the brain.
@@ -3319,6 +3326,8 @@ components:
           $ref: "#/components/schemas/PageType"
         pinned:
           type: boolean
+        status:
+          $ref: "#/components/schemas/PageStatus"
         updatedAt:
           type: string
           format: date-time

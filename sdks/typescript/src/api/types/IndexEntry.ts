@@ -11,5 +11,6 @@ export interface IndexEntry {
     summary: string;
     pageType: MemtaviApi.PageType;
     pinned: boolean;
+    status?: MemtaviApi.PageStatus | undefined;
     updatedAt?: string | undefined;
 }

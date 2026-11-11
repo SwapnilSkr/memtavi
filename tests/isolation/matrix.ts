@@ -351,6 +351,7 @@ function buildCase(operation: SpecOperation, kind: CaseKind, world: World): Matr
   }
   if (operation.operationId === "deletePage") options.query = { permanent: "true" };
   if (operation.operationId === "searchBrain") options.query = { q: world.searchToken };
+  if (operation.operationId === "getIndex") options.query = { offset: "0", status: "active" };
   if (operation.operationId === "diffPageVersions") options.query = { from: "1", to: "2" };
   if (kind === "auth-missing-key") options.key = null;
   if (kind === "auth-unknown-key") options.key = world.keys.unknown;

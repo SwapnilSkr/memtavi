@@ -19,8 +19,10 @@ export const pageListQuery = t.Object({
   status: t.Optional(pageStatus),
 });
 
-export const indexLimit = t.Object({
+export const indexQuery = t.Object({
   limit: t.Optional(t.Numeric({ minimum: 1, maximum: 200, multipleOf: 1, default: 40 })),
+  offset: t.Optional(t.Numeric({ minimum: 0, multipleOf: 1, default: 0 })),
+  status: t.Optional(pageStatus),
 });
 
 export const scoreHistoryQuery = t.Object({
