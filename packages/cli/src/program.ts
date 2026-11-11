@@ -1,7 +1,6 @@
 import {
   type ApiClient,
   ApiError,
-  type ChangeAction,
   type ChangeEvent,
   type Connection,
   type IngestSource,
@@ -11,6 +10,7 @@ import {
   type ProfileUpdate,
   type Score,
   type Webhook,
+  type WebhookEvent,
 } from "@memtavi/client/client";
 import { ConfigError } from "@memtavi/client/config";
 import { Command, CommanderError, InvalidArgumentError } from "commander";
@@ -525,19 +525,14 @@ export function buildProgram(deps: CliDeps): Command {
     .command("create")
     .description("Register a webhook and print its signing secret once")
     .requiredOption("--url <url>", "the http or https endpoint to deliver to")
-    .option(
-      "--event <name>",
-      "a change action to subscribe to; repeat for several",
-      collectEvent,
-      [],
-    )
+    .option("--event <name>", "an event name to subscribe to; repeat for several", collectEvent, [])
     .action(async (options: { url: string; event: string[] }, command: Command) => {
       if (options.event.length === 0) {
         throw new UsageError("webhook create requires at least one --event.");
       }
       const created = await deps.client.createWebhook({
         url: options.url,
-        events: options.event as ChangeAction[],
+        events: options.event as WebhookEvent[],
       });
       if (globals(command).json) {
         deps.out(JSON.stringify(created, null, 2));

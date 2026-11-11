@@ -10,6 +10,10 @@ export const WEBHOOK_EVENTS = [
   "restored",
   "recovered",
   "routed",
+  "brain.page.updated",
+  "brain.change.new",
+  "brain.connection.new",
+  "brain.import.progress",
 ] as const;
 
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];

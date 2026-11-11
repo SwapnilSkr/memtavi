@@ -3325,7 +3325,18 @@ components:
           minItems: 1
           maxItems: 20
           uniqueItems: true
-          description: One to twenty distinct change actions.
+          description: >-
+            One to twenty distinct event names. Raw change actions remain supported with their
+            original payloads. brain.change.new fires for every change event. brain.page.updated
+            fires for every current action (created, updated, renamed, merged, split, archived,
+            restored, recovered, routed), which changes page content or status. brain.connection.new
+            fires only when discovery inserts an automatic connection, not when it updates one.
+            brain.import.progress fires whenever an ingest source transitions to completed or failed.
+            Each underlying event produces at most one delivery per webhook. When subscriptions
+            overlap, the raw action takes precedence, then brain.page.updated, then brain.change.new.
+            See WebhookPayload for the signed JSON body. x-memtavi-event equals its type;
+            x-memtavi-delivery equals deliveryId; x-memtavi-signature is sha256= followed by the
+            hexadecimal HMAC-SHA256 of the exact body using the one-time signing secret.
           items:
             type: string
             enum:
@@ -3338,6 +3349,112 @@ components:
               - restored
               - recovered
               - routed
+              - brain.page.updated
+              - brain.change.new
+              - brain.connection.new
+              - brain.import.progress
+
+    WebhookPayload:
+      description: >-
+        Informational schema for outbound deliveries. eventId identifies the underlying event;
+        deliveryId identifies its delivery to one webhook. Both and the body remain stable on
+        retry. Events are snapshots taken in the transaction that changes the resource.
+      oneOf:
+        - $ref: "#/components/schemas/WebhookChangePayload"
+        - $ref: "#/components/schemas/WebhookConnectionPayload"
+        - $ref: "#/components/schemas/WebhookImportPayload"
+
+    WebhookChangePayload:
+      type: object
+      additionalProperties: false
+      required: [deliveryId, eventId, type, brainId, pageId, changeSummary, fromVersion, toVersion, createdAt]
+      properties:
+        deliveryId:
+          type: string
+          format: uuid
+        eventId:
+          type: string
+        type:
+          type: string
+          enum: [created, updated, renamed, merged, split, archived, restored, recovered, routed, brain.page.updated, brain.change.new]
+        action:
+          type: string
+          description: Present for PRD event names; omitted for legacy raw-action deliveries.
+          enum: [created, updated, renamed, merged, split, archived, restored, recovered, routed]
+        brainId:
+          type: string
+        pageId:
+          type: string
+        changeSummary:
+          type: string
+        fromVersion:
+          type: [integer, "null"]
+        toVersion:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    WebhookConnectionPayload:
+      type: object
+      additionalProperties: false
+      required: [deliveryId, eventId, type, brainId, connectionId, pageAId, pageBId, similarity, strength, reasoning, createdAt]
+      properties:
+        deliveryId:
+          type: string
+          format: uuid
+        eventId:
+          type: string
+        type:
+          type: string
+          enum: [brain.connection.new]
+        brainId:
+          type: string
+        connectionId:
+          type: string
+        pageAId:
+          type: string
+        pageBId:
+          type: string
+        similarity:
+          type: number
+        strength:
+          type: string
+          enum: [weak, medium, strong]
+        reasoning:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    WebhookImportPayload:
+      type: object
+      additionalProperties: false
+      required: [deliveryId, eventId, type, brainId, sourceId, status, affectedPageIds, createdAt]
+      properties:
+        deliveryId:
+          type: string
+          format: uuid
+        eventId:
+          type: string
+          description: Opaque transition identifier; repeated transitions have distinct identifiers.
+        type:
+          type: string
+          enum: [brain.import.progress]
+        brainId:
+          type: string
+        sourceId:
+          type: string
+        status:
+          type: string
+          enum: [completed, failed]
+        affectedPageIds:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
 
     Tenant:
       type: object

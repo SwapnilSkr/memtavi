@@ -555,6 +555,24 @@ describe("webhooks", () => {
     });
   });
 
+  test("creates a webhook with every PRD event name", async () => {
+    const events = [
+      "brain.page.updated",
+      "brain.change.new",
+      "brain.connection.new",
+      "brain.import.progress",
+    ] as const;
+    const { fetchImpl, recorded } = recordingFetch(
+      jsonResponse({ ...createdWebhook, events }, 201),
+    );
+    const result = await createClient({ ...base, fetch: fetchImpl }).createWebhook({
+      url: "https://example.com/hooks",
+      events: [...events],
+    });
+    expect(result.events).toEqual([...events]);
+    expect(JSON.parse(String(recorded[0]?.init.body)).events).toEqual([...events]);
+  });
+
   test("rejects a create response without a secret", async () => {
     const { fetchImpl } = recordingFetch(jsonResponse(webhook, 201));
     const error = await createClient({ ...base, fetch: fetchImpl })

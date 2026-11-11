@@ -474,6 +474,7 @@ export const EXPECTED_TENANT_SCOPED_TABLES = [
   "subject_links",
   "usage_ledger",
   "webhook_deliveries",
+  "webhook_events",
   "webhooks",
 ] as const;
 

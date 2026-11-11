@@ -270,14 +270,21 @@ export interface Webhook {
   id: string;
   subjectId: string;
   url: string;
-  events: ChangeAction[];
+  events: WebhookEvent[];
   active: boolean;
   secret?: string | undefined;
 }
 
+export type WebhookEvent =
+  | ChangeAction
+  | "brain.page.updated"
+  | "brain.change.new"
+  | "brain.connection.new"
+  | "brain.import.progress";
+
 export interface WebhookCreate {
   url: string;
-  events: ChangeAction[];
+  events: WebhookEvent[];
 }
 
 export interface CreatedWebhook extends Webhook {
@@ -550,7 +557,15 @@ const webhookSchema = z.object({
   id: z.string(),
   subjectId: z.string(),
   url: z.string(),
-  events: z.array(changeActionSchema),
+  events: z.array(
+    z.enum([
+      ...changeActionSchema.options,
+      "brain.page.updated",
+      "brain.change.new",
+      "brain.connection.new",
+      "brain.import.progress",
+    ]),
+  ),
   active: z.boolean(),
   secret: z.string().optional(),
 });

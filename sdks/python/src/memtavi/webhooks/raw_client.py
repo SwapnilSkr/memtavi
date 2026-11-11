@@ -144,7 +144,7 @@ class RawWebhooksClient:
             An `http` or `https` URL with no embedded credentials, at most 2,048 characters.
 
         events : typing.Sequence[WebhookCreateEventsItem]
-            One to twenty distinct change actions.
+            One to twenty distinct event names. Raw change actions remain supported with their original payloads. brain.change.new fires for every change event. brain.page.updated fires for every current action (created, updated, renamed, merged, split, archived, restored, recovered, routed), which changes page content or status. brain.connection.new fires only when discovery inserts an automatic connection, not when it updates one. brain.import.progress fires whenever an ingest source transitions to completed or failed. Each underlying event produces at most one delivery per webhook. When subscriptions overlap, the raw action takes precedence, then brain.page.updated, then brain.change.new. See WebhookPayload for the signed JSON body. x-memtavi-event equals its type; x-memtavi-delivery equals deliveryId; x-memtavi-signature is sha256= followed by the hexadecimal HMAC-SHA256 of the exact body using the one-time signing secret.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -448,7 +448,7 @@ class AsyncRawWebhooksClient:
             An `http` or `https` URL with no embedded credentials, at most 2,048 characters.
 
         events : typing.Sequence[WebhookCreateEventsItem]
-            One to twenty distinct change actions.
+            One to twenty distinct event names. Raw change actions remain supported with their original payloads. brain.change.new fires for every change event. brain.page.updated fires for every current action (created, updated, renamed, merged, split, archived, restored, recovered, routed), which changes page content or status. brain.connection.new fires only when discovery inserts an automatic connection, not when it updates one. brain.import.progress fires whenever an ingest source transitions to completed or failed. Each underlying event produces at most one delivery per webhook. When subscriptions overlap, the raw action takes precedence, then brain.page.updated, then brain.change.new. See WebhookPayload for the signed JSON body. x-memtavi-event equals its type; x-memtavi-delivery equals deliveryId; x-memtavi-signature is sha256= followed by the hexadecimal HMAC-SHA256 of the exact body using the one-time signing secret.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
