@@ -11,7 +11,6 @@ Ordered by product value per unit of risk. Remove items as they land.
 
 ## Phase 5, hardening
 
-- **FTS under RLS**: the GIN index is unreachable because `ts_match_vq` is not leakproof; scans are sequential (`docs/benchmarks.md`).
 - ~~Backup/restore rehearsal~~ (schema-only pass, 0.38 s RTO); still run it against the 10k-page shape for a real production RTO.
 
 ## Product gaps

@@ -9,6 +9,8 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-11** — Keyword search reaches its GIN index under RLS: `search_pages_keyword` (migration 0017), a definer function repeating the `tenant_isolation` predicate plus the transaction subject. One index scan per query; RLS unchanged.
+
 - **2026-11-11** — Inspector settings: health on 0–100 (was clamped to 0–1) with factors, 30-day trend and linked suggestions; profile suggestions on demand with one-click apply; `/settings` with API keys and webhooks (secret shown once, never cached), members, memory mode, export and deletion progress; pages list pages through `getIndex`.
 
 - **2026-11-11** — `POST /profile/suggestions` (`suggestProfile`, developer): prompt v1 over the top 40 index entries plus the current profile, no bodies; fewer than 3 pages returns `[]` with no call. Drops unknown fields, unchanged values and slugs not in the input. Shared `budgetExceeded` policy with the worker, usage recorded once against a completed `profile.suggest` job. `503` (+`Retry-After`) when unconfigured or the provider is transiently down, `502` on a permanent provider error. Never auto-applied.
@@ -37,8 +39,4 @@ Newest first. One line per shipped change: what, where, why. Not a commit log.
 
 - **2026-11-11** — Page versions: `listPageVersions`, `getPageVersion` and `diffPageVersions` (line diff, 3 lines of context, `diff@9.0.0`, 5000-line cap). Reading versions never bumps `lastReferencedAt`.
 
-- **2026-11-11** — `POST /sources/{sourceId}/retry` (`retryIngestSource`): a `failed` source goes back to `pending` with one recompile (or re-ingest when no body is stored), same source id, no extra storage usage; anything else is `409`. `attempts` counts manual retries.
-
-- **2026-11-11** — Health scores: `packages/core/health/compute` (freshness, readiness, strain 0–100 with explaining factors, weights as constants), one aggregate metrics query in `@memtavi/db/health`, a `score.snapshot` job after every compile (one per brain per minute), and `GET /score` computes one on demand instead of `404`.
-
-- **2026-11-11** — Brain lifecycle (details in git history): `deleteBrain` (`202` receipt, async two-phase purge, content-free tombstone, migration 0010), `listMembers` (definer function, migration 0011), and the Phase 6 contract hardening (`updateBrain`, spec statuses, isolation matrix, strict response validation, Fern SDKs).
+- **2026-11-11** — Earlier Phase 3 and 6 work (details in git history): source retry, health scores, `deleteBrain` with async purge and tombstone, `listMembers`, and the contract hardening (`updateBrain`, spec statuses, isolation matrix, strict response validation, Fern SDKs).
