@@ -497,9 +497,17 @@ export const routingReviews = pgTable(
     bestGap: doublePrecision("best_gap"),
     status: reviewStatus("status").notNull().default("open"),
     resolution: text("resolution"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index("routing_reviews_tenant_brain_idx").on(table.tenantId, table.brainId),
+    index("routing_reviews_list_idx").on(
+      table.tenantId,
+      table.brainId,
+      table.status,
+      table.createdAt.desc(),
+      table.id,
+    ),
     foreignKey({
       columns: [table.tenantId, table.brainId, table.ingestSourceId],
       foreignColumns: [ingestSources.tenantId, ingestSources.brainId, ingestSources.id],

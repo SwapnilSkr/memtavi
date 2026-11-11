@@ -39,6 +39,8 @@ tags:
     description: Semantic links between pages.
   - name: Changes
     description: The change feed for a brain.
+  - name: Reviews
+    description: Human decisions for ambiguous fact routing.
   - name: Score
     description: Brain health metrics.
   - name: Profile
@@ -1142,6 +1144,127 @@ paths:
         "500":
           $ref: "#/components/responses/Error500"
 
+  /v1/brains/{brainId}/routing-reviews:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+    get:
+      operationId: listRoutingReviews
+      tags:
+        - Reviews
+      summary: List routing reviews
+      description: Requires viewer or higher. Deleted candidates are omitted. Reviews are newest first.
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, resolved, dismissed]
+            default: open
+      responses:
+        "200":
+          description: List routing reviews.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoutingReviewList"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/brains/{brainId}/routing-reviews/{reviewId}/resolve:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+      - $ref: "#/components/parameters/ReviewId"
+    post:
+      operationId: resolveRoutingReview
+      tags:
+        - Reviews
+      summary: Resolve a routing review
+      description: Requires developer or higher. Atomically settles an open review and queues review.apply. The selected page must be an active candidate. Placement uses compiler patching, evidence, budget caps and embeddings. A 202 confirms the decision; placement runs asynchronously.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoutingReviewResolve"
+      responses:
+        "202":
+          description: Resolve a routing review.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoutingReview"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/brains/{brainId}/routing-reviews/{reviewId}/dismiss:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+      - $ref: "#/components/parameters/ReviewId"
+    post:
+      operationId: dismissRoutingReview
+      tags:
+        - Reviews
+      summary: Dismiss a routing review
+      description: Requires developer or higher. Settles an open review without deleting the source fact.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoutingReviewDismiss"
+      responses:
+        "200":
+          description: Dismiss a routing review.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoutingReview"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
   /v1/brains/{brainId}/score:
     parameters:
       - $ref: "#/components/parameters/BrainId"
@@ -1741,6 +1864,14 @@ components:
       schema:
         type: string
         pattern: "^cnn_[0-9a-f]{32}$"
+    ReviewId:
+      name: reviewId
+      in: path
+      required: true
+      description: Routing review identifier.
+      schema:
+        type: string
+        format: uuid
     ChangeId:
       name: changeId
       in: path
@@ -2579,6 +2710,128 @@ components:
             - string
             - "null"
           format: date-time
+
+    RoutingReview:
+      type: object
+      required: [id, sourceId, fact, candidates, bestGap, status, resolution, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        sourceId:
+          type: string
+        fact:
+          type: object
+          required: [claim, entities, evidence]
+          properties:
+            claim:
+              type: string
+            entities:
+              type: array
+              items:
+                type: string
+            evidence:
+              type: object
+              required: [chunkUuid, charStart, charEnd, quote]
+              properties:
+                chunkUuid:
+                  type: string
+                  format: uuid
+                charStart:
+                  type: integer
+                  minimum: 0
+                charEnd:
+                  type: integer
+                  minimum: 0
+                quote:
+                  type: string
+        candidates:
+          type: array
+          items:
+            type: object
+            required: [pageId, slug, title]
+            properties:
+              pageId:
+                type: string
+              slug:
+                type: string
+              title:
+                type: string
+        bestGap:
+          type: [number, "null"]
+        status:
+          type: string
+          enum: [open, resolved, dismissed]
+        resolution:
+          type: [string, "null"]
+          description: Optional human note about the decision.
+        createdAt:
+          type: string
+          format: date-time
+      example:
+        id: 11111111-1111-4111-8111-111111111111
+        sourceId: src_11111111111111111111111111111111
+        fact:
+          claim: Acme ships on Friday.
+          entities: [Acme]
+          evidence:
+            chunkUuid: 22222222-2222-4222-8222-222222222222
+            charStart: 0
+            charEnd: 21
+            quote: Acme ships on Friday.
+        candidates: []
+        bestGap: 0.05
+        status: open
+        resolution: null
+        createdAt: "2026-11-11T00:00:00.000Z"
+    RoutingReviewList:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoutingReview"
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+    RoutingReviewResolve:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [pageId]
+          properties:
+            pageId:
+              type: string
+              minLength: 1
+            note:
+              type: string
+              maxLength: 2000
+        - type: object
+          additionalProperties: false
+          required: [newPage]
+          properties:
+            newPage:
+              type: boolean
+              const: true
+            note:
+              type: string
+              maxLength: 2000
+      example:
+        newPage: true
+        note: Keep this fact separate.
+    RoutingReviewDismiss:
+      type: object
+      additionalProperties: false
+      properties:
+        note:
+          type: string
+          maxLength: 2000
+      example:
+        note: Keep in the source only.
 
     ChangeEvent:
       type: object

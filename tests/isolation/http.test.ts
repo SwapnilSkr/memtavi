@@ -82,6 +82,7 @@ const OWN_PROBES: Record<string, (world: World) => string[]> = {
   getGraph: (world) => [world.own.pageSlug, world.own.connectionId],
   listConnections: (world) => [world.own.connectionId],
   listChanges: (world) => [world.own.changeId],
+  listRoutingReviews: (world) => [world.own.reviewId, world.own.pageTitle],
   listIngestSources: (world) => [world.own.sourceId],
   listWebhooks: (world) => [world.own.webhookId],
   listApiKeys: (world) => [world.keys.nonOwnerKeyId],

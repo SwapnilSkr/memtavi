@@ -4,7 +4,11 @@ import { applyPatch, buildPatchMessages, parsePatchResult } from "@memtavi/core/
 import { decideMws } from "@memtavi/core/compile/policies/mws";
 import { decidePfs } from "@memtavi/core/compile/policies/pfs";
 import { promptVersion } from "@memtavi/core/compile/prompts";
-import type { ExtractedFact, PatchResult } from "@memtavi/core/compile/schemas";
+import {
+  type ExtractedFact,
+  extractedFactSchema,
+  type PatchResult,
+} from "@memtavi/core/compile/schemas";
 import { enqueueScoreSnapshot } from "@memtavi/db/health";
 import { chatCostUsd, embeddingCostUsd } from "@memtavi/llm/cost";
 import { type ChatResult, type EmbeddingResult, ProviderError } from "@memtavi/llm/provider";
@@ -101,6 +105,7 @@ async function compileSource({
   recordUsage,
   onRouting,
 }: JobContext): Promise<void> {
+  const isReview = job.type === "review.apply";
   const sourceId = job.payload.sourceId;
   if (typeof sourceId !== "string" || !sourceId || job.payload.brainId !== job.brainId) {
     throw new JobError("permanent", "Invalid job payload");
@@ -119,40 +124,98 @@ async function compileSource({
     scope,
   );
   const source = sources.rows[0];
-  if (!source || source.deleted_at || source.status === "completed") return;
+  if (!source || source.deleted_at || (!isReview && source.status === "completed")) return;
+  let reviewFact: ExtractedFact | undefined;
+  if (isReview) {
+    const applied = await client.query<{ applied: boolean }>(
+      `SELECT COALESCE((payload->>'applied')::boolean, false) AS applied FROM jobs
+       WHERE tenant_id = $1 AND brain_id = $2 AND id = $3 FOR NO KEY UPDATE`,
+      [job.tenantId, job.brainId, job.id],
+    );
+    if (!applied.rowCount) throw new JobError("permanent", "Missing review job");
+    if (applied.rows[0]?.applied) return;
+    if (
+      typeof job.payload.reviewId !== "string" ||
+      !((typeof job.payload.pageId === "string") !== (job.payload.newPage === true))
+    ) {
+      throw new JobError("permanent", "Invalid review payload");
+    }
+    const review = await client.query<{ fact: unknown; candidate_page_ids: string[] }>(
+      `SELECT fact, candidate_page_ids FROM routing_reviews
+       WHERE tenant_id = $1 AND brain_id = $2 AND id = $3
+         AND ingest_source_id = $4 AND status = 'resolved' FOR UPDATE`,
+      [job.tenantId, job.brainId, job.payload.reviewId, sourceId],
+    );
+    const row = review.rows[0];
+    if (
+      !row ||
+      (typeof job.payload.pageId === "string" &&
+        !row.candidate_page_ids.includes(job.payload.pageId))
+    ) {
+      throw new JobError("permanent", "Invalid resolved review");
+    }
+    reviewFact = extractedFactSchema.parse(row.fact);
+  }
   if (!compiler) throw new JobError("permanent", "Compiler configuration is required");
   const { chatProvider, embeddingProvider, chatModel, embeddingModel } = compiler;
   const subjectId = source.subject_id;
-  const body = source.body_ref
-    ? await new Response(await store.get(source.body_ref)).text()
-    : source.content;
   const chunks: { chunkUuid: string; text: string }[] = [];
-  for (const [ordinal, chunk] of chunkBody(body).entries()) {
-    const bodyRef = chunkKey({ tenantId: job.tenantId, sourceId, body: chunk.text, ordinal });
-    await store.put(bodyRef, chunk.text, "text/plain; charset=utf-8");
-    const inserted = await client.query<{ id: string }>(
-      `INSERT INTO source_chunks
+  if (isReview) {
+    const stored = await client.query<{ id: string; text: string | null; body_ref: string | null }>(
+      `SELECT id, text, body_ref FROM source_chunks
+       WHERE tenant_id = $1 AND brain_id = $2 AND source_id = $3 AND id = $4 LIMIT 1`,
+      [...scope, reviewFact?.evidence.chunkUuid],
+    );
+    for (const chunk of stored.rows) {
+      chunks.push({
+        chunkUuid: chunk.id,
+        text: chunk.body_ref
+          ? await new Response(await store.get(chunk.body_ref)).text()
+          : (chunk.text ?? ""),
+      });
+    }
+    const evidence = reviewFact?.evidence;
+    const text = chunks.find((chunk) => chunk.chunkUuid === evidence?.chunkUuid)?.text;
+    if (
+      !evidence ||
+      text === undefined ||
+      evidence.charEnd <= evidence.charStart ||
+      evidence.charEnd > text.length ||
+      text.slice(evidence.charStart, evidence.charEnd) !== evidence.quote
+    ) {
+      throw new CompileError();
+    }
+  } else {
+    const body = source.body_ref
+      ? await new Response(await store.get(source.body_ref)).text()
+      : source.content;
+    for (const [ordinal, chunk] of chunkBody(body).entries()) {
+      const bodyRef = chunkKey({ tenantId: job.tenantId, sourceId, body: chunk.text, ordinal });
+      await store.put(bodyRef, chunk.text, "text/plain; charset=utf-8");
+      const inserted = await client.query<{ id: string }>(
+        `INSERT INTO source_chunks
        (id, tenant_id, brain_id, source_id, ordinal, text, body_ref, char_start, char_end, token_count)
        VALUES ($9::uuid, $1, $2, $3, $4, NULL, $5, $6, $7, $8) RETURNING id`,
-      [
-        ...scope,
-        ordinal,
-        bodyRef,
-        chunk.charStart,
-        chunk.charEnd,
-        Math.ceil(chunk.text.length / 4),
-        contentHash(bodyRef).slice(0, 32),
-      ],
-    );
-    const chunkUuid = inserted.rows[0]?.id;
-    if (!chunkUuid) throw new JobError("permanent", "Chunk write failed");
-    chunks.push({ chunkUuid, text: chunk.text });
-  }
-  await client.query(
-    `UPDATE ingest_sources SET status = 'compiling', chunk_uuids = $4, last_error = NULL
+        [
+          ...scope,
+          ordinal,
+          bodyRef,
+          chunk.charStart,
+          chunk.charEnd,
+          Math.ceil(chunk.text.length / 4),
+          contentHash(bodyRef).slice(0, 32),
+        ],
+      );
+      const chunkUuid = inserted.rows[0]?.id;
+      if (!chunkUuid) throw new JobError("permanent", "Chunk write failed");
+      chunks.push({ chunkUuid, text: chunk.text });
+    }
+    await client.query(
+      `UPDATE ingest_sources SET status = 'compiling', chunk_uuids = $4, last_error = NULL
      WHERE tenant_id = $1 AND brain_id = $2 AND id = $3`,
-    [...scope, chunks.map((chunk) => chunk.chunkUuid)],
-  );
+      [...scope, chunks.map((chunk) => chunk.chunkUuid)],
+    );
+  }
 
   async function ledger(result: ChatResult | EmbeddingResult): Promise<void> {
     const chat = "text" in result;
@@ -210,7 +273,8 @@ async function compileSource({
   }
 
   const facts: ExtractedFact[] = [];
-  for (let start = 0; start < chunks.length; start += 8) {
+  if (reviewFact) facts.push(reviewFact);
+  for (let start = 0; !isReview && start < chunks.length; start += 8) {
     await assertBudget(client, job.tenantId);
     const extraction = await extractFacts(
       {
@@ -229,7 +293,8 @@ async function compileSource({
     );
     facts.push(...extraction.facts.filter((fact) => decideMws(fact).band !== "source_only"));
   }
-  const vectors = facts.length ? (await embed(facts.map((fact) => fact.claim))).vectors : [];
+  const vectors =
+    !isReview && facts.length ? (await embed(facts.map((fact) => fact.claim))).vectors : [];
   const affected = new Set<string>();
 
   async function recordPage(
@@ -249,7 +314,13 @@ async function compileSource({
         [job.tenantId, page.id, page.version, page.title, page.summary, page.body, sourceId],
       );
       const eventId = newId("change");
-      const action = splitFrom ? "split" : previousVersion === null ? "created" : "updated";
+      const action = isReview
+        ? "routed"
+        : splitFrom
+          ? "split"
+          : previousVersion === null
+            ? "created"
+            : "updated";
       const changeSummary = splitFrom
         ? `Split from ${splitFrom.title} (${splitFrom.id})`
         : previousVersion === null
@@ -393,6 +464,23 @@ async function compileSource({
   const routing: RoutingEvent[] = [];
   const placed = new Map<string, ExtractedFact[]>();
   for (const [index, fact] of facts.entries()) {
+    if (isReview) {
+      if (typeof job.payload.pageId === "string") {
+        placed.set(job.payload.pageId, [fact]);
+      } else {
+        const title =
+          fact.entities.find((entity) => entity.trim())?.trim() ?? fact.claim.trim().slice(0, 120);
+        const entities = normalizeEntities(fact.entities);
+        await createPage(
+          [fact],
+          title,
+          entities.length > 0 ? "entity" : "topic",
+          entities,
+          job.payload.reviewId as string,
+        );
+      }
+      continue;
+    }
     const entities = normalizeEntities(fact.entities);
     const vector = vectors[index];
     if (!vector) throw new JobError("permanent", "Missing fact embedding");
@@ -477,11 +565,11 @@ async function compileSource({
       [job.tenantId, job.brainId, pageId],
     );
     const existing = found.rows[0];
-    if (!existing) throw new JobError("transient", "Routing page changed");
+    if (!existing) throw new JobError(isReview ? "permanent" : "transient", "Routing page changed");
     const userEdited = existing.user_edited_at !== null;
     const estimatedSize =
       existing.body.length + pageFacts.reduce((total, fact) => total + fact.claim.length + 200, 0);
-    if (!userEdited && estimatedSize > PAGE_BODY_MAX_CHARS) {
+    if (!isReview && !userEdited && estimatedSize > PAGE_BODY_MAX_CHARS) {
       const frequencies = new Map<string, number>();
       for (const fact of pageFacts) {
         const entities = new Set(
@@ -585,21 +673,35 @@ async function compileSource({
     await recordPage(page, pageFacts, previousVersion, contradictions, changed);
   }
 
-  await client.query(
-    `UPDATE ingest_sources SET status = 'completed', compiled_at = now(), affected_page_ids = $4,
+  if (isReview) {
+    await client.query(
+      `UPDATE jobs SET payload = payload || '{"applied":true}'::jsonb
+       WHERE tenant_id = $1 AND brain_id = $2 AND id = $3`,
+      [job.tenantId, job.brainId, job.id],
+    );
+    await client.query(
+      `UPDATE ingest_sources SET affected_page_ids = ARRAY(
+        SELECT DISTINCT id FROM unnest(affected_page_ids || $4::text[]) AS id ORDER BY id)
+       WHERE tenant_id = $1 AND brain_id = $2 AND id = $3`,
+      [...scope, [...affected].sort()],
+    );
+  } else {
+    await client.query(
+      `UPDATE ingest_sources SET status = 'completed', compiled_at = now(), affected_page_ids = $4,
        metadata = metadata || $5::jsonb, last_error = NULL
      WHERE tenant_id = $1 AND brain_id = $2 AND id = $3`,
-    [
-      ...scope,
-      [...affected].sort(),
-      JSON.stringify({
-        compilerPrompts: {
-          extract: promptVersion("extract"),
-          patch: promptVersion("patch"),
-        },
-      }),
-    ],
-  );
+      [
+        ...scope,
+        [...affected].sort(),
+        JSON.stringify({
+          compilerPrompts: {
+            extract: promptVersion("extract"),
+            patch: promptVersion("patch"),
+          },
+        }),
+      ],
+    );
+  }
   for (const event of routing) onRouting?.(event);
   await enqueueScoreSnapshot(client, job.tenantId, job.brainId);
 }

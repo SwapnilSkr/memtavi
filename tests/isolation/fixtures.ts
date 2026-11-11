@@ -19,6 +19,7 @@ export interface SubjectFixtures {
   connectionId: string;
   connectionReasoning: string;
   changeId: string;
+  reviewId: string;
   changeSummary: string;
   webhookId: string;
   webhookUrl: string;
@@ -57,6 +58,7 @@ export type TargetTable =
   | "ingest_sources"
   | "connections"
   | "change_events"
+  | "routing_reviews"
   | "webhooks"
   | "api_keys";
 
@@ -199,6 +201,27 @@ async function seedChildren(
       fixtures.changeSummary,
     ],
   );
+  await owner.query(
+    `INSERT INTO routing_reviews (id, tenant_id, brain_id, ingest_source_id, fact, candidate_page_ids, best_gap)
+     VALUES ($1, $2, $3, $4, $5, $6, 0.05)`,
+    [
+      fixtures.reviewId,
+      fixtures.tenantId,
+      fixtures.brainId,
+      fixtures.sourceId,
+      JSON.stringify({
+        claim: fixtures.sourceContent,
+        entities: [],
+        evidence: {
+          chunkUuid: crypto.randomUUID(),
+          charStart: 0,
+          charEnd: fixtures.sourceContent.length,
+          quote: fixtures.sourceContent,
+        },
+      }),
+      [fixtures.pageId, fixtures.secondPageId],
+    ],
+  );
   await owner.query("INSERT INTO profiles (brain_id, tenant_id, focus) VALUES ($1, $2, $3)", [
     fixtures.brainId,
     fixtures.tenantId,
@@ -227,6 +250,7 @@ function markersOf(fixtures: SubjectFixtures): string[] {
     fixtures.connectionId,
     fixtures.connectionReasoning,
     fixtures.changeId,
+    fixtures.reviewId,
     fixtures.changeSummary,
     fixtures.webhookId,
     fixtures.webhookUrl,
@@ -318,6 +342,7 @@ export async function seedWorld(harness: Harness): Promise<World> {
     connectionId: newId("connection"),
     connectionReasoning: token("a1-connection-reasoning"),
     changeId: newId("change"),
+    reviewId: crypto.randomUUID(),
     changeSummary: token("a1-change-summary"),
     webhookId: ownWebhook.id,
     webhookUrl: ownWebhook.url,
@@ -340,6 +365,7 @@ export async function seedWorld(harness: Harness): Promise<World> {
     connectionId: newId("connection"),
     connectionReasoning: token("a2-connection-reasoning"),
     changeId: newId("change"),
+    reviewId: crypto.randomUUID(),
     changeSummary: token("a2-change-summary"),
     webhookId: siblingWebhook.id,
     webhookUrl: siblingWebhook.url,
@@ -362,6 +388,7 @@ export async function seedWorld(harness: Harness): Promise<World> {
     connectionId: newId("connection"),
     connectionReasoning: token("b1-connection-reasoning"),
     changeId: newId("change"),
+    reviewId: crypto.randomUUID(),
     changeSummary: token("b1-change-summary"),
     webhookId: foreignWebhook.id,
     webhookUrl: foreignWebhook.url,

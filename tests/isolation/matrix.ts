@@ -2,7 +2,14 @@ import type { RequestOptions } from "../support/harness";
 import type { TargetTable, World } from "./fixtures";
 
 const HTTP_METHODS = ["get", "post", "put", "patch", "delete"] as const;
-const CHILD_PARAMS = new Set(["sourceId", "slug", "connectionId", "changeId", "version"]);
+const CHILD_PARAMS = new Set([
+  "sourceId",
+  "slug",
+  "connectionId",
+  "changeId",
+  "reviewId",
+  "version",
+]);
 const TENANT_SCOPED_PARAMS = new Set(["webhookId", "keyId"]);
 const SUBJECT_SCOPED_PARAMS = new Set(["webhookId"]);
 
@@ -16,6 +23,7 @@ export const OWN_LIST = new Set([
   "getGraph",
   "listConnections",
   "listChanges",
+  "listRoutingReviews",
   "listIngestSources",
   "listWebhooks",
   "listApiKeys",
@@ -114,6 +122,7 @@ const BODIES: Record<string, () => unknown> = {
   updateBrain: () => ({ name: "Matrix brain" }),
   createCapture: () => ({ kind: "note", content: `matrix capture ${crypto.randomUUID()}` }),
   updatePage: () => ({ title: "Matrix page", version: 1 }),
+  resolveRoutingReview: () => ({ newPage: true }),
   resolvePage: () => ({ note: "Matrix resolution" }),
   ackConnection: () => ({ acked: true }),
   ackChange: () => ({ acked: true }),
@@ -209,6 +218,7 @@ interface ParamValues {
   version: string;
   connectionId: string;
   changeId: string;
+  reviewId: string;
   webhookId: string;
   keyId: string;
 }
@@ -221,6 +231,7 @@ function paramValues(kind: CaseKind, world: World): ParamValues {
     version: "1",
     connectionId: world.own.connectionId,
     changeId: world.own.changeId,
+    reviewId: world.own.reviewId,
     webhookId: world.own.webhookId,
     keyId: world.keys.nonOwnerKeyId,
   };
@@ -231,6 +242,7 @@ function paramValues(kind: CaseKind, world: World): ParamValues {
     version: "1",
     connectionId: world.sibling.connectionId,
     changeId: world.sibling.changeId,
+    reviewId: world.sibling.reviewId,
     webhookId: world.sibling.webhookId,
     keyId: world.keys.nonOwnerKeyId,
   };
@@ -241,6 +253,7 @@ function paramValues(kind: CaseKind, world: World): ParamValues {
     version: "1",
     connectionId: world.foreign.connectionId,
     changeId: world.foreign.changeId,
+    reviewId: world.foreign.reviewId,
     webhookId: world.foreign.webhookId,
     keyId: world.keys.foreignKeyId,
   };
@@ -256,6 +269,7 @@ function paramValues(kind: CaseKind, world: World): ParamValues {
         slug: sibling.slug,
         connectionId: sibling.connectionId,
         changeId: sibling.changeId,
+        reviewId: sibling.reviewId,
       };
     case "foreign-child-b":
       return {
@@ -264,6 +278,7 @@ function paramValues(kind: CaseKind, world: World): ParamValues {
         slug: foreign.slug,
         connectionId: foreign.connectionId,
         changeId: foreign.changeId,
+        reviewId: foreign.reviewId,
       };
     case "tenant-scoped":
       return { ...own, webhookId: foreign.webhookId, keyId: world.keys.foreignKeyId };
@@ -302,6 +317,7 @@ function foreignTarget(
   if (params.includes("sourceId")) return { table: "ingest_sources", id: child.sourceId };
   if (params.includes("slug")) return { table: "pages", id: child.pageId };
   if (params.includes("connectionId")) return { table: "connections", id: child.connectionId };
+  if (params.includes("reviewId")) return { table: "routing_reviews", id: child.reviewId };
   if (params.includes("changeId")) return { table: "change_events", id: child.changeId };
   return undefined;
 }

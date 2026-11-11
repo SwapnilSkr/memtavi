@@ -9,6 +9,8 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-11** — Routing reviews: `listRoutingReviews`, `resolveRoutingReview` (onto a candidate or a new page, applied by a `review.apply` job through the compile placement path, `routed` event) and `dismissRoutingReview`. Migration 0012 adds `created_at` and a list index.
+
 - **2026-11-11** — Score history and suggestions: `getScoreHistory` (one point per UTC day over 7/30/90 days, plus delta) and `getScoreSuggestions` (deterministic rules in `@memtavi/core/health/suggestions`, `generatedBy: "rules"`).
 
 - **2026-11-11** — `POST /pages/{slug}/resolve` (`resolvePage`): a contested page goes back to `active` with a note on an `updated` change event; an edited body writes a user version and re-embeds. `listPages` takes `status` (the contested queue). User page edits now fan out webhooks.

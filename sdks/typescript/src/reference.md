@@ -1655,6 +1655,208 @@ await client.changes.ackChange({
 </dl>
 </details>
 
+## Reviews
+<details><summary><code>client.reviews.<a href="/src/api/resources/reviews/client/Client.ts">listRoutingReviews</a>({ ...params }) -> MemtaviApi.RoutingReviewList</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Requires viewer or higher. Deleted candidates are omitted. Reviews are newest first.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.reviews.listRoutingReviews({
+    brainId: "brainId"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `MemtaviApi.ListRoutingReviewsRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `ReviewsClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.reviews.<a href="/src/api/resources/reviews/client/Client.ts">resolveRoutingReview</a>({ ...params }) -> MemtaviApi.RoutingReview</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Requires developer or higher. Atomically settles an open review and queues review.apply. The selected page must be an active candidate. Placement uses compiler patching, evidence, budget caps and embeddings. A 202 confirms the decision; placement runs asynchronously.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.reviews.resolveRoutingReview({
+    brainId: "brainId",
+    reviewId: "reviewId",
+    body: {
+        pageId: "pageId"
+    }
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `MemtaviApi.ResolveRoutingReviewRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `ReviewsClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.reviews.<a href="/src/api/resources/reviews/client/Client.ts">dismissRoutingReview</a>({ ...params }) -> MemtaviApi.RoutingReview</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Requires developer or higher. Settles an open review without deleting the source fact.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.reviews.dismissRoutingReview({
+    brainId: "brainId",
+    reviewId: "reviewId",
+    note: "Keep in the source only."
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `MemtaviApi.RoutingReviewDismiss` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `ReviewsClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
 ## Score
 <details><summary><code>client.score.<a href="/src/api/resources/score/client/Client.ts">getScore</a>({ ...params }) -> MemtaviApi.Score</code></summary>
 <dl>
