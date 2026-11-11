@@ -16,6 +16,21 @@ export class RateLimitError extends DomainError {
   }
 }
 
+export class ServiceUnavailableError extends DomainError {
+  constructor(
+    message: string,
+    readonly retryAfterSeconds = 60,
+  ) {
+    super("ServiceUnavailableError", 503, message);
+  }
+}
+
+export class UpstreamError extends DomainError {
+  constructor(message: string) {
+    super("UpstreamError", 502, message);
+  }
+}
+
 export function errors(now: () => Date, denials: Record<401 | 403 | 404, number>) {
   return new Elysia({ name: "errors" }).onError(
     { as: "global" },
@@ -29,7 +44,7 @@ export function errors(now: () => Date, denials: Record<401 | 403 | 404, number>
               ? new DomainError("BadRequestError", 400, "Invalid request")
               : new DomainError("InternalServerError", 500, "Internal server error");
       set.status = failure.status;
-      if (failure instanceof RateLimitError) {
+      if (failure instanceof RateLimitError || failure instanceof ServiceUnavailableError) {
         set.headers["Retry-After"] = String(failure.retryAfterSeconds);
       }
       if (failure.status === 401 || failure.status === 403 || failure.status === 404) {

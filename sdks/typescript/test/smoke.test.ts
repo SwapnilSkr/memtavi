@@ -89,6 +89,57 @@ describe("memtavi typescript sdk", () => {
     expect(error).toBeInstanceOf(MemtaviApi.NotFoundError);
     expect((error as MemtaviApi.NotFoundError).body.body.error).toBe("NotFoundError");
   });
+
+  test.each([
+    [502, "UpstreamError", MemtaviApi.BadGatewayError],
+    [503, "ServiceUnavailableError", MemtaviApi.ServiceUnavailableError],
+  ] as const)(
+    "suggestProfile exposes %s (%s) as a declared SDK error",
+    async (status, code, errorType) => {
+      const captured: CapturedRequest[] = [];
+      const body = {
+        statusCode: status,
+        timestamp: "2026-11-06T10:00:00.000Z",
+        path: `/v1/brains/${BRAIN_ID}/profile/suggestions`,
+        message: "Profile suggestions unavailable",
+        body: { message: "Profile suggestions unavailable", error: code, statusCode: status },
+      };
+      const client = stubClient(jsonResponse(body, status), captured);
+      const error = await client.profile
+        .suggestProfile({ brainId: BRAIN_ID })
+        .catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(errorType);
+      expect(error).toMatchObject({ statusCode: status, body });
+      expect(captured).toHaveLength(1);
+    },
+  );
+
+  test("suggestProfile sends POST with both auth headers and preserves suggestion metadata", async () => {
+    const captured: CapturedRequest[] = [];
+    const body = {
+      generatedBy: "model",
+      model: "pinned-chat-v1",
+      promptHash: "a".repeat(64),
+      items: [
+        {
+          field: "focus",
+          value: "Ship the API",
+          confidence: 0.8,
+          evidence: [{ slug: "api", title: "API" }],
+        },
+      ],
+    };
+    const client = stubClient(jsonResponse(body, 200), captured);
+    expect(await client.profile.suggestProfile({ brainId: BRAIN_ID })).toEqual(body);
+    expect(captured).toEqual([
+      {
+        method: "POST",
+        path: `/v1/brains/${BRAIN_ID}/profile/suggestions`,
+        apiKey: API_KEY,
+        subjectId: SUBJECT_ID,
+      },
+    ]);
+  });
 });
 
 test("review operations serialize filters, both placement choices and dismissal", async () => {

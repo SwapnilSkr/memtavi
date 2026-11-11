@@ -13,6 +13,8 @@
     "./compile/policies/pfs": "./src/compile/policies/pfs.ts",
     "./compile/patch": "./src/compile/patch.ts",
     "./compile/prompts": "./src/compile/prompts.ts",
+    "./profile/budget": "./src/profile/budget.ts",
+    "./profile/suggestions": "./src/profile/suggestions.ts",
     "./health/compute": "./src/health/compute.ts",
     "./health/suggestions": "./src/health/suggestions.ts"
   },

@@ -1542,6 +1542,54 @@ paths:
         "500":
           $ref: "#/components/responses/Error500"
 
+  /v1/brains/{brainId}/profile/suggestions:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+    post:
+      operationId: suggestProfile
+      tags:
+        - Profile
+      summary: Suggest profile fields from existing pages
+      description: Requires developer or higher. Uses up to 40 prompt-index page summaries and the current profile, never page bodies. Best-effort suggestions are never applied automatically; use updateProfile to apply one. Fewer than 3 pages returns an empty set without a model call. Budget caps and the emergency stop refuse model work with 429 and Retry-After. Missing configuration or transient provider failures return 503 with Retry-After; permanent provider failures return 502.
+      responses:
+        "200":
+          description: Evidence-backed suggestions, or an empty set when signal is thin.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileSuggestions"
+              example:
+                generatedBy: model
+                model: pinned-model-id
+                promptHash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+                items:
+                  - field: focus
+                    value: Build a memory service
+                    confidence: 0.8
+                    evidence:
+                      - slug: memory-service
+                        title: Memory service
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+        "502":
+          $ref: "#/components/responses/Error502"
+        "503":
+          $ref: "#/components/responses/Error503"
+
   /v1/brains/{brainId}/export:
     parameters:
       - $ref: "#/components/parameters/BrainId"
@@ -2122,6 +2170,27 @@ components:
       headers:
         x-request-id:
           $ref: "#/components/headers/RequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+
+    Error502:
+      description: Permanent upstream provider failure (UpstreamError).
+      headers:
+        x-request-id:
+          $ref: "#/components/headers/RequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Error503:
+      description: Suggestions are not configured or the provider is temporarily unavailable (ServiceUnavailableError). Retry after the number of seconds in `Retry-After`.
+      headers:
+        x-request-id:
+          $ref: "#/components/headers/RequestId"
+        Retry-After:
+          $ref: "#/components/headers/RetryAfter"
       content:
         application/json:
           schema:
@@ -3060,6 +3129,56 @@ components:
         directives:
           type: object
           additionalProperties: true
+
+    ProfileSuggestions:
+      type: object
+      required:
+        - generatedBy
+        - model
+        - promptHash
+        - items
+      properties:
+        generatedBy:
+          type: string
+          enum: [model]
+        model:
+          type: string
+        promptHash:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        items:
+          type: array
+          items:
+            type: object
+            required:
+              - field
+              - value
+              - confidence
+              - evidence
+            properties:
+              field:
+                type: string
+                enum: [whoTheyAre, whatTheyDo, focus, goals, currentProjects, stuckOn, vaultOrganization]
+              value:
+                type: string
+                minLength: 1
+              confidence:
+                type: number
+                minimum: 0
+                maximum: 1
+              evidence:
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  required:
+                    - slug
+                    - title
+                  properties:
+                    slug:
+                      type: string
+                    title:
+                      type: string
 
     ProfileUpdate:
       type: object

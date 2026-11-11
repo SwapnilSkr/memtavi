@@ -1,7 +1,7 @@
 import httpx
 import pytest
 
-from memtavi import MemtaviApi, NotFoundError
+from memtavi import BadGatewayError, MemtaviApi, NotFoundError, ServiceUnavailableError
 from memtavi.core.api_error import ApiError
 
 API_KEY = "test-key"
@@ -72,6 +72,46 @@ def test_a_declared_404_envelope_surfaces_as_not_found_error():
         client.brains.get_brain(BRAIN_ID)
 
     assert caught.value.body.body.error == "NotFoundError"
+
+
+@pytest.mark.parametrize("status,code,error_type", [
+    (502, "UpstreamError", BadGatewayError),
+    (503, "ServiceUnavailableError", ServiceUnavailableError),
+])
+def test_suggest_profile_exposes_declared_upstream_errors(status, code, error_type):
+    body = {
+        "statusCode": status,
+        "timestamp": "2026-11-06T10:00:00.000Z",
+        "path": f"/v1/brains/{BRAIN_ID}/profile/suggestions",
+        "message": "Profile suggestions unavailable",
+        "body": {"message": "Profile suggestions unavailable", "error": code, "statusCode": status},
+    }
+    client = build_client(lambda request: httpx.Response(status, json=body))
+    with pytest.raises(error_type) as caught:
+        client.profile.suggest_profile(BRAIN_ID, request_options={"max_retries": 0})
+    assert caught.value.status_code == status
+    assert caught.value.body.body.error == code
+
+
+def test_suggest_profile_sends_post_and_preserves_evidence_and_metadata():
+    captured = []
+
+    def handler(request):
+        captured.append((request.method, request.url.path,
+                         request.headers["x-api-key"], request.headers["x-subject-id"]))
+        return httpx.Response(200, json={
+            "generatedBy": "model", "model": "pinned-chat-v1", "promptHash": "a" * 64,
+            "items": [{"field": "focus", "value": "Ship the API", "confidence": 0.8,
+                       "evidence": [{"slug": "api", "title": "API"}]}],
+        })
+
+    result = build_client(handler).profile.suggest_profile(BRAIN_ID)
+    assert result.generated_by == "model"
+    assert result.model == "pinned-chat-v1"
+    assert result.prompt_hash == "a" * 64
+    assert result.items[0].evidence[0].slug == "api"
+    assert result.items[0].confidence == 0.8
+    assert captured == [("POST", f"/v1/brains/{BRAIN_ID}/profile/suggestions", API_KEY, SUBJECT_ID)]
 
 
 def test_review_operations_serialize_filters_choices_and_dismissal():

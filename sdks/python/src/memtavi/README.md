@@ -41,8 +41,8 @@ client = MemtaviApi(
     subject_id="<x-subject-id>",
 )
 
-client.brains.create_brain(
-    name="name",
+client.profile.suggest_profile(
+    brain_id="brainId",
 )
 ```
 
@@ -62,8 +62,8 @@ client = AsyncMemtaviApi(
 
 
 async def main() -> None:
-    await client.brains.create_brain(
-        name="name",
+    await client.profile.suggest_profile(
+        brain_id="brainId",
     )
 
 
@@ -79,7 +79,7 @@ will be thrown.
 from memtavi.core.api_error import ApiError
 
 try:
-    client.brains.create_brain(...)
+    client.profile.suggest_profile(...)
 except ApiError as e:
     print(e.status_code)
     print(e.body)
@@ -96,7 +96,7 @@ The `.with_raw_response` property returns a "raw" client that can be used to acc
 from memtavi import MemtaviApi
 
 client = MemtaviApi(...)
-response = client.brains.with_raw_response.create_brain(...)
+response = client.profile.with_raw_response.suggest_profile(...)
 print(response.headers)  # access the response headers
 print(response.status_code)  # access the response status code
 print(response.data)  # access the underlying object
@@ -117,7 +117,7 @@ A request is deemed retryable when any of the following HTTP status codes is ret
 Use the `max_retries` request option to configure this behavior.
 
 ```python
-client.brains.create_brain(..., request_options={
+client.profile.suggest_profile(..., request_options={
     "max_retries": 1
 })
 ```
@@ -132,7 +132,7 @@ from memtavi import MemtaviApi
 client = MemtaviApi(..., timeout=20.0)
 
 # Override timeout for a specific method
-client.brains.create_brain(..., request_options={
+client.profile.suggest_profile(..., request_options={
     "timeout_in_seconds": 1
 })
 ```

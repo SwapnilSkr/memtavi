@@ -9,6 +9,8 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-11** — `POST /profile/suggestions` (`suggestProfile`, developer): prompt v1 over the top 40 index entries plus the current profile, no bodies; fewer than 3 pages returns `[]` with no call. Drops unknown fields, unchanged values and slugs not in the input. Shared `budgetExceeded` policy with the worker, usage recorded once against a completed `profile.suggest` job. `503` (+`Retry-After`) when unconfigured or the provider is transiently down, `502` on a permanent provider error. Never auto-applied.
+
 - **2026-11-11** — `getIndex` pages (`offset`), filters (`status`) and returns each entry's `status` (optional in the spec, so 0 breaking); `total` counts the filtered set. SDKs regenerated.
 
 - **2026-11-11** — Inspector loop: brain rename/delete, capture retry/approve with backed-off polling (stops after 10 min idle), pages status filter (`/index` for the unfiltered list, since `listPages` must return bodies), version history and diff, new `/conflicts` (side-by-side claims, resolve with note) and `/reviews` (resolve onto a candidate or dismiss). Per-mutation invalidation map.
@@ -37,8 +39,4 @@ Newest first. One line per shipped change: what, where, why. Not a commit log.
 
 - **2026-11-11** — Health scores: `packages/core/health/compute` (freshness, readiness, strain 0–100 with explaining factors, weights as constants), one aggregate metrics query in `@memtavi/db/health`, a `score.snapshot` job after every compile (one per brain per minute), and `GET /score` computes one on demand instead of `404`.
 
-- **2026-11-11** — `GET /v1/members` (`listMembers`): admin keys list their tenant's members through a `SECURITY DEFINER` function scoped to `app.tenant_id` (migration 0011); the runtime still cannot read `users`. Every spec operation now has a route.
-
-- **2026-11-11** — `DELETE /v1/brains/{brainId}` (`deleteBrain`): `202` receipt, brain hidden from every read and capture at once, `brain.purge` job deletes child rows then stored objects (crash-safe, idempotent), content-free tombstone keeps the `deletion_ops` record, slug reusable (partial unique index, migration 0010). Captures lock the brain, so none can land under a purge.
-
-- **2026-11-11** — Phase 6 contract hardening (details in the archive and git history): `updateBrain`; spec statuses matched to routes; spec-generated HTTP isolation matrix; strict response validation over every operation; Fern-generated TS and Python SDKs with our own manifests, checked in CI.
+- **2026-11-11** — Brain lifecycle (details in git history): `deleteBrain` (`202` receipt, async two-phase purge, content-free tombstone, migration 0010), `listMembers` (definer function, migration 0011), and the Phase 6 contract hardening (`updateBrain`, spec statuses, isolation matrix, strict response validation, Fern SDKs).

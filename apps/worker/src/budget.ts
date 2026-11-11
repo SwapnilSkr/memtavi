@@ -1,3 +1,4 @@
+import { budgetExceeded } from "@memtavi/core/profile/budget";
 import type { PoolClient } from "pg";
 import { JobError } from "./types";
 
@@ -25,7 +26,7 @@ export async function assertBudget(client: PoolClient, tenantId: string): Promis
     (await client.query<{ spend: string }>(SPEND_SQL, [tenantId])).rows[0]?.spend ?? 0,
   );
   const capUsd = Number(cap.monthlyUsd);
-  if (cap.hardStop && spend >= capUsd) {
+  if (budgetExceeded({ monthlyUsd: capUsd, hardStop: cap.hardStop }, spend)) {
     throw new JobError(
       "permanent",
       `Monthly budget cap reached: spent $${spend.toFixed(8)} of $${capUsd.toFixed(8)}`,

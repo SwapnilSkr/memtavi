@@ -43,6 +43,11 @@ if typing.TYPE_CHECKING:
     from .page_version_hunk import PageVersionHunk
     from .page_version_summary import PageVersionSummary
     from .profile import Profile
+    from .profile_suggestions import ProfileSuggestions
+    from .profile_suggestions_generated_by import ProfileSuggestionsGeneratedBy
+    from .profile_suggestions_items_item import ProfileSuggestionsItemsItem
+    from .profile_suggestions_items_item_evidence_item import ProfileSuggestionsItemsItemEvidenceItem
+    from .profile_suggestions_items_item_field import ProfileSuggestionsItemsItemField
     from .routing_review import RoutingReview
     from .routing_review_candidates_item import RoutingReviewCandidatesItem
     from .routing_review_fact import RoutingReviewFact
@@ -115,6 +120,11 @@ _dynamic_imports: typing.Dict[str, str] = {
     "PageVersionHunk": ".page_version_hunk",
     "PageVersionSummary": ".page_version_summary",
     "Profile": ".profile",
+    "ProfileSuggestions": ".profile_suggestions",
+    "ProfileSuggestionsGeneratedBy": ".profile_suggestions_generated_by",
+    "ProfileSuggestionsItemsItem": ".profile_suggestions_items_item",
+    "ProfileSuggestionsItemsItemEvidenceItem": ".profile_suggestions_items_item_evidence_item",
+    "ProfileSuggestionsItemsItemField": ".profile_suggestions_items_item_field",
     "RoutingReview": ".routing_review",
     "RoutingReviewCandidatesItem": ".routing_review_candidates_item",
     "RoutingReviewFact": ".routing_review_fact",
@@ -211,6 +221,11 @@ __all__ = [
     "PageVersionHunk",
     "PageVersionSummary",
     "Profile",
+    "ProfileSuggestions",
+    "ProfileSuggestionsGeneratedBy",
+    "ProfileSuggestionsItemsItem",
+    "ProfileSuggestionsItemsItemEvidenceItem",
+    "ProfileSuggestionsItemsItemField",
     "RoutingReview",
     "RoutingReviewCandidatesItem",
     "RoutingReviewFact",

@@ -21,7 +21,6 @@ Ordered by product value per unit of risk. Remove items as they land.
 - **Inspector pages list**: switch to the paged, status-aware `getIndex` (drop the 200-row window and the second `listPages` call).
 - **Eval quality**: 15% exact / 0.205 F1 on a 20-question slice, 37 reviews; run full LoCoMo before tuning prompts.
 
-- **Missing v1 endpoints**: profile suggestions.
 - **SDK publishing**: npm and PyPI accounts, licence; then optionally rebase the CLI/MCP on `@memtavi/sdk`.
 
 ## Deployment

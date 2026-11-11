@@ -222,6 +222,71 @@ await client.profile.updateProfile({
 </dl>
 </details>
 
+<details><summary><code>client.profile.<a href="/src/api/resources/profile/client/Client.ts">suggestProfile</a>({ ...params }) -> MemtaviApi.ProfileSuggestions</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Requires developer or higher. Uses up to 40 prompt-index page summaries and the current profile, never page bodies. Best-effort suggestions are never applied automatically; use updateProfile to apply one. Fewer than 3 pages returns an empty set without a model call. Budget caps and the emergency stop refuse model work with 429 and Retry-After. Missing configuration or transient provider failures return 503 with Retry-After; permanent provider failures return 502.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.profile.suggestProfile({
+    brainId: "brainId"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `MemtaviApi.SuggestProfileRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `ProfileClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
 ## Brains
 <details><summary><code>client.brains.<a href="/src/api/resources/brains/client/Client.ts">listBrains</a>({ ...params }) -> MemtaviApi.ListBrainsResponse</code></summary>
 <dl>
