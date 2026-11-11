@@ -119,7 +119,7 @@ test.each<{
   },
   {
     mutation: "updatePage",
-    queryKey: ["index", "brn_a", { limit: 200 }],
+    queryKey: ["index", "brn_a", { limit: 50, offset: 250, status: "contested" }],
     scope: brain,
     effect: "invalidate",
   },
@@ -240,3 +240,22 @@ test("a settled capture refreshes brain lists and only the affected page", () =>
   expect(captureSettledEffect(["pages", "brn_b", {}], "pg_1", scope)).toBe(false);
   expect(captureSettledEffect(["profile", "brn_a", {}], undefined, scope)).toBe(false);
 });
+
+test.each(["updatePage", "resolvePage", "deletePage"] as const)(
+  "%s refreshes all paged index filters for only the affected brain",
+  (mutation) => {
+    expect(
+      queryEffect(
+        mutation,
+        ["index", "brn_b", { limit: 50, offset: 250, status: "contested" }],
+        brain,
+      ),
+    ).toBe("keep");
+    for (const params of [
+      { limit: 50, offset: 0 },
+      { limit: 50, offset: 250, status: "contested" },
+    ]) {
+      expect(queryEffect(mutation, ["index", "brn_a", params], brain)).toBe("invalidate");
+    }
+  },
+);

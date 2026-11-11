@@ -1,19 +1,12 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router";
 import { EmptyState, ErrorBanner, Loading, Pagination } from "../components/feedback";
-import type { IndexEntry, Page, PageStatus } from "../lib/api";
+import type { IndexEntry, PageStatus } from "../lib/api";
 import { useApi } from "../lib/api-context";
 import { exportFilename } from "../lib/export";
-import {
-  indexDispute,
-  listSearchParams,
-  pageStatuses,
-  parseOffset,
-  parsePageStatus,
-} from "../lib/list-params";
+import { listSearchParams, pageStatuses, parseOffset, parsePageStatus } from "../lib/list-params";
 
 const pageSize = 50;
-const indexLimit = 200;
 
 interface DisplayRow {
   id: string;
@@ -22,9 +15,8 @@ interface DisplayRow {
   summary: string;
   pageType: string;
   pinned: boolean;
-  archived: boolean;
   updated: string | null;
-  dispute: PageStatus | "clear" | "unknown" | "checking";
+  dispute: PageStatus | "unknown";
 }
 
 function usableTime(value: string | null | undefined): string | null {
@@ -34,20 +26,9 @@ function usableTime(value: string | null | undefined): string | null {
   return value;
 }
 
-function pageUpdated(page: Page): string | null {
-  return usableTime(
-    [page.userEditedAt, page.lastCompiledAt]
-      .filter((date): date is string => Boolean(date))
-      .sort()
-      .at(-1),
-  );
-}
-
 function statusText(dispute: DisplayRow["dispute"]): string {
   if (dispute === "contested") return "Disputed · contested";
-  if (dispute === "checking") return "Checking disputes…";
   if (dispute === "unknown") return "Status unavailable";
-  if (dispute === "clear") return "Not contested";
   return dispute;
 }
 
@@ -82,7 +63,6 @@ function PageTable({ brainId, rows }: { brainId: string; rows: readonly DisplayR
                 <span className={page.dispute === "contested" ? "disputed" : ""}>
                   {statusText(page.dispute)}
                 </span>
-                {page.archived && page.dispute !== "archived" ? " · archived" : null}
               </td>
               <td data-label="Pinned">{page.pinned ? "Yes" : "No"}</td>
               <td data-label="Updated">
@@ -100,36 +80,16 @@ function PageTable({ brainId, rows }: { brainId: string; rows: readonly DisplayR
   );
 }
 
-function indexRows(
-  items: readonly IndexEntry[],
-  offset: number,
-  contestedSlugs: readonly string[],
-  labels: "checking" | "unknown" | "ready",
-): DisplayRow[] {
-  return items.slice(offset, offset + pageSize).map((page) => ({
+function indexRows(items: readonly IndexEntry[]): DisplayRow[] {
+  return items.map((page) => ({
     id: page.slug,
     slug: page.slug,
     title: page.title,
     summary: page.summary,
     pageType: page.pageType,
     pinned: page.pinned,
-    archived: false,
     updated: usableTime(page.updatedAt),
-    dispute: labels === "ready" ? indexDispute(page.slug, contestedSlugs, true) : labels,
-  }));
-}
-
-function filteredRows(items: readonly Page[]): DisplayRow[] {
-  return items.map((page) => ({
-    id: page.id,
-    slug: page.slug,
-    title: page.title,
-    summary: page.summary,
-    pageType: page.pageType,
-    pinned: page.pinned,
-    archived: page.archived,
-    updated: pageUpdated(page),
-    dispute: page.status,
+    dispute: page.status ?? "unknown",
   }));
 }
 
@@ -139,28 +99,10 @@ export function Pages() {
   const [params, setParams] = useSearchParams();
   const offset = parseOffset(params.get("offset"));
   const status = parsePageStatus(params.get("status"));
+  const listParams = { limit: pageSize, offset, ...(status ? { status } : {}) };
   const index = useQuery({
-    queryKey: ["index", brainId, { limit: indexLimit }],
-    queryFn: () => api.getIndex(brainId, { limit: indexLimit }),
-    enabled: !status,
-  });
-  const contested = useQuery({
-    queryKey: ["pages", brainId, { limit: indexLimit, offset: 0, status: "contested" }],
-    queryFn: () => api.listPages(brainId, { limit: indexLimit, offset: 0, status: "contested" }),
-    enabled: !status,
-  });
-  const filtered = useQuery({
-    queryKey: [
-      "pages",
-      brainId,
-      status ? { limit: pageSize, offset, status } : { limit: pageSize, offset, view: "idle" },
-    ],
-    queryFn: () =>
-      api.listPages(
-        brainId,
-        status ? { limit: pageSize, offset, status } : { limit: pageSize, offset },
-      ),
-    enabled: Boolean(status),
+    queryKey: ["index", brainId, listParams],
+    queryFn: () => api.getIndex(brainId, listParams),
   });
   const download = useMutation({
     mutationFn: () => api.exportBrain(brainId),
@@ -176,21 +118,7 @@ export function Pages() {
       URL.revokeObjectURL(url);
     },
   });
-  const active = status ? filtered : index;
-  const contestedSlugs = contested.data?.items.map((page) => page.slug) ?? [];
-  const contestedComplete = contested.data
-    ? contested.data.items.length >= contested.data.total
-    : false;
-  const labels = contested.isPending
-    ? "checking"
-    : contested.isError || !contestedComplete
-      ? "unknown"
-      : "ready";
-  const rows = status
-    ? filteredRows(filtered.data?.items ?? [])
-    : indexRows(index.data?.items ?? [], offset, contestedSlugs, labels);
-  const pageableTotal = status ? (filtered.data?.total ?? 0) : (index.data?.items.length ?? 0);
-  const indexTruncated = !status && index.data ? index.data.total > index.data.items.length : false;
+  const rows = indexRows(index.data?.items ?? []);
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -218,29 +146,11 @@ export function Pages() {
         </select>
       </div>
       <div aria-live="polite" aria-atomic="true">
-        <ErrorBanner error={active.error ?? download.error} />
+        <ErrorBanner error={index.error ?? download.error} />
         {download.isSuccess ? <p className="help">Export downloaded.</p> : null}
-        {!status && contested.isError ? (
-          <p className="help" role="status">
-            Contested pages could not be checked, so their dispute status is unavailable.
-          </p>
-        ) : null}
-        {indexTruncated ? (
-          <p className="help" role="status">
-            Showing the first {index.data?.items.length} of {index.data?.total}. The index has no
-            offset parameter, so later pages are unavailable. Filter by status to page through one
-            status.
-          </p>
-        ) : null}
-        {!status && contested.data && !contestedComplete ? (
-          <p className="help" role="status">
-            The contested list is longer than {indexLimit}, so dispute labels are hidden. Filter by
-            contested to review them.
-          </p>
-        ) : null}
       </div>
-      {active.isPending ? <Loading label="Loading pages" /> : null}
-      {active.data && rows.length === 0 ? (
+      {index.isPending ? <Loading label="Loading pages" /> : null}
+      {index.data && rows.length === 0 ? (
         <EmptyState>
           <div className="space-y-3">
             {offset > 0 ? (
@@ -268,17 +178,16 @@ export function Pages() {
       {rows.length > 0 ? <PageTable brainId={brainId} rows={rows} /> : null}
       {rows.length > 0 ? (
         <p className="help mt-3">
-          {status
-            ? "Updated reflects the latest compile or user edit. Opening a page does not change it."
-            : "The unfiltered list is the brain index, which has no page bodies. Updated is the latest compile, or the last reference when a page has not been compiled."}
+          The brain index contains no page bodies. Updated is the latest compile, or the last
+          reference when a page has not been compiled.
         </p>
       ) : null}
-      {active.data ? (
+      {index.data ? (
         <Pagination
-          total={pageableTotal}
-          limit={pageSize}
-          offset={offset}
-          pending={active.isFetching}
+          total={index.data.total}
+          limit={index.data.limit}
+          offset={index.data.offset}
+          pending={index.isFetching}
           onChange={(next) => setParams(listSearchParams(status, next))}
         />
       ) : null}

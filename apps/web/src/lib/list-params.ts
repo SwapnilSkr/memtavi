@@ -22,12 +22,3 @@ export function listSearchParams(
     ...(offset > 0 ? { offset: String(offset) } : {}),
   };
 }
-
-export function indexDispute(
-  slug: string,
-  contestedSlugs: readonly string[],
-  complete: boolean,
-): "contested" | "clear" | "unknown" {
-  if (!complete) return "unknown";
-  return contestedSlugs.includes(slug) ? "contested" : "clear";
-}

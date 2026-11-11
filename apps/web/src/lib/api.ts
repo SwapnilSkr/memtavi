@@ -178,6 +178,7 @@ export interface IndexEntry {
   summary: string;
   pageType: PageType;
   pinned: boolean;
+  status?: PageStatus;
   updatedAt?: string;
 }
 
@@ -315,7 +316,86 @@ export interface Score {
   freshness: number;
   readiness: number;
   strain: number;
-  factors: Record<string, unknown>;
+  factors: Partial<Record<HealthMetric, HealthFactor[]>>;
+}
+
+export type HealthMetric = "freshness" | "readiness" | "strain";
+
+export interface HealthFactor {
+  key: string;
+  label: string;
+  description: string;
+  value: number;
+  unit: string;
+  tone: "positive" | "neutral" | "negative";
+}
+
+export type ScorePoint = Pick<Score, "computedAt" | HealthMetric>;
+
+export interface ScoreHistory {
+  range: "7d" | "30d" | "90d";
+  points: ScorePoint[];
+  delta: Record<HealthMetric, number> | null;
+}
+
+export interface ScoreSuggestions {
+  generatedBy: "rules";
+  basedOn: string;
+  items: {
+    key: string;
+    title: string;
+    description: string;
+    action: string;
+    actionLabel: string;
+    priority: "high" | "medium" | "low";
+  }[];
+}
+
+export type MemberRole = "owner" | "admin" | "developer" | "viewer";
+
+export interface ApiKey {
+  id: string;
+  name: string;
+  prefix: string;
+  role: MemberRole;
+  scopes: string[];
+  lastUsedAt: string | null;
+  expiresAt: string | null;
+  revokedAt: string | null;
+}
+
+export interface ApiKeyCreate {
+  name: string;
+  role?: MemberRole;
+  scopes?: string[];
+  expiresAt?: string | null;
+}
+
+export interface Webhook {
+  id: string;
+  subjectId: string;
+  url: string;
+  events: string[];
+  active: boolean;
+}
+
+export interface WebhookCreate {
+  url: string;
+  events: string[];
+}
+
+export interface Member {
+  id: string;
+  email: string;
+  name: string;
+  image: string | null;
+  role: MemberRole;
+  createdAt: string;
+}
+
+export interface MemorySettings {
+  mode: "auto" | "ask" | "off";
+  updatedAt: string | null;
 }
 
 export interface ProfileFields {
@@ -335,6 +415,20 @@ export interface Profile extends ProfileFields {
 
 export type ProfileUpdate = Partial<ProfileFields>;
 
+export interface ProfileSuggestion {
+  field: Exclude<keyof ProfileFields, "directives">;
+  value: string;
+  confidence: number;
+  evidence: { slug: string; title: string }[];
+}
+
+export interface ProfileSuggestions {
+  generatedBy: "model";
+  model: string;
+  promptHash: string;
+  items: ProfileSuggestion[];
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -352,7 +446,7 @@ export type Fetcher = (input: string, init: RequestInit) => Promise<Response>;
 export function createApi(session: Session, fetcher: Fetcher = fetch) {
   async function request<T>(
     path: string,
-    { method, body }: { method?: "GET" | "POST" | "PATCH" | "DELETE"; body?: unknown } = {},
+    { method, body }: { method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE"; body?: unknown } = {},
   ): Promise<T> {
     const headers = new Headers({
       "x-api-key": session.apiKey,
@@ -377,6 +471,7 @@ export function createApi(session: Session, fetcher: Fetcher = fetch) {
         "transient",
       );
     }
+    if (response.status === 204 && response.ok) return undefined as T;
     const payload: unknown = await response.json().catch(() => null);
     if (!response.ok) {
       const envelope = payload && typeof payload === "object" ? payload : {};
@@ -425,6 +520,63 @@ export function createApi(session: Session, fetcher: Fetcher = fetch) {
     },
     getScore(brainId: string) {
       return request<Score>(`/brains/${encodeURIComponent(brainId)}/score`);
+    },
+    getScoreHistory(brainId: string, range: ScoreHistory["range"] = "30d") {
+      return request<ScoreHistory>(
+        `/brains/${encodeURIComponent(brainId)}/score/history?${new URLSearchParams({ range })}`,
+      );
+    },
+    getScoreSuggestions(brainId: string) {
+      return request<ScoreSuggestions>(`/brains/${encodeURIComponent(brainId)}/score/suggestions`, {
+        method: "POST",
+      });
+    },
+    suggestProfile(brainId: string) {
+      return request<ProfileSuggestions>(
+        `/brains/${encodeURIComponent(brainId)}/profile/suggestions`,
+        {
+          method: "POST",
+        },
+      );
+    },
+    getMemorySettings() {
+      return request<MemorySettings>("/memory-settings");
+    },
+    updateMemorySettings(body: Pick<MemorySettings, "mode">) {
+      return request<MemorySettings>("/memory-settings", { method: "PUT", body });
+    },
+    listApiKeys(params: Pagination = {}) {
+      const query = new URLSearchParams({
+        limit: String(params.limit ?? 50),
+        offset: String(params.offset ?? 0),
+      });
+      return request<ListResponse<ApiKey>>(`/api-keys?${query}`);
+    },
+    createApiKey(body: ApiKeyCreate) {
+      return request<ApiKey & { key?: string }>("/api-keys", { body });
+    },
+    deleteApiKey(keyId: string) {
+      return request<void>(`/api-keys/${encodeURIComponent(keyId)}`, { method: "DELETE" });
+    },
+    listWebhooks(params: Pagination = {}) {
+      const query = new URLSearchParams({
+        limit: String(params.limit ?? 50),
+        offset: String(params.offset ?? 0),
+      });
+      return request<ListResponse<Webhook>>(`/webhooks?${query}`);
+    },
+    createWebhook(body: WebhookCreate) {
+      return request<Webhook & { secret?: string }>("/webhooks", { body });
+    },
+    deleteWebhook(webhookId: string) {
+      return request<void>(`/webhooks/${encodeURIComponent(webhookId)}`, { method: "DELETE" });
+    },
+    listMembers(params: Pagination = {}) {
+      const query = new URLSearchParams({
+        limit: String(params.limit ?? 50),
+        offset: String(params.offset ?? 0),
+      });
+      return request<ListResponse<Member>>(`/members?${query}`);
     },
     getProfile(brainId: string) {
       return request<Profile>(`/brains/${encodeURIComponent(brainId)}/profile`);
@@ -489,8 +641,12 @@ export function createApi(session: Session, fetcher: Fetcher = fetch) {
       if (params.status) query.set("status", params.status);
       return request<ListResponse<Page>>(`/brains/${encodeURIComponent(brainId)}/pages?${query}`);
     },
-    getIndex(brainId: string, params: { limit?: number } = {}) {
-      const query = new URLSearchParams({ limit: String(params.limit ?? 40) });
+    getIndex(brainId: string, params: PageListParams = {}) {
+      const query = new URLSearchParams({
+        limit: String(params.limit ?? 40),
+        offset: String(params.offset ?? 0),
+      });
+      if (params.status) query.set("status", params.status);
       return request<ListResponse<IndexEntry>>(
         `/brains/${encodeURIComponent(brainId)}/index?${query}`,
       );

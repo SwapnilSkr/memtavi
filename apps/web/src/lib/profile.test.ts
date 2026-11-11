@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { parseDirectives } from "./profile";
+import { ApiError } from "./api";
+import { parseDirectives, profileSuggestionError } from "./profile";
 
 test.each(["", " ", "\n\t"])("empty directives become an empty object: %j", (text) => {
   expect(parseDirectives(text)).toEqual({ valid: true, value: {} });
@@ -33,4 +34,19 @@ test.each(["null", "[]", '"text"', "42", "true"])("non-object JSON is rejected: 
   expect(result.valid).toBe(false);
   if (result.valid) throw new Error("Expected validation failure");
   expect(result.message).toContain("JSON object");
+});
+
+test.each([
+  { status: 429, text: "budget exceeded" },
+  { status: 503, text: "unavailable. Retry later" },
+  { status: 502, text: "provider could not complete" },
+])("profile suggestions distinguish $status", ({ status, text }) => {
+  expect(
+    profileSuggestionError(new ApiError(status, "ProviderError", "Safe error", "transient")),
+  ).toContain(text);
+});
+
+test("suggestion error state is empty before a request and preserves other safe errors", () => {
+  expect(profileSuggestionError(null)).toBeNull();
+  expect(profileSuggestionError(new Error("Safe error"))).toBe("Safe error");
 });

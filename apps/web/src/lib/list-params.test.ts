@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { indexDispute, listSearchParams, parseOffset, parsePageStatus } from "./list-params";
+import { listSearchParams, parseOffset, parsePageStatus } from "./list-params";
 
 test.each([
   { value: null, offset: 0 },
@@ -27,12 +27,4 @@ test("list params keep a status when returning to the first page", () => {
   expect(listSearchParams("contested", 0)).toEqual({ status: "contested" });
   expect(listSearchParams("stale", 50)).toEqual({ status: "stale", offset: "50" });
   expect(listSearchParams(undefined, 0)).toEqual({});
-});
-
-test.each([
-  { slug: "known", complete: false, dispute: "unknown" },
-  { slug: "known", complete: true, dispute: "contested" },
-  { slug: "other", complete: true, dispute: "clear" },
-])("index dispute for $slug when complete=$complete is $dispute", ({ slug, complete, dispute }) => {
-  expect(indexDispute(slug, ["known"], complete)).toBe(dispute);
 });

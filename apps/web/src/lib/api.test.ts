@@ -431,7 +431,7 @@ describe("API client", () => {
     },
     {
       name: "getIndex",
-      path: "/v1/brains/brn%2Fa/index?limit=200",
+      path: "/v1/brains/brn%2Fa/index?limit=200&offset=0",
       method: "GET",
       body: undefined,
       response: { items: [], total: 0, limit: 200, offset: 0 },
