@@ -38,6 +38,11 @@ const RATE_LIMITED = "Rate limiting is out of scope for this brief.";
 const SERVER_ERROR = "A 5xx needs fault injection and is out of scope for this brief.";
 
 const UNIMPLEMENTED = new Set<string>();
+const REVIEW_OPERATIONS = new Set([
+  "listRoutingReviews",
+  "resolveRoutingReview",
+  "dismissRoutingReview",
+]);
 const UNKNOWN_BRAIN = `brn_${"0".repeat(32)}`;
 const UNKNOWN_UUID = "00000000-0000-4000-8000-000000000000";
 const INVALID_KEY = "mtv_invalid_contract_key";
@@ -47,11 +52,11 @@ const contract: Contract = createContract();
 const UNEXERCISED: readonly Unexercised[] = [
   ...contract
     .documented()
-    .filter((pair) => pair.status === 429)
+    .filter((pair) => pair.status === 429 && !REVIEW_OPERATIONS.has(pair.operationId))
     .map((pair) => ({ ...pair, reason: RATE_LIMITED })),
   ...contract
     .documented()
-    .filter((pair) => pair.status === 500)
+    .filter((pair) => pair.status === 500 && !REVIEW_OPERATIONS.has(pair.operationId))
     .map((pair) => ({ ...pair, reason: SERVER_ERROR })),
   ...contract
     .documented()
@@ -75,6 +80,8 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
   let connectionId = "";
   let changeId = "";
   let sourceId = "";
+  let resolvedReviewId = "";
+  let dismissedReviewId = "";
   let deletedSourceId = "";
   let throwawayKeyId = "";
   let viewerKey = "";
@@ -499,6 +506,56 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
       200,
     );
 
+    resolvedReviewId = crypto.randomUUID();
+    dismissedReviewId = crypto.randomUUID();
+    for (const id of [resolvedReviewId, dismissedReviewId]) {
+      await harness.owner.query(
+        `INSERT INTO routing_reviews (id, tenant_id, brain_id, ingest_source_id, fact, candidate_page_ids, best_gap)
+         VALUES ($1, $2, $3, $4, $5, $6, 0.05)`,
+        [
+          id,
+          harness.tenants.a,
+          brainId,
+          sourceId,
+          JSON.stringify({
+            claim: "Contract routing fact",
+            entities: [],
+            evidence: {
+              chunkUuid: crypto.randomUUID(),
+              charStart: 0,
+              charEnd: 21,
+              quote: "Contract routing fact",
+            },
+          }),
+          [alphaId, betaId],
+        ],
+      );
+    }
+    await callSuccess(
+      "listRoutingReviews",
+      "/v1/brains/{brainId}/routing-reviews",
+      "GET",
+      `/v1/brains/${brainId}/routing-reviews`,
+      {},
+      200,
+    );
+    await callSuccess(
+      "resolveRoutingReview",
+      "/v1/brains/{brainId}/routing-reviews/{reviewId}/resolve",
+      "POST",
+      `/v1/brains/${brainId}/routing-reviews/${resolvedReviewId}/resolve`,
+      { method: "POST", body: { pageId: alphaId, note: "Route to Alpha" } },
+      202,
+    );
+    await callSuccess(
+      "dismissRoutingReview",
+      "/v1/brains/{brainId}/routing-reviews/{reviewId}/dismiss",
+      "POST",
+      `/v1/brains/${brainId}/routing-reviews/${dismissedReviewId}/dismiss`,
+      { method: "POST" },
+      200,
+    );
+
     await callSuccess("listWebhooks", "/v1/webhooks", "GET", "/v1/webhooks", {}, 200);
     const webhook = (await callSuccess(
       "createWebhook",
@@ -600,6 +657,16 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
         path: `/v1/brains/${brainId}`,
         options: { method: "DELETE" },
       },
+      {
+        operationId: "resolveRoutingReview",
+        path: `/v1/brains/${brainId}/routing-reviews/${resolvedReviewId}/resolve`,
+        options: { method: "POST", body: { newPage: true } },
+      },
+      {
+        operationId: "dismissRoutingReview",
+        path: `/v1/brains/${brainId}/routing-reviews/${dismissedReviewId}/dismiss`,
+        options: { method: "POST" },
+      },
       { operationId: "getTenant", path: "/v1/tenant", options: {} },
       { operationId: "listMembers", path: "/v1/members", options: {} },
       { operationId: "listApiKeys", path: "/v1/api-keys", options: {} },
@@ -644,6 +711,11 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
   });
 
   test("every reachable documented 409 validates", async () => {
+    for (const operationId of ["resolveRoutingReview", "dismissRoutingReview"]) {
+      const probe = probes.get(operationId);
+      expect(probe).toBeDefined();
+      if (probe) await callVariant(probe, probe.path, probe.options, 409);
+    }
     const duplicate = await harness.request("/v1/brains", {
       method: "POST",
       body: { name: "Contract", slug: `contract-${crypto.randomUUID()}` },
@@ -710,6 +782,43 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
       method: "POST",
       path: "/v1/brains/{brainId}/pages/{slug}/resolve",
     });
+  });
+
+  test("review operations validate rate limiting and internal errors without exemptions", async () => {
+    const limited = await createHarness();
+    try {
+      for (let count = 0; count < 300; count += 1) {
+        expect((await limited.request("/v1/brains")).status).toBe(200);
+      }
+      for (const operationId of REVIEW_OPERATIONS) {
+        const probe = probes.get(operationId);
+        if (!probe) throw new Error(`Missing review probe ${operationId}`);
+        const response = await limited.request(probe.path, probe.options);
+        const body = await response.json();
+        expect(response.status).toBe(429);
+        expect(Number(response.headers.get("Retry-After"))).toBeGreaterThan(0);
+        contract.expectContract(response, body, { method: probe.method, path: probe.template });
+      }
+    } finally {
+      await limited.close();
+    }
+    const query = harness.owner.query;
+    harness.owner.query = () => {
+      throw new Error("Injected database failure");
+    };
+    try {
+      for (const operationId of REVIEW_OPERATIONS) {
+        const probe = probes.get(operationId);
+        if (!probe) throw new Error(`Missing review probe ${operationId}`);
+        const response = await harness.request(probe.path, probe.options);
+        const body = await response.json();
+        expect(response.status).toBe(500);
+        contract.expectContract(response, body, { method: probe.method, path: probe.template });
+        expect(JSON.stringify(body)).not.toContain("Injected database failure");
+      }
+    } finally {
+      harness.owner.query = query;
+    }
   });
 
   test("a bad enum and a capture with both content and fetchUrl answer 400", async () => {

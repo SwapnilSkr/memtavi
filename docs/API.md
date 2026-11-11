@@ -6,8 +6,8 @@ file by hand; run `bun run spec:docs`.
 - OpenAPI: 3.1.0
 - Version: 1.0.0
 - Server: https://api.memtavi.com
-- Endpoints: 40 operations across 31 paths
-- Schemas: 53 component schemas
+- Endpoints: 43 operations across 34 paths
+- Schemas: 57 component schemas
 
 ## Authentication
 
@@ -38,6 +38,9 @@ Subject routes (require `x-subject-id`):
 - `/v1/brains/{brainId}/pages/{slug}/versions`
 - `/v1/brains/{brainId}/pages/{slug}/versions/{version}`
 - `/v1/brains/{brainId}/profile`
+- `/v1/brains/{brainId}/routing-reviews`
+- `/v1/brains/{brainId}/routing-reviews/{reviewId}/dismiss`
+- `/v1/brains/{brainId}/routing-reviews/{reviewId}/resolve`
 - `/v1/brains/{brainId}/score`
 - `/v1/brains/{brainId}/score/history`
 - `/v1/brains/{brainId}/score/suggestions`
@@ -84,6 +87,9 @@ Tenant routes (do not accept `x-subject-id`):
 - [`GET /v1/brains/{brainId}/pages/{slug}/versions/{version}`](#get-v1brainsbrainidpagesslugversionsversion) — Pages
 - [`GET /v1/brains/{brainId}/profile`](#get-v1brainsbrainidprofile) — Profile
 - [`PATCH /v1/brains/{brainId}/profile`](#patch-v1brainsbrainidprofile) — Profile
+- [`GET /v1/brains/{brainId}/routing-reviews`](#get-v1brainsbrainidrouting-reviews) — Reviews
+- [`POST /v1/brains/{brainId}/routing-reviews/{reviewId}/dismiss`](#post-v1brainsbrainidrouting-reviewsreviewiddismiss) — Reviews
+- [`POST /v1/brains/{brainId}/routing-reviews/{reviewId}/resolve`](#post-v1brainsbrainidrouting-reviewsreviewidresolve) — Reviews
 - [`GET /v1/brains/{brainId}/score`](#get-v1brainsbrainidscore) — Score
 - [`GET /v1/brains/{brainId}/score/history`](#get-v1brainsbrainidscorehistory) — Score
 - [`POST /v1/brains/{brainId}/score/suggestions`](#post-v1brainsbrainidscoresuggestions) — Score
@@ -139,6 +145,10 @@ Tenant routes (do not accept `x-subject-id`):
   - [`PageVersionSummary`](#pageversionsummary)
   - [`Profile`](#profile)
   - [`ProfileUpdate`](#profileupdate)
+  - [`RoutingReview`](#routingreview)
+  - [`RoutingReviewDismiss`](#routingreviewdismiss)
+  - [`RoutingReviewList`](#routingreviewlist)
+  - [`RoutingReviewResolve`](#routingreviewresolve)
   - [`Score`](#score)
   - [`ScoreHistory`](#scorehistory)
   - [`ScorePoint`](#scorepoint)
@@ -913,6 +923,104 @@ Update the subject profile
 | 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
+| 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
+| 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
+
+### GET /v1/brains/{brainId}/routing-reviews
+
+`listRoutingReviews` · Tags: Reviews
+
+List routing reviews
+
+Requires viewer or higher. Deleted candidates are omitted. Reviews are newest first.
+
+**Security:** `x-api-key` + `x-subject-id`
+
+**Parameters**
+
+| Name | In | Required | Type | Notes |
+| --- | --- | --- | --- | --- |
+| `brainId` | path | yes | `string` | Prefixed brain id, `brn_` followed by 32 lowercase hex characters. Matches `^brn_[0-9a-f]{32}$`. |
+| `limit` | query | no | `integer` | Maximum number of items to return. Default `50`. Minimum 1. Maximum 200. |
+| `offset` | query | no | `integer` | Number of items to skip before collecting the page. Default `0`. Minimum 0. |
+| `status` | query | no | `string` | One of `open`, `resolved`, `dismissed`. Default `open`. |
+
+**Responses**
+
+| Status | Description | Schema |
+| --- | --- | --- |
+| 200 | List routing reviews. | `RoutingReviewList` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
+| 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
+| 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
+| 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
+| 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
+
+### POST /v1/brains/{brainId}/routing-reviews/{reviewId}/dismiss
+
+`dismissRoutingReview` · Tags: Reviews
+
+Dismiss a routing review
+
+Requires developer or higher. Settles an open review without deleting the source fact.
+
+**Security:** `x-api-key` + `x-subject-id`
+
+**Parameters**
+
+| Name | In | Required | Type | Notes |
+| --- | --- | --- | --- | --- |
+| `brainId` | path | yes | `string` | Prefixed brain id, `brn_` followed by 32 lowercase hex characters. Matches `^brn_[0-9a-f]{32}$`. |
+| `reviewId` | path | yes | `string (uuid)` | Routing review identifier. |
+
+**Request body** (optional)
+
+`RoutingReviewDismiss` (`application/json`)
+
+**Responses**
+
+| Status | Description | Schema |
+| --- | --- | --- |
+| 200 | Dismiss a routing review. | `RoutingReview` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
+| 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
+| 403 | The key role does not permit this operation or granting a higher role. | `ErrorEnvelope` |
+| 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
+| 409 | Conflict with the current state, such as a page version conflict or a duplicate slug. | `ErrorEnvelope` |
+| 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
+| 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
+
+### POST /v1/brains/{brainId}/routing-reviews/{reviewId}/resolve
+
+`resolveRoutingReview` · Tags: Reviews
+
+Resolve a routing review
+
+Requires developer or higher. Atomically settles an open review and queues review.apply. The selected page must be an active candidate. Placement uses compiler patching, evidence, budget caps and embeddings. A 202 confirms the decision; placement runs asynchronously.
+
+**Security:** `x-api-key` + `x-subject-id`
+
+**Parameters**
+
+| Name | In | Required | Type | Notes |
+| --- | --- | --- | --- | --- |
+| `brainId` | path | yes | `string` | Prefixed brain id, `brn_` followed by 32 lowercase hex characters. Matches `^brn_[0-9a-f]{32}$`. |
+| `reviewId` | path | yes | `string (uuid)` | Routing review identifier. |
+
+**Request body** (required)
+
+`RoutingReviewResolve` (`application/json`)
+
+**Responses**
+
+| Status | Description | Schema |
+| --- | --- | --- |
+| 202 | Resolve a routing review. | `RoutingReview` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
+| 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
+| 403 | The key role does not permit this operation or granting a higher role. | `ErrorEnvelope` |
+| 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
+| 409 | Conflict with the current state, such as a page version conflict or a duplicate slug. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
 | 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
 
@@ -1797,6 +1905,44 @@ Required: none
 | `stuckOn` | `string` | no |  |
 | `vaultOrganization` | `string` | no |  |
 | `directives` | `object` | no | Free-form object. |
+
+### RoutingReview
+
+Required: `id`, `sourceId`, `fact`, `candidates`, `bestGap`, `status`, `resolution`, `createdAt`
+
+| Property | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | `string (uuid)` | yes |  |
+| `sourceId` | `string` | yes |  |
+| `fact` | `object { claim: string, entities: string[], evidence: object { chunkUuid: string (uuid), charStart: integer, charEnd: integer, quote: string } }` | yes |  |
+| `candidates` | `object { pageId: string, slug: string, title: string }[]` | yes |  |
+| `bestGap` | `number \| null` | yes |  |
+| `status` | `string` | yes | One of `open`, `resolved`, `dismissed`. |
+| `resolution` | `string \| null` | yes | Optional human note about the decision. |
+| `createdAt` | `string (date-time)` | yes |  |
+
+### RoutingReviewDismiss
+
+Required: none
+
+| Property | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `note` | `string` | no | Maximum length 2000. |
+
+### RoutingReviewList
+
+Required: `items`, `total`, `limit`, `offset`
+
+| Property | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `items` | `RoutingReview[]` | yes |  |
+| `total` | `integer` | yes |  |
+| `limit` | `integer` | yes |  |
+| `offset` | `integer` | yes |  |
+
+### RoutingReviewResolve
+
+Type: `unknown`
 
 ### Score
 

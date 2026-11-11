@@ -9,6 +9,7 @@ import { ExportClient } from "./api/resources/export/client/Client.js";
 import { MembersClient } from "./api/resources/members/client/Client.js";
 import { PagesClient } from "./api/resources/pages/client/Client.js";
 import { ProfileClient } from "./api/resources/profile/client/Client.js";
+import { ReviewsClient } from "./api/resources/reviews/client/Client.js";
 import { ScoreClient } from "./api/resources/score/client/Client.js";
 import { SearchClient } from "./api/resources/search/client/Client.js";
 import { SourcesClient } from "./api/resources/sources/client/Client.js";
@@ -33,6 +34,7 @@ export class MemtaviApiClient {
     protected _search: SearchClient | undefined;
     protected _connections: ConnectionsClient | undefined;
     protected _changes: ChangesClient | undefined;
+    protected _reviews: ReviewsClient | undefined;
     protected _score: ScoreClient | undefined;
     protected _profile: ProfileClient | undefined;
     protected _export: ExportClient | undefined;
@@ -71,6 +73,10 @@ export class MemtaviApiClient {
 
     public get changes(): ChangesClient {
         return (this._changes ??= new ChangesClient(this._options));
+    }
+
+    public get reviews(): ReviewsClient {
+        return (this._reviews ??= new ReviewsClient(this._options));
     }
 
     public get score(): ScoreClient {

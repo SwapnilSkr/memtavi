@@ -1,0 +1,2 @@
+ALTER TABLE "routing_reviews" ADD COLUMN "created_at" timestamp with time zone DEFAULT now() NOT NULL;--> statement-breakpoint
+CREATE INDEX "routing_reviews_list_idx" ON "routing_reviews" USING btree ("tenant_id","brain_id","status","created_at" DESC NULLS LAST,"id");

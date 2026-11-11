@@ -13,6 +13,7 @@ import { graphRoutes } from "./routes/graph";
 import { memberRoutes } from "./routes/members";
 import { pageRoutes } from "./routes/pages";
 import { profileRoutes } from "./routes/profile";
+import { routingReviewRoutes } from "./routes/routing-reviews";
 import { scoreRoutes } from "./routes/score";
 import { tenantRoutes } from "./routes/tenant";
 import { webhookRoutes } from "./routes/webhooks";
@@ -36,6 +37,7 @@ export function createApp(config: AppConfig) {
     .use(pageRoutes(routeConfig))
     .use(exportRoutes(routeConfig))
     .use(changeRoutes(routeConfig))
+    .use(routingReviewRoutes(routeConfig))
     .use(graphRoutes(routeConfig))
     .use(scoreRoutes(routeConfig))
     .use(profileRoutes(routeConfig))

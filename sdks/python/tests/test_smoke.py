@@ -72,3 +72,43 @@ def test_a_declared_404_envelope_surfaces_as_not_found_error():
         client.brains.get_brain(BRAIN_ID)
 
     assert caught.value.body.body.error == "NotFoundError"
+
+
+def test_review_operations_serialize_filters_choices_and_dismissal():
+    import json
+    from memtavi import RoutingReviewResolveNewPage, RoutingReviewResolvePageId
+
+    review_id = "11111111-1111-4111-8111-111111111111"
+    page_id = "pg_" + "1" * 32
+    base_path = f"/v1/brains/{BRAIN_ID}/routing-reviews"
+    captured = []
+    review = {
+        "id": review_id, "sourceId": "src_" + "1" * 32,
+        "fact": {"claim": "Friday", "entities": [], "evidence": {
+            "chunkUuid": review_id, "charStart": 0, "charEnd": 6, "quote": "Friday"}},
+        "candidates": [], "bestGap": 0, "status": "resolved", "resolution": None,
+        "createdAt": "2026-11-11T00:00:00.000Z",
+    }
+
+    def handler(request):
+        assert request.headers["x-api-key"] == API_KEY
+        assert request.headers["x-subject-id"] == SUBJECT_ID
+        captured.append((request.method, request.url.path, dict(request.url.params),
+                         json.loads(request.content) if request.content else None))
+        if request.method == "GET":
+            return httpx.Response(200, json={"items": [review], "total": 1, "limit": 5, "offset": 2})
+        return httpx.Response(202 if request.url.path.endswith("resolve") else 200, json=review)
+
+    client = build_client(handler)
+    assert client.reviews.list_routing_reviews(BRAIN_ID, status="resolved", limit=5, offset=2).total == 1
+    client.reviews.resolve_routing_review(BRAIN_ID, review_id,
+        request=RoutingReviewResolvePageId(page_id=page_id, note="Chosen"))
+    client.reviews.resolve_routing_review(BRAIN_ID, review_id,
+        request=RoutingReviewResolveNewPage(new_page=True))
+    client.reviews.dismiss_routing_review(BRAIN_ID, review_id, note="Source only")
+    assert captured == [
+        ("GET", base_path, {"limit": "5", "offset": "2", "status": "resolved"}, None),
+        ("POST", f"{base_path}/{review_id}/resolve", {}, {"pageId": page_id, "note": "Chosen"}),
+        ("POST", f"{base_path}/{review_id}/resolve", {}, {"newPage": True}),
+        ("POST", f"{base_path}/{review_id}/dismiss", {}, {"note": "Source only"}),
+    ]

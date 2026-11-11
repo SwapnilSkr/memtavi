@@ -41,6 +41,15 @@ if typing.TYPE_CHECKING:
     from .page_version_hunk import PageVersionHunk
     from .page_version_summary import PageVersionSummary
     from .profile import Profile
+    from .routing_review import RoutingReview
+    from .routing_review_candidates_item import RoutingReviewCandidatesItem
+    from .routing_review_fact import RoutingReviewFact
+    from .routing_review_fact_evidence import RoutingReviewFactEvidence
+    from .routing_review_list import RoutingReviewList
+    from .routing_review_resolve import RoutingReviewResolve
+    from .routing_review_resolve_new_page import RoutingReviewResolveNewPage
+    from .routing_review_resolve_page_id import RoutingReviewResolvePageId
+    from .routing_review_status import RoutingReviewStatus
     from .score import Score
     from .score_history import ScoreHistory
     from .score_history_delta import ScoreHistoryDelta
@@ -92,6 +101,15 @@ _dynamic_imports: typing.Dict[str, str] = {
     "PageVersionHunk": ".page_version_hunk",
     "PageVersionSummary": ".page_version_summary",
     "Profile": ".profile",
+    "RoutingReview": ".routing_review",
+    "RoutingReviewCandidatesItem": ".routing_review_candidates_item",
+    "RoutingReviewFact": ".routing_review_fact",
+    "RoutingReviewFactEvidence": ".routing_review_fact_evidence",
+    "RoutingReviewList": ".routing_review_list",
+    "RoutingReviewResolve": ".routing_review_resolve",
+    "RoutingReviewResolveNewPage": ".routing_review_resolve_new_page",
+    "RoutingReviewResolvePageId": ".routing_review_resolve_page_id",
+    "RoutingReviewStatus": ".routing_review_status",
     "Score": ".score",
     "ScoreHistory": ".score_history",
     "ScoreHistoryDelta": ".score_history_delta",
@@ -167,6 +185,15 @@ __all__ = [
     "PageVersionHunk",
     "PageVersionSummary",
     "Profile",
+    "RoutingReview",
+    "RoutingReviewCandidatesItem",
+    "RoutingReviewFact",
+    "RoutingReviewFactEvidence",
+    "RoutingReviewList",
+    "RoutingReviewResolve",
+    "RoutingReviewResolveNewPage",
+    "RoutingReviewResolvePageId",
+    "RoutingReviewStatus",
     "Score",
     "ScoreHistory",
     "ScoreHistoryDelta",

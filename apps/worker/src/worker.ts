@@ -133,6 +133,7 @@ export function createWorker(config: WorkerConfig): Worker {
   const handlers = config.handlers ?? {
     "capture.ingest": ingestCapture,
     "capture.compile": compileCapture,
+    "review.apply": compileCapture,
     "score.snapshot": snapshotScore,
     "webhook.deliver": deliverWebhook,
     "brain.purge": purgeBrain,

@@ -19,6 +19,7 @@ if typing.TYPE_CHECKING:
     from .members.client import AsyncMembersClient, MembersClient
     from .pages.client import AsyncPagesClient, PagesClient
     from .profile.client import AsyncProfileClient, ProfileClient
+    from .reviews.client import AsyncReviewsClient, ReviewsClient
     from .score.client import AsyncScoreClient, ScoreClient
     from .search.client import AsyncSearchClient, SearchClient
     from .sources.client import AsyncSourcesClient, SourcesClient
@@ -107,6 +108,7 @@ class MemtaviApi:
         self._search: typing.Optional[SearchClient] = None
         self._connections: typing.Optional[ConnectionsClient] = None
         self._changes: typing.Optional[ChangesClient] = None
+        self._reviews: typing.Optional[ReviewsClient] = None
         self._score: typing.Optional[ScoreClient] = None
         self._profile: typing.Optional[ProfileClient] = None
         self._export: typing.Optional[ExportClient] = None
@@ -170,6 +172,14 @@ class MemtaviApi:
 
             self._changes = ChangesClient(client_wrapper=self._client_wrapper)
         return self._changes
+
+    @property
+    def reviews(self):
+        if self._reviews is None:
+            from .reviews.client import ReviewsClient  # noqa: E402
+
+            self._reviews = ReviewsClient(client_wrapper=self._client_wrapper)
+        return self._reviews
 
     @property
     def score(self):
@@ -309,6 +319,7 @@ class AsyncMemtaviApi:
         self._search: typing.Optional[AsyncSearchClient] = None
         self._connections: typing.Optional[AsyncConnectionsClient] = None
         self._changes: typing.Optional[AsyncChangesClient] = None
+        self._reviews: typing.Optional[AsyncReviewsClient] = None
         self._score: typing.Optional[AsyncScoreClient] = None
         self._profile: typing.Optional[AsyncProfileClient] = None
         self._export: typing.Optional[AsyncExportClient] = None
@@ -372,6 +383,14 @@ class AsyncMemtaviApi:
 
             self._changes = AsyncChangesClient(client_wrapper=self._client_wrapper)
         return self._changes
+
+    @property
+    def reviews(self):
+        if self._reviews is None:
+            from .reviews.client import AsyncReviewsClient  # noqa: E402
+
+            self._reviews = AsyncReviewsClient(client_wrapper=self._client_wrapper)
+        return self._reviews
 
     @property
     def score(self):
