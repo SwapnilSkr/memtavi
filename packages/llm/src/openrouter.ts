@@ -1,3 +1,4 @@
+import { withSpan } from "@memtavi/shared/telemetry";
 import {
   DEFAULT_TIMEOUT_MS,
   type FetchImpl,
@@ -7,7 +8,7 @@ import {
   postJson,
   trimmedBaseUrl,
 } from "./http";
-import type { ChatProvider, ChatRequest, ChatResult } from "./provider";
+import { type ChatProvider, type ChatRequest, type ChatResult, ProviderError } from "./provider";
 
 export const OPENROUTER_DEFAULT_BASE_URL = "https://openrouter.ai/api/v1";
 
@@ -63,13 +64,34 @@ export function createOpenRouterChat(options: OpenRouterChatOptions): ChatProvid
         body.response_format = { type: "json_object" };
       }
 
-      const payload = await postJson(`${baseUrl}/chat/completions`, {
-        apiKey: options.apiKey,
-        body,
-        fetchImpl,
-        timeoutMs,
-      });
-      return parseChatResult(payload, request.model);
+      return withSpan(
+        "provider.chat",
+        { provider: "openrouter", model: request.model },
+        async (span) => {
+          try {
+            const { payload, status } = await postJson(`${baseUrl}/chat/completions`, {
+              apiKey: options.apiKey,
+              body,
+              fetchImpl,
+              timeoutMs,
+            });
+            const result = parseChatResult(payload, request.model);
+            span.setAttributes({
+              model: result.model,
+              input_tokens: result.usage.inputTokens,
+              output_tokens: result.usage.outputTokens,
+              status_code: status,
+            });
+            return result;
+          } catch (error) {
+            if (error instanceof ProviderError) {
+              span.setAttribute("error_type", error.code);
+              if (error.status !== null) span.setAttribute("status_code", error.status);
+            }
+            throw error;
+          }
+        },
+      );
     },
   };
 }

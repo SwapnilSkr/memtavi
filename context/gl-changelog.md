@@ -9,6 +9,8 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-11** — OpenTelemetry: off unless `OTEL_EXPORTER_OTLP_ENDPOINT` is set. Server span per request, a span per job attempt, a span per provider call; no bodies, keys, subject ids or prompt text. `jobs.trace_context` (migration 0016) is filled by trigger from `app.traceparent`, which `withTenant` sets, so a job joins the request trace. Request logs carry `traceId`. `docs/operations.md`.
+
 - **2026-11-11** — Provider drills: `FakeProvider` queues `ProviderError`s for chat and embed; five drills (429, timeout, 5xx at embedding, malformed output, transient forever) prove retry, dead letter and nothing partial. Fixed: a source is `pending` during a queued transient retry and `failed` only when the job dies, so Retry cannot double-compile. `docs/operations.md`.
 
 - **2026-11-11** — Retention: a source uncited for 90 days (clock kept by triggers on `page_sources`, fresh grace on backfill) loses its body, chunks text, previews and objects; keeps summary, hash and row. `retention.sweep` per tenant, 50 per batch, crash-safe deletion manifest. Migration 0015. Needs a storage stack update for prefix-scoped `s3:ListBucket`.

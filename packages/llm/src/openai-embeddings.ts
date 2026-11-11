@@ -1,3 +1,4 @@
+import { withSpan } from "@memtavi/shared/telemetry";
 import {
   DEFAULT_TIMEOUT_MS,
   type FetchImpl,
@@ -92,17 +93,37 @@ export function createOpenAIImbeddings(options: OpenAIEmbeddingsOptions): Embedd
 
       for (let start = 0; start < texts.length; start += MAX_EMBEDDING_BATCH) {
         const batch = texts.slice(start, start + MAX_EMBEDDING_BATCH);
-        const payload = await postJson(`${baseUrl}/embeddings`, {
-          apiKey: options.apiKey,
-          body: {
-            model: options.model,
-            input: batch,
-            dimensions: options.dimensions,
+        const parsed = await withSpan(
+          "provider.embeddings",
+          { provider: "openai", model: options.model },
+          async (span) => {
+            try {
+              const { payload, status } = await postJson(`${baseUrl}/embeddings`, {
+                apiKey: options.apiKey,
+                body: {
+                  model: options.model,
+                  input: batch,
+                  dimensions: options.dimensions,
+                },
+                fetchImpl,
+                timeoutMs,
+              });
+              const result = parseBatch(payload, batch.length, options.dimensions, options.model);
+              span.setAttributes({
+                model: result.model,
+                input_tokens: result.inputTokens,
+                status_code: status,
+              });
+              return result;
+            } catch (error) {
+              if (error instanceof ProviderError) {
+                span.setAttribute("error_type", error.code);
+                if (error.status !== null) span.setAttribute("status_code", error.status);
+              }
+              throw error;
+            }
           },
-          fetchImpl,
-          timeoutMs,
-        });
-        const parsed = parseBatch(payload, batch.length, options.dimensions, options.model);
+        );
         vectors.push(...parsed.vectors);
         inputTokens += parsed.inputTokens;
         model = parsed.model;
