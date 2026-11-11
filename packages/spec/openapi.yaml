@@ -57,6 +57,67 @@ tags:
     description: Tenant-scoped credentials.
 
 paths:
+  /v1/memory-settings:
+    get:
+      operationId: getMemorySettings
+      tags:
+        - Profile
+      summary: Read the subject memory mode
+      description: Requires viewer or higher. Scoped to `x-subject-id`; an unset subject returns `auto` with `updatedAt` null without writing a row.
+      responses:
+        "200":
+          description: The subject memory settings.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemorySettings"
+              example: { mode: auto, updatedAt: null }
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+    put:
+      operationId: updateMemorySettings
+      tags:
+        - Profile
+      summary: Update the subject memory mode
+      description: Requires developer or higher. Updates only the tenant and subject in the request headers and audits the creating user of the API key. Existing captures are unchanged.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MemorySettingsUpdate"
+            example: { mode: ask }
+      responses:
+        "200":
+          description: The updated subject memory settings.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemorySettings"
+              example: { mode: ask, updatedAt: "2026-11-11T00:00:00.000Z" }
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
   /v1/brains:
     get:
       operationId: listBrains
@@ -236,7 +297,11 @@ paths:
       summary: Capture material
       description: |
         Submits one capture for compilation. Supply exactly one of `content` or `fetchUrl`;
-        supplying both returns `400`. The capture is queued, not compiled in the request.
+        supplying both returns `400`. In `auto` mode the capture is queued for compilation.
+        In `ask` mode it is stored with `awaitingApproval: true` and no job until approved.
+        In `off` mode it returns `202` with `stored: false`: the id is a receipt id only,
+        content fields are empty, and no source, body, job, usage or idempotency record is stored.
+        Off-mode receipts are stateless and are not persisted for idempotency replay.
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
@@ -256,7 +321,16 @@ paths:
               schema:
                 $ref: "#/components/schemas/IngestSource"
         "201":
-          description: The capture was accepted and queued.
+          description: The capture was stored, queued in auto mode or awaiting approval in ask mode.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestSource"
+        "202":
+          description: Memory is off; a stateless receipt with stored false and no captured data.
           headers:
             x-request-id:
               $ref: "#/components/headers/RequestId"
@@ -433,6 +507,45 @@ paths:
       responses:
         "202":
           description: The source was requeued with status `pending`.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestSource"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/brains/{brainId}/sources/{sourceId}/approve:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+      - $ref: "#/components/parameters/SourceId"
+    post:
+      operationId: approveIngestSource
+      tags:
+        - Sources
+      summary: Approve a held ingest source
+      description: |
+        Requires developer or higher. Atomically releases a source awaiting human approval and
+        queues its normal ingest job exactly once. Returns 409 when it is not awaiting approval.
+        Reject a held capture with deleteIngestSource. Explicit approval releases the held capture
+        even if the subject mode has changed since capture.
+      responses:
+        "202":
+          description: The source was approved with awaitingApproval false and queued with status pending.
           headers:
             x-request-id:
               $ref: "#/components/headers/RequestId"
@@ -2576,9 +2689,29 @@ components:
           type: object
           additionalProperties: true
 
+    MemorySettings:
+      type: object
+      required: [mode, updatedAt]
+      properties:
+        mode:
+          type: string
+          enum: [auto, ask, off]
+        updatedAt:
+          type: [string, "null"]
+          format: date-time
+          description: Null when the subject has never saved settings.
+
+    MemorySettingsUpdate:
+      type: object
+      required: [mode]
+      properties:
+        mode:
+          type: string
+          enum: [auto, ask, off]
+
     IngestSource:
       type: object
-      description: A stored capture and its compilation status.
+      description: A stored capture and its compilation status, or a stateless off-mode receipt when stored is false.
       required:
         - id
         - brainId
@@ -2629,6 +2762,12 @@ components:
           additionalProperties: true
         status:
           $ref: "#/components/schemas/SourceStatus"
+        awaitingApproval:
+          type: boolean
+          description: True when held for human approval; status remains pending and no job is queued.
+        stored:
+          type: boolean
+          description: False only for an off-mode stateless receipt. Its source id cannot be retrieved. Omitted means stored.
         attempts:
           type: integer
           minimum: 0

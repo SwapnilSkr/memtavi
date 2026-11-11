@@ -39,6 +39,7 @@ export type CaseKind =
   | "foreign-child-b"
   | "tenant-scoped"
   | "own-list"
+  | "scoped-settings"
   | "auth-missing-key"
   | "auth-unknown-key"
   | "auth-revoked-key"
@@ -59,7 +60,7 @@ const AUTH_KINDS: CaseKind[] = [
   "auth-malformed-subject",
 ];
 
-const MUTATING_METHODS = new Set(["POST", "PATCH", "DELETE"]);
+const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 type JsonObject = Record<string, unknown>;
 
@@ -127,6 +128,7 @@ const BODIES: Record<string, () => unknown> = {
   ackConnection: () => ({ acked: true }),
   ackChange: () => ({ acked: true }),
   updateProfile: () => ({ focus: "matrix focus" }),
+  updateMemorySettings: () => ({ mode: "off" }),
   createWebhook: () => ({ url: "https://matrix.example.invalid/hook", events: ["created"] }),
   createApiKey: () => ({ name: `Matrix key ${crypto.randomUUID()}` }),
 };
@@ -189,6 +191,8 @@ export function specOperations(spec: unknown): SpecOperation[] {
 function requiredKinds(operation: SpecOperation): CaseKind[] {
   if (UNIMPLEMENTED.has(operation.operationId)) return [];
   const kinds: CaseKind[] = [];
+  if (["getMemorySettings", "updateMemorySettings"].includes(operation.operationId))
+    kinds.push("scoped-settings");
   if (operation.pathParams.includes("brainId")) {
     kinds.push("foreign-tenant", "foreign-subject");
   }
@@ -329,6 +333,7 @@ const EXPECTATIONS: Record<CaseKind, { status: number; message: string }> = {
   "foreign-child-b": { status: 404, message: "Not found" },
   "tenant-scoped": { status: 404, message: "Not found" },
   "own-list": { status: 200, message: "" },
+  "scoped-settings": { status: 200, message: "" },
   "auth-missing-key": { status: 401, message: "Missing API key" },
   "auth-unknown-key": { status: 401, message: "Invalid API key" },
   "auth-revoked-key": { status: 401, message: "Invalid API key" },

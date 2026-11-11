@@ -227,6 +227,47 @@ class SourcesClient:
         _response = self._raw_client.retry_ingest_source(brain_id, source_id, request_options=request_options)
         return _response.data
 
+    def approve_ingest_source(
+        self, brain_id: str, source_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> IngestSource:
+        """
+        Requires developer or higher. Atomically releases a source awaiting human approval and
+        queues its normal ingest job exactly once. Returns 409 when it is not awaiting approval.
+        Reject a held capture with deleteIngestSource. Explicit approval releases the held capture
+        even if the subject mode has changed since capture.
+
+        Parameters
+        ----------
+        brain_id : str
+            Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+
+        source_id : str
+            Prefixed ingest source id, `src_` followed by 32 lowercase hex characters.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        IngestSource
+            The source was approved with awaitingApproval false and queued with status pending.
+
+        Examples
+        --------
+        from memtavi import MemtaviApi
+
+        client = MemtaviApi(
+            subject_id="YOUR_SUBJECT_ID",
+            api_key="YOUR_API_KEY",
+        )
+        client.sources.approve_ingest_source(
+            brain_id="brainId",
+            source_id="sourceId",
+        )
+        """
+        _response = self._raw_client.approve_ingest_source(brain_id, source_id, request_options=request_options)
+        return _response.data
+
 
 class AsyncSourcesClient:
     def __init__(self, *, client_wrapper: AsyncClientWrapper):
@@ -482,4 +523,53 @@ class AsyncSourcesClient:
         asyncio.run(main())
         """
         _response = await self._raw_client.retry_ingest_source(brain_id, source_id, request_options=request_options)
+        return _response.data
+
+    async def approve_ingest_source(
+        self, brain_id: str, source_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> IngestSource:
+        """
+        Requires developer or higher. Atomically releases a source awaiting human approval and
+        queues its normal ingest job exactly once. Returns 409 when it is not awaiting approval.
+        Reject a held capture with deleteIngestSource. Explicit approval releases the held capture
+        even if the subject mode has changed since capture.
+
+        Parameters
+        ----------
+        brain_id : str
+            Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+
+        source_id : str
+            Prefixed ingest source id, `src_` followed by 32 lowercase hex characters.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        IngestSource
+            The source was approved with awaitingApproval false and queued with status pending.
+
+        Examples
+        --------
+        import asyncio
+
+        from memtavi import AsyncMemtaviApi
+
+        client = AsyncMemtaviApi(
+            subject_id="YOUR_SUBJECT_ID",
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.sources.approve_ingest_source(
+                brain_id="brainId",
+                source_id="sourceId",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.approve_ingest_source(brain_id, source_id, request_options=request_options)
         return _response.data

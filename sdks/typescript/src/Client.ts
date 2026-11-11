@@ -27,6 +27,7 @@ export declare namespace MemtaviApiClient {
 
 export class MemtaviApiClient {
     protected readonly _options: NormalizedClientOptionsWithAuth<MemtaviApiClient.Options>;
+    protected _profile: ProfileClient | undefined;
     protected _brains: BrainsClient | undefined;
     protected _captures: CapturesClient | undefined;
     protected _sources: SourcesClient | undefined;
@@ -36,7 +37,6 @@ export class MemtaviApiClient {
     protected _changes: ChangesClient | undefined;
     protected _reviews: ReviewsClient | undefined;
     protected _score: ScoreClient | undefined;
-    protected _profile: ProfileClient | undefined;
     protected _export: ExportClient | undefined;
     protected _webhooks: WebhooksClient | undefined;
     protected _tenant: TenantClient | undefined;
@@ -45,6 +45,10 @@ export class MemtaviApiClient {
 
     constructor(options: MemtaviApiClient.Options) {
         this._options = normalizeClientOptionsWithAuth(options);
+    }
+
+    public get profile(): ProfileClient {
+        return (this._profile ??= new ProfileClient(this._options));
     }
 
     public get brains(): BrainsClient {
@@ -81,10 +85,6 @@ export class MemtaviApiClient {
 
     public get score(): ScoreClient {
         return (this._score ??= new ScoreClient(this._options));
-    }
-
-    public get profile(): ProfileClient {
-        return (this._profile ??= new ProfileClient(this._options));
     }
 
     public get export(): ExportClient {

@@ -11,10 +11,11 @@ interface SourceRow {
   kind: string;
   content: string;
   metadata: Record<string, unknown>;
+  awaiting_approval: boolean;
 }
 
 const SOURCE_SQL = `
-  SELECT id, kind, content, metadata FROM ingest_sources
+  SELECT id, kind, content, metadata, awaiting_approval FROM ingest_sources
   WHERE tenant_id = $1 AND brain_id = $2 AND id = $3 AND deleted_at IS NULL
 `;
 
@@ -107,6 +108,7 @@ export async function ingestCapture({
   const result = await client.query<SourceRow>(SOURCE_SQL, [job.tenantId, brainId, sourceId]);
   const source = result.rows[0];
   if (!source) throw new JobError("permanent", "Source not found");
+  if (source.awaiting_approval) return;
 
   if (source.kind === "url") {
     await storeFetched(

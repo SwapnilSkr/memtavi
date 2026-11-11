@@ -31,6 +31,8 @@ if typing.TYPE_CHECKING:
         IngestSource,
         Member,
         MemberRole,
+        MemorySettings,
+        MemorySettingsMode,
         Page,
         PageStatus,
         PageType,
@@ -113,6 +115,7 @@ if typing.TYPE_CHECKING:
     from .export import ExportBrainResponse
     from .members import ListMembersResponse
     from .pages import ListPageVersionsResponse, ListPagesResponse
+    from .profile import MemorySettingsUpdateMode
     from .reviews import ListRoutingReviewsRequestStatus
     from .search import GetIndexResponse, SearchBrainResponse
     from .sources import ListIngestSourcesResponse
@@ -159,6 +162,9 @@ _dynamic_imports: typing.Dict[str, str] = {
     "ListWebhooksResponse": ".webhooks",
     "Member": ".types",
     "MemberRole": ".types",
+    "MemorySettings": ".types",
+    "MemorySettingsMode": ".types",
+    "MemorySettingsUpdateMode": ".profile",
     "MemtaviApi": ".client",
     "MemtaviApiEnvironment": ".environment",
     "NotFoundError": ".errors",
@@ -293,6 +299,9 @@ __all__ = [
     "ListWebhooksResponse",
     "Member",
     "MemberRole",
+    "MemorySettings",
+    "MemorySettingsMode",
+    "MemorySettingsUpdateMode",
     "MemtaviApi",
     "MemtaviApiEnvironment",
     "NotFoundError",

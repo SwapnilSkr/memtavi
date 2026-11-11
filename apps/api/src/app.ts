@@ -11,6 +11,7 @@ import { changeRoutes } from "./routes/changes";
 import { exportRoutes } from "./routes/export";
 import { graphRoutes } from "./routes/graph";
 import { memberRoutes } from "./routes/members";
+import { memorySettingsRoutes } from "./routes/memory-settings";
 import { pageRoutes } from "./routes/pages";
 import { profileRoutes } from "./routes/profile";
 import { routingReviewRoutes } from "./routes/routing-reviews";
@@ -34,6 +35,7 @@ export function createApp(config: AppConfig) {
     .use(requestLog(config.logger))
     .use(brainRoutes(routeConfig))
     .use(captureRoutes(routeConfig))
+    .use(memorySettingsRoutes(routeConfig))
     .use(pageRoutes(routeConfig))
     .use(exportRoutes(routeConfig))
     .use(changeRoutes(routeConfig))

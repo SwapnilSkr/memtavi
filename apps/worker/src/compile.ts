@@ -26,6 +26,7 @@ interface SourceRow {
   subject_id: string;
   status: string;
   deleted_at: Date | null;
+  awaiting_approval: boolean;
 }
 
 interface PageRow {
@@ -117,14 +118,20 @@ async function compileSource({
     scope.slice(0, 2),
   );
   if (!brain.rowCount) return;
-  await assertBudget(client, job.tenantId);
   const sources = await client.query<SourceRow>(
-    `SELECT content, body_ref, subject_id, status, deleted_at FROM ingest_sources
+    `SELECT content, body_ref, subject_id, status, deleted_at, awaiting_approval FROM ingest_sources
      WHERE tenant_id = $1 AND brain_id = $2 AND id = $3 FOR UPDATE`,
     scope,
   );
   const source = sources.rows[0];
-  if (!source || source.deleted_at || (!isReview && source.status === "completed")) return;
+  if (
+    !source ||
+    source.deleted_at ||
+    source.awaiting_approval ||
+    (!isReview && source.status === "completed")
+  )
+    return;
+  await assertBudget(client, job.tenantId);
   let reviewFact: ExtractedFact | undefined;
   if (isReview) {
     const applied = await client.query<{ applied: boolean }>(

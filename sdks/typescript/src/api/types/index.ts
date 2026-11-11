@@ -21,6 +21,7 @@ export * from "./IndexEntry.js";
 export * from "./IngestSource.js";
 export * from "./Member.js";
 export * from "./MemberRole.js";
+export * from "./MemorySettings.js";
 export * from "./Page.js";
 export * from "./PageStatus.js";
 export * from "./PageType.js";

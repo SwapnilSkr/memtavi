@@ -27,6 +27,190 @@ export class ProfileClient {
     }
 
     /**
+     * Requires viewer or higher. Scoped to `x-subject-id`; an unset subject returns `auto` with `updatedAt` null without writing a row.
+     *
+     * @param {ProfileClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link MemtaviApi.BadRequestError}
+     * @throws {@link MemtaviApi.UnauthorizedError}
+     * @throws {@link MemtaviApi.TooManyRequestsError}
+     * @throws {@link MemtaviApi.InternalServerError}
+     * @throws {@link errors.MemtaviApiError}
+     * @throws {@link errors.MemtaviApiTimeoutError}
+     *
+     * @example
+     *     await client.profile.getMemorySettings()
+     */
+    public getMemorySettings(
+        requestOptions?: ProfileClient.RequestOptions,
+    ): core.HttpResponsePromise<MemtaviApi.MemorySettings> {
+        return core.HttpResponsePromise.fromPromise(this.__getMemorySettings(requestOptions));
+    }
+
+    private async __getMemorySettings(
+        requestOptions?: ProfileClient.RequestOptions,
+    ): Promise<core.WithRawResponse<MemtaviApi.MemorySettings>> {
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({ "x-subject-id": requestOptions?.subjectId ?? this._options?.subjectId }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.MemtaviApiEnvironment.Default,
+                "v1/memory-settings",
+            ),
+            method: "GET",
+            headers: _headers,
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as MemtaviApi.MemorySettings, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new MemtaviApi.BadRequestError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 401:
+                    throw new MemtaviApi.UnauthorizedError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 429:
+                    throw new MemtaviApi.TooManyRequestsError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 500:
+                    throw new MemtaviApi.InternalServerError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                default:
+                    throw new errors.MemtaviApiError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/v1/memory-settings");
+    }
+
+    /**
+     * Requires developer or higher. Updates only the tenant and subject in the request headers and audits the creating user of the API key. Existing captures are unchanged.
+     *
+     * @param {MemtaviApi.MemorySettingsUpdate} request
+     * @param {ProfileClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link MemtaviApi.BadRequestError}
+     * @throws {@link MemtaviApi.UnauthorizedError}
+     * @throws {@link MemtaviApi.ForbiddenError}
+     * @throws {@link MemtaviApi.TooManyRequestsError}
+     * @throws {@link MemtaviApi.InternalServerError}
+     * @throws {@link errors.MemtaviApiError}
+     * @throws {@link errors.MemtaviApiTimeoutError}
+     *
+     * @example
+     *     await client.profile.updateMemorySettings({
+     *         mode: "ask"
+     *     })
+     */
+    public updateMemorySettings(
+        request: MemtaviApi.MemorySettingsUpdate,
+        requestOptions?: ProfileClient.RequestOptions,
+    ): core.HttpResponsePromise<MemtaviApi.MemorySettings> {
+        return core.HttpResponsePromise.fromPromise(this.__updateMemorySettings(request, requestOptions));
+    }
+
+    private async __updateMemorySettings(
+        request: MemtaviApi.MemorySettingsUpdate,
+        requestOptions?: ProfileClient.RequestOptions,
+    ): Promise<core.WithRawResponse<MemtaviApi.MemorySettings>> {
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({ "x-subject-id": requestOptions?.subjectId ?? this._options?.subjectId }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.MemtaviApiEnvironment.Default,
+                "v1/memory-settings",
+            ),
+            method: "PUT",
+            headers: _headers,
+            contentType: "application/json",
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            requestType: "json",
+            body: mergeAdditionalBodyParameters(request, requestOptions?.additionalBodyParameters),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as MemtaviApi.MemorySettings, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new MemtaviApi.BadRequestError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 401:
+                    throw new MemtaviApi.UnauthorizedError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 403:
+                    throw new MemtaviApi.ForbiddenError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 429:
+                    throw new MemtaviApi.TooManyRequestsError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 500:
+                    throw new MemtaviApi.InternalServerError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                default:
+                    throw new errors.MemtaviApiError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "PUT", "/v1/memory-settings");
+    }
+
+    /**
      * @param {MemtaviApi.GetProfileRequest} request
      * @param {ProfileClient.RequestOptions} requestOptions - Request-specific configuration.
      *

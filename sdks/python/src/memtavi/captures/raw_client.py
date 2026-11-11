@@ -46,7 +46,11 @@ class RawCapturesClient:
     ) -> HttpResponse[IngestSource]:
         """
         Submits one capture for compilation. Supply exactly one of `content` or `fetchUrl`;
-        supplying both returns `400`. The capture is queued, not compiled in the request.
+        supplying both returns `400`. In `auto` mode the capture is queued for compilation.
+        In `ask` mode it is stored with `awaitingApproval: true` and no job until approved.
+        In `off` mode it returns `202` with `stored: false`: the id is a receipt id only,
+        content fields are empty, and no source, body, job, usage or idempotency record is stored.
+        Off-mode receipts are stateless and are not persisted for idempotency replay.
 
         Parameters
         ----------
@@ -204,7 +208,11 @@ class AsyncRawCapturesClient:
     ) -> AsyncHttpResponse[IngestSource]:
         """
         Submits one capture for compilation. Supply exactly one of `content` or `fetchUrl`;
-        supplying both returns `400`. The capture is queued, not compiled in the request.
+        supplying both returns `400`. In `auto` mode the capture is queued for compilation.
+        In `ask` mode it is stored with `awaitingApproval: true` and no job until approved.
+        In `off` mode it returns `202` with `stored: false`: the id is a receipt id only,
+        content fields are empty, and no source, body, job, usage or idempotency record is stored.
+        Off-mode receipts are stateless and are not persisted for idempotency replay.
 
         Parameters
         ----------

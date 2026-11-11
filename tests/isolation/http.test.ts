@@ -163,6 +163,78 @@ describe.skipIf(!hasTestDatabase)("the HTTP isolation matrix", () => {
     expect(failures).toEqual([]);
   });
 
+  test("subject settings operations only read or update the caller tenant and subject", async () => {
+    for (const testCase of cases.filter((entry) => entry.kind === "scoped-settings")) {
+      for (const scope of [world.sibling, world.foreign]) {
+        await harness.owner.query(
+          `INSERT INTO memory_settings (tenant_id, subject_id, mode) VALUES ($1, $2, 'ask')
+           ON CONFLICT (tenant_id, subject_id) DO UPDATE SET mode = 'ask'`,
+          [scope.tenantId, scope.subjectId],
+        );
+        const before = (await snapshotScope(
+          harness.owner,
+          plan,
+          scope.tenantId,
+          scope.subjectId,
+        )) as Record<string, Record<string, unknown>[]>;
+        const response = await harness.request(testCase.path, testCase.options);
+        expect(response.status).toBe(200);
+        const settings = (await response.json()) as { mode: string; updatedAt: string | null };
+        expect(settings.mode).toBe(testCase.method === "PUT" ? "off" : "auto");
+        contract.expectContract(response, settings, {
+          method: testCase.method,
+          path: testCase.template,
+        });
+        const after = (await snapshotScope(
+          harness.owner,
+          plan,
+          scope.tenantId,
+          scope.subjectId,
+        )) as Record<string, Record<string, unknown>[]>;
+        const priorAudits = before.audit_events ?? [];
+        const audits = after.audit_events ?? [];
+        expect(audits).toEqual(expect.arrayContaining(priorAudits));
+        const added = audits.filter((row) => !priorAudits.some((prior) => prior.id === row.id));
+        expect(added.length).toBe(
+          testCase.method === "PUT" && scope.tenantId === world.own.tenantId ? 1 : 0,
+        );
+        for (const row of added) {
+          expect(row).toMatchObject({
+            tenant_id: world.own.tenantId,
+            target_id: world.own.subjectId,
+            action: "memory_settings.updated",
+            metadata: { mode: "off" },
+          });
+        }
+        expect({ ...after, audit_events: priorAudits }).toEqual({
+          ...before,
+          audit_events: priorAudits,
+        });
+      }
+      const ownBefore = await snapshotScope(
+        harness.owner,
+        plan,
+        world.own.tenantId,
+        world.own.subjectId,
+      );
+      const foreign = await harness.request(testCase.path, {
+        ...testCase.options,
+        key: harness.keys.b,
+        subject: world.own.subjectId,
+      });
+      expect(foreign.status).toBe(200);
+      const foreignSettings = (await foreign.json()) as { mode: string; updatedAt: string | null };
+      expect(foreignSettings.mode).toBe(testCase.method === "PUT" ? "off" : "auto");
+      contract.expectContract(foreign, foreignSettings, {
+        method: testCase.method,
+        path: testCase.template,
+      });
+      expect(
+        await snapshotScope(harness.owner, plan, world.own.tenantId, world.own.subjectId),
+      ).toEqual(ownBefore);
+    }
+  });
+
   test("every list and read answers with no foreign id, slug or title", async () => {
     const failures: string[] = [];
     for (const testCase of cases.filter((entry) => entry.kind === "own-list")) {

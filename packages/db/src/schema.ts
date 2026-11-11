@@ -274,6 +274,7 @@ export const ingestSources = pgTable(
     bucket: bucket("bucket").notNull().default("inbox"),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
     status: sourceStatus("status").notNull().default("pending"),
+    awaitingApproval: boolean("awaiting_approval").notNull().default(false),
     attempts: integer("attempts").notNull().default(0),
     lastError: text("last_error"),
     affectedPageIds: text("affected_page_ids").array().notNull().default(sql`'{}'::text[]`),

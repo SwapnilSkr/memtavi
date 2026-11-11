@@ -1,4 +1,227 @@
 # Reference
+## Profile
+<details><summary><code>client.profile.<a href="/src/api/resources/profile/client/Client.ts">getMemorySettings</a>() -> MemtaviApi.MemorySettings</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Requires viewer or higher. Scoped to `x-subject-id`; an unset subject returns `auto` with `updatedAt` null without writing a row.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.profile.getMemorySettings();
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**requestOptions:** `ProfileClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.profile.<a href="/src/api/resources/profile/client/Client.ts">updateMemorySettings</a>({ ...params }) -> MemtaviApi.MemorySettings</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Requires developer or higher. Updates only the tenant and subject in the request headers and audits the creating user of the API key. Existing captures are unchanged.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.profile.updateMemorySettings({
+    mode: "ask"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `MemtaviApi.MemorySettingsUpdate` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `ProfileClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.profile.<a href="/src/api/resources/profile/client/Client.ts">getProfile</a>({ ...params }) -> MemtaviApi.Profile</code></summary>
+<dl>
+<dd>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.profile.getProfile({
+    brainId: "brainId"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `MemtaviApi.GetProfileRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `ProfileClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.profile.<a href="/src/api/resources/profile/client/Client.ts">updateProfile</a>({ ...params }) -> MemtaviApi.Profile</code></summary>
+<dl>
+<dd>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.profile.updateProfile({
+    brainId: "brainId"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `MemtaviApi.ProfileUpdate` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `ProfileClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
 ## Brains
 <details><summary><code>client.brains.<a href="/src/api/resources/brains/client/Client.ts">listBrains</a>({ ...params }) -> MemtaviApi.ListBrainsResponse</code></summary>
 <dl>
@@ -309,7 +532,11 @@ await client.brains.updateBrain({
 <dd>
 
 Submits one capture for compilation. Supply exactly one of `content` or `fetchUrl`;
-supplying both returns `400`. The capture is queued, not compiled in the request.
+supplying both returns `400`. In `auto` mode the capture is queued for compilation.
+In `ask` mode it is stored with `awaitingApproval: true` and no job until approved.
+In `off` mode it returns `202` with `stored: false`: the id is a receipt id only,
+content fields are empty, and no source, body, job, usage or idempotency record is stored.
+Off-mode receipts are stateless and are not persisted for idempotency replay.
 </dd>
 </dl>
 </dd>
@@ -652,6 +879,75 @@ await client.sources.retryIngestSource({
 <dd>
 
 **request:** `MemtaviApi.RetryIngestSourceRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `SourcesClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.sources.<a href="/src/api/resources/sources/client/Client.ts">approveIngestSource</a>({ ...params }) -> MemtaviApi.IngestSource</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Requires developer or higher. Atomically releases a source awaiting human approval and
+queues its normal ingest job exactly once. Returns 409 when it is not awaiting approval.
+Reject a held capture with deleteIngestSource. Explicit approval releases the held capture
+even if the subject mode has changed since capture.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.sources.approveIngestSource({
+    brainId: "brainId",
+    sourceId: "sourceId"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `MemtaviApi.ApproveIngestSourceRequest` 
     
 </dd>
 </dl>
@@ -2045,109 +2341,6 @@ await client.score.getScoreSuggestions({
 <dd>
 
 **requestOptions:** `ScoreClient.RequestOptions` 
-    
-</dd>
-</dl>
-</dd>
-</dl>
-
-
-</dd>
-</dl>
-</details>
-
-## Profile
-<details><summary><code>client.profile.<a href="/src/api/resources/profile/client/Client.ts">getProfile</a>({ ...params }) -> MemtaviApi.Profile</code></summary>
-<dl>
-<dd>
-
-#### 🔌 Usage
-
-<dl>
-<dd>
-
-<dl>
-<dd>
-
-```typescript
-await client.profile.getProfile({
-    brainId: "brainId"
-});
-
-```
-</dd>
-</dl>
-</dd>
-</dl>
-
-#### ⚙️ Parameters
-
-<dl>
-<dd>
-
-<dl>
-<dd>
-
-**request:** `MemtaviApi.GetProfileRequest` 
-    
-</dd>
-</dl>
-
-<dl>
-<dd>
-
-**requestOptions:** `ProfileClient.RequestOptions` 
-    
-</dd>
-</dl>
-</dd>
-</dl>
-
-
-</dd>
-</dl>
-</details>
-
-<details><summary><code>client.profile.<a href="/src/api/resources/profile/client/Client.ts">updateProfile</a>({ ...params }) -> MemtaviApi.Profile</code></summary>
-<dl>
-<dd>
-
-#### 🔌 Usage
-
-<dl>
-<dd>
-
-<dl>
-<dd>
-
-```typescript
-await client.profile.updateProfile({
-    brainId: "brainId"
-});
-
-```
-</dd>
-</dl>
-</dd>
-</dl>
-
-#### ⚙️ Parameters
-
-<dl>
-<dd>
-
-<dl>
-<dd>
-
-**request:** `MemtaviApi.ProfileUpdate` 
-    
-</dd>
-</dl>
-
-<dl>
-<dd>
-
-**requestOptions:** `ProfileClient.RequestOptions` 
     
 </dd>
 </dl>

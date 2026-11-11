@@ -101,6 +101,7 @@ class MemtaviApi:
             timeout=_defaulted_timeout,
             logging=logging,
         )
+        self._profile: typing.Optional[ProfileClient] = None
         self._brains: typing.Optional[BrainsClient] = None
         self._captures: typing.Optional[CapturesClient] = None
         self._sources: typing.Optional[SourcesClient] = None
@@ -110,12 +111,19 @@ class MemtaviApi:
         self._changes: typing.Optional[ChangesClient] = None
         self._reviews: typing.Optional[ReviewsClient] = None
         self._score: typing.Optional[ScoreClient] = None
-        self._profile: typing.Optional[ProfileClient] = None
         self._export: typing.Optional[ExportClient] = None
         self._webhooks: typing.Optional[WebhooksClient] = None
         self._tenant: typing.Optional[TenantClient] = None
         self._members: typing.Optional[MembersClient] = None
         self._api_keys: typing.Optional[ApiKeysClient] = None
+
+    @property
+    def profile(self):
+        if self._profile is None:
+            from .profile.client import ProfileClient  # noqa: E402
+
+            self._profile = ProfileClient(client_wrapper=self._client_wrapper)
+        return self._profile
 
     @property
     def brains(self):
@@ -188,14 +196,6 @@ class MemtaviApi:
 
             self._score = ScoreClient(client_wrapper=self._client_wrapper)
         return self._score
-
-    @property
-    def profile(self):
-        if self._profile is None:
-            from .profile.client import ProfileClient  # noqa: E402
-
-            self._profile = ProfileClient(client_wrapper=self._client_wrapper)
-        return self._profile
 
     @property
     def export(self):
@@ -312,6 +312,7 @@ class AsyncMemtaviApi:
             timeout=_defaulted_timeout,
             logging=logging,
         )
+        self._profile: typing.Optional[AsyncProfileClient] = None
         self._brains: typing.Optional[AsyncBrainsClient] = None
         self._captures: typing.Optional[AsyncCapturesClient] = None
         self._sources: typing.Optional[AsyncSourcesClient] = None
@@ -321,12 +322,19 @@ class AsyncMemtaviApi:
         self._changes: typing.Optional[AsyncChangesClient] = None
         self._reviews: typing.Optional[AsyncReviewsClient] = None
         self._score: typing.Optional[AsyncScoreClient] = None
-        self._profile: typing.Optional[AsyncProfileClient] = None
         self._export: typing.Optional[AsyncExportClient] = None
         self._webhooks: typing.Optional[AsyncWebhooksClient] = None
         self._tenant: typing.Optional[AsyncTenantClient] = None
         self._members: typing.Optional[AsyncMembersClient] = None
         self._api_keys: typing.Optional[AsyncApiKeysClient] = None
+
+    @property
+    def profile(self):
+        if self._profile is None:
+            from .profile.client import AsyncProfileClient  # noqa: E402
+
+            self._profile = AsyncProfileClient(client_wrapper=self._client_wrapper)
+        return self._profile
 
     @property
     def brains(self):
@@ -399,14 +407,6 @@ class AsyncMemtaviApi:
 
             self._score = AsyncScoreClient(client_wrapper=self._client_wrapper)
         return self._score
-
-    @property
-    def profile(self):
-        if self._profile is None:
-            from .profile.client import AsyncProfileClient  # noqa: E402
-
-            self._profile = AsyncProfileClient(client_wrapper=self._client_wrapper)
-        return self._profile
 
     @property
     def export(self):

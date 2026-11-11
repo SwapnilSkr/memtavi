@@ -438,6 +438,7 @@ describe("source_status", () => {
       attempts: 2,
       lastError: null,
       affectedPageIds: ["pg_1", "pg_2"],
+      awaitingApproval: false,
     });
   });
 

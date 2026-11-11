@@ -9,6 +9,8 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-11** — Memory modes enforced: `GET`/`PUT /v1/memory-settings` per subject (default `auto`, audited); `ask` holds captures (`awaitingApproval`) until `approveIngestSource`; `off` answers `202 stored:false` and writes nothing. REST, MCP `remember` and the client all respect it. Migration 0014.
+
 - **2026-11-11** — Webhook events per PRD §8.4: `brain.change.new`, `brain.page.updated`, `brain.connection.new`, `brain.import.progress` are subscribable and delivered with typed signed payloads through a `webhook_events` outbox (migration 0013, trigger producers); raw-action subscriptions unchanged; overlap delivers once.
 
 - **2026-11-11** — Connection discovery: every compile enqueues `connections.discover`; nearest 8 same-model pages above a 0.45 floor are judged in one `connect` v1 call (strong/medium/weak, noise dropped, one-line reasoning), canonically upserted; manual pairs untouched; no lock held across the model call. Connection webhooks wait on `p7-webhook-events`.

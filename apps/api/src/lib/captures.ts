@@ -6,6 +6,7 @@ import type { Static } from "elysia";
 import type { PoolClient } from "pg";
 import type { Auth } from "../middleware/auth";
 import { DomainError } from "../middleware/errors";
+import { getMemorySettings } from "./memory-settings";
 import type { captureCreate } from "./schemas";
 
 const PREVIEW_LIMIT = 4_000;
@@ -23,6 +24,7 @@ const fields = [
   "bucket",
   "metadata",
   "status",
+  "awaitingApproval",
   "attempts",
   "lastError",
   "affectedPageIds",
@@ -34,7 +36,7 @@ const fields = [
 
 export const sourceColumns = `id, brain_id AS "brainId", kind, content AS "contentPreview",
   content_hash AS "contentHash", body_ref AS "bodyRef",
-  origin_ref AS "originRef", label, bucket, metadata, status, attempts,
+  origin_ref AS "originRef", label, bucket, metadata, status, awaiting_approval AS "awaitingApproval", attempts,
   last_error AS "lastError", affected_page_ids AS "affectedPageIds",
   original_bytes AS "originalBytes", created_at AS "createdAt", compiled_at AS "compiledAt",
   deleted_at AS "deletedAt"`;
@@ -48,7 +50,10 @@ interface StoredResponse {
 
 export function sourceBody(row: Row): Record<string, unknown> {
   const body: Record<string, unknown> = {};
-  for (const field of fields) body[field] = row[field] ?? null;
+  for (const field of fields) {
+    if (field === "awaitingApproval" && row[field] === undefined) continue;
+    body[field] = row[field] ?? null;
+  }
   return body;
 }
 
@@ -180,10 +185,40 @@ export async function createCapture(
   brainId: string,
   body: Static<typeof captureCreate>,
   idempotencyKey: string | null,
+  now: () => Date = () => new Date(),
 ): Promise<StoredResponse> {
   const { content, fetchUrl } = normalize(body);
   const tenantId = auth.tenantId;
   await requireBrain(client, tenantId, subjectId, brainId);
+
+  const { mode } = await getMemorySettings(client, tenantId, subjectId);
+  if (mode === "off") {
+    return {
+      status: 202,
+      body: {
+        id: newId("source"),
+        brainId,
+        kind: body.kind,
+        contentPreview: "",
+        contentUrl: null,
+        contentHash: "",
+        originRef: null,
+        label: null,
+        bucket: "inbox",
+        metadata: {},
+        status: "pending",
+        awaitingApproval: false,
+        stored: false,
+        attempts: 0,
+        lastError: null,
+        affectedPageIds: [],
+        originalBytes: 0,
+        createdAt: now().toISOString(),
+        compiledAt: null,
+        deletedAt: null,
+      },
+    };
+  }
 
   const scope = `POST /v1/brains/${brainId}/captures`;
   const requestHash = hash(canonical(body));
@@ -215,8 +250,8 @@ export async function createCapture(
     const inserted = await client.query(
       `INSERT INTO ingest_sources
          (id, tenant_id, subject_id, brain_id, kind, content, content_hash, origin_ref,
-          label, bucket, metadata, original_bytes, body_ref, body_bytes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+          label, bucket, metadata, original_bytes, body_ref, body_bytes, awaiting_approval)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        ON CONFLICT (brain_id, origin_ref)
          WHERE origin_ref IS NOT NULL AND deleted_at IS NULL DO NOTHING
        RETURNING ${sourceColumns}`,
@@ -235,16 +270,17 @@ export async function createCapture(
         content === null ? 0 : Buffer.byteLength(content, "utf8"),
         bodyRef,
         bodyBytes,
+        mode === "ask",
       ],
     );
     row = inserted.rows[0] as Row | undefined;
-    if (row) {
+    if (row && mode === "auto") {
       await client.query(
         `INSERT INTO jobs (tenant_id, brain_id, type, payload, idempotency_key, max_attempts)
          VALUES ($1, $2, 'capture.ingest', $3, $4, 5)`,
         [tenantId, brainId, JSON.stringify({ sourceId: id, brainId }), `capture:${id}`],
       );
-    } else if (originRef !== null) {
+    } else if (!row && originRef !== null) {
       row = await findOrigin(client, tenantId, subjectId, brainId, originRef);
       status = 200;
     }
@@ -257,6 +293,39 @@ export async function createCapture(
     await remember(client, tenantId, scope, idempotencyKey, requestHash, stored);
   }
   return stored;
+}
+
+export async function approveSource(
+  client: PoolClient,
+  tenantId: string,
+  subjectId: string,
+  brainId: string,
+  sourceId: string,
+) {
+  await requireBrain(client, tenantId, subjectId, brainId);
+  const found = await client.query(
+    `SELECT ${sourceColumns} FROM ingest_sources
+     WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND id = $4
+     AND deleted_at IS NULL FOR UPDATE`,
+    [tenantId, subjectId, brainId, sourceId],
+  );
+  const row = found.rows[0] as Row | undefined;
+  if (!row) throw new DomainError("NotFoundError", 404, "Not found");
+  if (!row.awaitingApproval) {
+    throw new DomainError("ConflictError", 409, "Source is not awaiting approval");
+  }
+  const updated = await client.query(
+    `UPDATE ingest_sources SET awaiting_approval = false
+     WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND id = $4
+     RETURNING ${sourceColumns}`,
+    [tenantId, subjectId, brainId, sourceId],
+  );
+  await client.query(
+    `INSERT INTO jobs (tenant_id, brain_id, type, payload, idempotency_key, max_attempts)
+     VALUES ($1, $2, 'capture.ingest', $3, $4, 5)`,
+    [tenantId, brainId, JSON.stringify({ sourceId, brainId }), `capture:${sourceId}`],
+  );
+  return sourceBody(updated.rows[0] as Row);
 }
 
 export async function retrySource(
@@ -276,7 +345,9 @@ export async function retrySource(
   );
   const row = found.rows[0] as Row | undefined;
   if (!row) throw new DomainError("NotFoundError", 404, "Not found");
-  if (row.status !== "failed") throw new DomainError("ConflictError", 409, "Source has not failed");
+  if (row.awaitingApproval || row.status !== "failed") {
+    throw new DomainError("ConflictError", 409, "Source has not failed");
+  }
 
   const attempts = Number(row.attempts ?? 0) + 1;
   const storedBody = row.bodyRef !== null || Number(row.chunkCount ?? 0) > 0;

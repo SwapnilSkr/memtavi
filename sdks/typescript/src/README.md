@@ -61,7 +61,7 @@ following namespace:
 ```typescript
 import { MemtaviApi } from "MemtaviApi";
 
-const request: MemtaviApi.ListBrainsRequest = {
+const request: MemtaviApi.MemorySettingsUpdate = {
     ...
 };
 ```
@@ -93,9 +93,9 @@ try {
 This SDK supports direct imports of subpackage clients, which allows JavaScript bundlers to tree-shake and include only the imported subpackage code. This results in much smaller bundle sizes.
 
 ```typescript
-import { BrainsClient } from 'MemtaviApi/brains';
+import { ProfileClient } from 'MemtaviApi/profile';
 
-const client = new BrainsClient({...});
+const client = new ProfileClient({...});
 ```
 
 ### Additional Headers
