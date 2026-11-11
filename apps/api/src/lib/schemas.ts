@@ -5,6 +5,20 @@ export const pagination = t.Object({
   offset: t.Optional(t.Numeric({ minimum: 0, multipleOf: 1, default: 0 })),
 });
 
+const pageStatus = t.Union([
+  t.Literal("active"),
+  t.Literal("stale"),
+  t.Literal("contested"),
+  t.Literal("deprecated"),
+  t.Literal("archived"),
+]);
+
+export const pageListQuery = t.Object({
+  limit: t.Optional(t.Numeric({ minimum: 1, maximum: 200, multipleOf: 1, default: 50 })),
+  offset: t.Optional(t.Numeric({ minimum: 0, multipleOf: 1, default: 0 })),
+  status: t.Optional(pageStatus),
+});
+
 export const indexLimit = t.Object({
   limit: t.Optional(t.Numeric({ minimum: 1, maximum: 200, multipleOf: 1, default: 40 })),
 });
@@ -75,16 +89,15 @@ export const pageUpdate = t.Object({
   ),
   pinned: t.Optional(t.Boolean()),
   archived: t.Optional(t.Boolean()),
-  status: t.Optional(
-    t.Union([
-      t.Literal("active"),
-      t.Literal("stale"),
-      t.Literal("contested"),
-      t.Literal("deprecated"),
-      t.Literal("archived"),
-    ]),
-  ),
+  status: t.Optional(pageStatus),
   version: t.Optional(t.Integer({ minimum: 1 })),
+});
+
+export const pageResolve = t.Object({
+  note: t.String({ minLength: 1, maxLength: 2000 }),
+  title: t.Optional(t.String()),
+  summary: t.Optional(t.String()),
+  body: t.Optional(t.String()),
 });
 
 export const profileUpdate = t.Object({

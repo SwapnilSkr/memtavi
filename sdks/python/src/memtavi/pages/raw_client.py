@@ -12,6 +12,7 @@ from ..core.pydantic_utilities import parse_obj_as
 from ..core.request_options import RequestOptions
 from ..errors.bad_request_error import BadRequestError
 from ..errors.conflict_error import ConflictError
+from ..errors.forbidden_error import ForbiddenError
 from ..errors.internal_server_error import InternalServerError
 from ..errors.not_found_error import NotFoundError
 from ..errors.too_many_requests_error import TooManyRequestsError
@@ -41,6 +42,7 @@ class RawPagesClient:
         *,
         limit: typing.Optional[int] = None,
         offset: typing.Optional[int] = None,
+        status: typing.Optional[PageStatus] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[ListPagesResponse]:
         """
@@ -57,6 +59,9 @@ class RawPagesClient:
         offset : typing.Optional[int]
             Number of items to skip before collecting the page.
 
+        status : typing.Optional[PageStatus]
+            Only return pages with this status.
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -71,6 +76,7 @@ class RawPagesClient:
             params={
                 "limit": limit,
                 "offset": offset,
+                "status": status,
             },
             request_options=request_options,
         )
@@ -514,6 +520,158 @@ class RawPagesClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
+    def resolve_page(
+        self,
+        brain_id: str,
+        slug: str,
+        *,
+        note: str,
+        title: typing.Optional[str] = OMIT,
+        summary: typing.Optional[str] = OMIT,
+        body: typing.Optional[str] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> HttpResponse[Page]:
+        """
+        Resolves a contested page with a note and returns it to `active`. When `title`,
+        `summary` or `body` is supplied, a new immutable version is recorded first. A page
+        that is not `contested` returns `409`.
+
+        Parameters
+        ----------
+        brain_id : str
+            Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+
+        slug : str
+            The page slug within the brain.
+
+        note : str
+            Why the page was resolved. Recorded as the change summary.
+
+        title : typing.Optional[str]
+
+        summary : typing.Optional[str]
+
+        body : typing.Optional[str]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[Page]
+            The resolved page.
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"v1/brains/{jsonable_encoder(brain_id)}/pages/{jsonable_encoder(slug)}/resolve",
+            method="POST",
+            json={
+                "note": note,
+                "title": title,
+                "summary": summary,
+                "body": body,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    Page,
+                    parse_obj_as(
+                        type_=Page,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 400:
+                raise BadRequestError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorEnvelope,
+                        parse_obj_as(
+                            type_=ErrorEnvelope,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 401:
+                raise UnauthorizedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorEnvelope,
+                        parse_obj_as(
+                            type_=ErrorEnvelope,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 403:
+                raise ForbiddenError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorEnvelope,
+                        parse_obj_as(
+                            type_=ErrorEnvelope,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 404:
+                raise NotFoundError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorEnvelope,
+                        parse_obj_as(
+                            type_=ErrorEnvelope,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 409:
+                raise ConflictError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorEnvelope,
+                        parse_obj_as(
+                            type_=ErrorEnvelope,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 429:
+                raise TooManyRequestsError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorEnvelope,
+                        parse_obj_as(
+                            type_=ErrorEnvelope,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 500:
+                raise InternalServerError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorEnvelope,
+                        parse_obj_as(
+                            type_=ErrorEnvelope,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
     def list_page_versions(
         self,
         brain_id: str,
@@ -870,6 +1028,7 @@ class AsyncRawPagesClient:
         *,
         limit: typing.Optional[int] = None,
         offset: typing.Optional[int] = None,
+        status: typing.Optional[PageStatus] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[ListPagesResponse]:
         """
@@ -886,6 +1045,9 @@ class AsyncRawPagesClient:
         offset : typing.Optional[int]
             Number of items to skip before collecting the page.
 
+        status : typing.Optional[PageStatus]
+            Only return pages with this status.
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -900,6 +1062,7 @@ class AsyncRawPagesClient:
             params={
                 "limit": limit,
                 "offset": offset,
+                "status": status,
             },
             request_options=request_options,
         )
@@ -1281,6 +1444,158 @@ class AsyncRawPagesClient:
                 )
             if _response.status_code == 401:
                 raise UnauthorizedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorEnvelope,
+                        parse_obj_as(
+                            type_=ErrorEnvelope,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 404:
+                raise NotFoundError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorEnvelope,
+                        parse_obj_as(
+                            type_=ErrorEnvelope,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 409:
+                raise ConflictError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorEnvelope,
+                        parse_obj_as(
+                            type_=ErrorEnvelope,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 429:
+                raise TooManyRequestsError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorEnvelope,
+                        parse_obj_as(
+                            type_=ErrorEnvelope,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 500:
+                raise InternalServerError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorEnvelope,
+                        parse_obj_as(
+                            type_=ErrorEnvelope,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def resolve_page(
+        self,
+        brain_id: str,
+        slug: str,
+        *,
+        note: str,
+        title: typing.Optional[str] = OMIT,
+        summary: typing.Optional[str] = OMIT,
+        body: typing.Optional[str] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> AsyncHttpResponse[Page]:
+        """
+        Resolves a contested page with a note and returns it to `active`. When `title`,
+        `summary` or `body` is supplied, a new immutable version is recorded first. A page
+        that is not `contested` returns `409`.
+
+        Parameters
+        ----------
+        brain_id : str
+            Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+
+        slug : str
+            The page slug within the brain.
+
+        note : str
+            Why the page was resolved. Recorded as the change summary.
+
+        title : typing.Optional[str]
+
+        summary : typing.Optional[str]
+
+        body : typing.Optional[str]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[Page]
+            The resolved page.
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"v1/brains/{jsonable_encoder(brain_id)}/pages/{jsonable_encoder(slug)}/resolve",
+            method="POST",
+            json={
+                "note": note,
+                "title": title,
+                "summary": summary,
+                "body": body,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    Page,
+                    parse_obj_as(
+                        type_=Page,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 400:
+                raise BadRequestError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorEnvelope,
+                        parse_obj_as(
+                            type_=ErrorEnvelope,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 401:
+                raise UnauthorizedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorEnvelope,
+                        parse_obj_as(
+                            type_=ErrorEnvelope,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 403:
+                raise ForbiddenError(
                     headers=dict(_response.headers),
                     body=typing.cast(
                         ErrorEnvelope,

@@ -7,9 +7,13 @@ import {
   listPages,
   updatePageBySlug,
 } from "../lib/pages";
+import { resolvePage } from "../lib/resolve";
+import { requireRole } from "../lib/roles";
 import {
   diffQuery,
   indexLimit,
+  pageListQuery,
+  pageResolve,
   pageUpdate,
   pagination,
   permanentQuery,
@@ -34,12 +38,13 @@ export function pageRoutes(config: RouteConfig) {
             auth.tenantId,
             subject,
             params.brainId,
+            query.status ?? null,
             query.limit ?? 50,
             query.offset ?? 0,
           ),
         );
       },
-      { query: pagination },
+      { query: pageListQuery },
     )
     .get("/v1/brains/:brainId/pages/:slug", ({ auth, request, params }) => {
       const subject = subjectId(request);
@@ -83,6 +88,25 @@ export function pageRoutes(config: RouteConfig) {
         return receipt;
       },
       { query: permanentQuery },
+    )
+    .post(
+      "/v1/brains/:brainId/pages/:slug/resolve",
+      ({ auth, request, params, body }) => {
+        const subject = subjectId(request);
+        requireRole(auth.role, "developer");
+        return scope(config, auth, subject, (client) =>
+          resolvePage(
+            client,
+            auth.tenantId,
+            subject,
+            params.brainId,
+            params.slug,
+            body,
+            config.embeddings ?? null,
+          ),
+        );
+      },
+      { body: pageResolve },
     )
     .get(
       "/v1/brains/:brainId/pages/:slug/versions",

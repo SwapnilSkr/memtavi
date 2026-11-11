@@ -114,6 +114,7 @@ const BODIES: Record<string, () => unknown> = {
   updateBrain: () => ({ name: "Matrix brain" }),
   createCapture: () => ({ kind: "note", content: `matrix capture ${crypto.randomUUID()}` }),
   updatePage: () => ({ title: "Matrix page", version: 1 }),
+  resolvePage: () => ({ note: "Matrix resolution" }),
   ackConnection: () => ({ acked: true }),
   ackChange: () => ({ acked: true }),
   updateProfile: () => ({ focus: "matrix focus" }),

@@ -206,6 +206,20 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
        VALUES ($1, $2, 1, 'Alpha guide', 'The first page', 'alpha body', 'compiler')`,
       [harness.tenants.a, alphaId],
     );
+    const contestedId = newId("page");
+    await harness.owner.query(
+      `INSERT INTO pages
+         (id, tenant_id, subject_id, brain_id, slug, title, summary, body, page_type,
+          content_hash, version, status)
+       VALUES ($1, $2, $3, $4, 'contested', 'Contested page', '', '', 'topic',
+               'hash-contested', 1, 'contested')`,
+      [contestedId, harness.tenants.a, harness.subjects.a, brainId],
+    );
+    await harness.owner.query(
+      `INSERT INTO page_versions (tenant_id, page_id, version, title, summary, body, actor)
+       VALUES ($1, $2, 1, 'Contested page', '', '', 'compiler')`,
+      [harness.tenants.a, contestedId],
+    );
     connectionId = newId("connection");
     await harness.owner.query(
       `INSERT INTO connections
@@ -338,6 +352,14 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
       "PATCH",
       `/v1/brains/${brainId}/pages/${pageSlug}`,
       { method: "PATCH", body: { title: "Alpha guide v2", version: 1 } },
+      200,
+    );
+    await callSuccess(
+      "resolvePage",
+      "/v1/brains/{brainId}/pages/{slug}/resolve",
+      "POST",
+      `/v1/brains/${brainId}/pages/contested/resolve`,
+      { method: "POST", body: { note: "The contract resolves this page" } },
       200,
     );
     await callSuccess(
@@ -580,6 +602,11 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
         path: `/v1/brains/${brainId}/sources/${sourceId}/retry`,
         options: { method: "POST" },
       },
+      {
+        operationId: "resolvePage",
+        path: `/v1/brains/${brainId}/pages/contested/resolve`,
+        options: { method: "POST", body: { note: "Forbidden resolution" } },
+      },
     ];
     for (const entry of cases) {
       const probe = probes.get(entry.operationId);
@@ -656,6 +683,16 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
     contract.expectContract(stale, await stale.json(), {
       method: "PATCH",
       path: "/v1/brains/{brainId}/pages/{slug}",
+    });
+
+    const notContested = await harness.request(`/v1/brains/${brainId}/pages/${pageSlug}/resolve`, {
+      method: "POST",
+      body: { note: "This page is not contested" },
+    });
+    expect(notContested.status).toBe(409);
+    contract.expectContract(notContested, await notContested.json(), {
+      method: "POST",
+      path: "/v1/brains/{brainId}/pages/{slug}/resolve",
     });
   });
 

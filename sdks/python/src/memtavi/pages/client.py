@@ -39,6 +39,7 @@ class PagesClient:
         *,
         limit: typing.Optional[int] = None,
         offset: typing.Optional[int] = None,
+        status: typing.Optional[PageStatus] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> ListPagesResponse:
         """
@@ -54,6 +55,9 @@ class PagesClient:
 
         offset : typing.Optional[int]
             Number of items to skip before collecting the page.
+
+        status : typing.Optional[PageStatus]
+            Only return pages with this status.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -75,7 +79,9 @@ class PagesClient:
             brain_id="brainId",
         )
         """
-        _response = self._raw_client.list_pages(brain_id, limit=limit, offset=offset, request_options=request_options)
+        _response = self._raw_client.list_pages(
+            brain_id, limit=limit, offset=offset, status=status, request_options=request_options
+        )
         return _response.data
 
     def get_page(self, brain_id: str, slug: str, *, request_options: typing.Optional[RequestOptions] = None) -> Page:
@@ -235,6 +241,66 @@ class PagesClient:
             status=status,
             version=version,
             request_options=request_options,
+        )
+        return _response.data
+
+    def resolve_page(
+        self,
+        brain_id: str,
+        slug: str,
+        *,
+        note: str,
+        title: typing.Optional[str] = OMIT,
+        summary: typing.Optional[str] = OMIT,
+        body: typing.Optional[str] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> Page:
+        """
+        Resolves a contested page with a note and returns it to `active`. When `title`,
+        `summary` or `body` is supplied, a new immutable version is recorded first. A page
+        that is not `contested` returns `409`.
+
+        Parameters
+        ----------
+        brain_id : str
+            Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+
+        slug : str
+            The page slug within the brain.
+
+        note : str
+            Why the page was resolved. Recorded as the change summary.
+
+        title : typing.Optional[str]
+
+        summary : typing.Optional[str]
+
+        body : typing.Optional[str]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        Page
+            The resolved page.
+
+        Examples
+        --------
+        from memtavi import MemtaviApi
+
+        client = MemtaviApi(
+            subject_id="YOUR_SUBJECT_ID",
+            api_key="YOUR_API_KEY",
+        )
+        client.pages.resolve_page(
+            brain_id="brainId",
+            slug="slug",
+            note="note",
+        )
+        """
+        _response = self._raw_client.resolve_page(
+            brain_id, slug, note=note, title=title, summary=summary, body=body, request_options=request_options
         )
         return _response.data
 
@@ -414,6 +480,7 @@ class AsyncPagesClient:
         *,
         limit: typing.Optional[int] = None,
         offset: typing.Optional[int] = None,
+        status: typing.Optional[PageStatus] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> ListPagesResponse:
         """
@@ -429,6 +496,9 @@ class AsyncPagesClient:
 
         offset : typing.Optional[int]
             Number of items to skip before collecting the page.
+
+        status : typing.Optional[PageStatus]
+            Only return pages with this status.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -459,7 +529,7 @@ class AsyncPagesClient:
         asyncio.run(main())
         """
         _response = await self._raw_client.list_pages(
-            brain_id, limit=limit, offset=offset, request_options=request_options
+            brain_id, limit=limit, offset=offset, status=status, request_options=request_options
         )
         return _response.data
 
@@ -648,6 +718,74 @@ class AsyncPagesClient:
             status=status,
             version=version,
             request_options=request_options,
+        )
+        return _response.data
+
+    async def resolve_page(
+        self,
+        brain_id: str,
+        slug: str,
+        *,
+        note: str,
+        title: typing.Optional[str] = OMIT,
+        summary: typing.Optional[str] = OMIT,
+        body: typing.Optional[str] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> Page:
+        """
+        Resolves a contested page with a note and returns it to `active`. When `title`,
+        `summary` or `body` is supplied, a new immutable version is recorded first. A page
+        that is not `contested` returns `409`.
+
+        Parameters
+        ----------
+        brain_id : str
+            Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+
+        slug : str
+            The page slug within the brain.
+
+        note : str
+            Why the page was resolved. Recorded as the change summary.
+
+        title : typing.Optional[str]
+
+        summary : typing.Optional[str]
+
+        body : typing.Optional[str]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        Page
+            The resolved page.
+
+        Examples
+        --------
+        import asyncio
+
+        from memtavi import AsyncMemtaviApi
+
+        client = AsyncMemtaviApi(
+            subject_id="YOUR_SUBJECT_ID",
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.pages.resolve_page(
+                brain_id="brainId",
+                slug="slug",
+                note="note",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.resolve_page(
+            brain_id, slug, note=note, title=title, summary=summary, body=body, request_options=request_options
         )
         return _response.data
 

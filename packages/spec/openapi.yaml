@@ -465,6 +465,12 @@ paths:
       parameters:
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/Offset"
+        - name: status
+          in: query
+          required: false
+          description: Only return pages with this status.
+          schema:
+            $ref: "#/components/schemas/PageStatus"
       responses:
         "200":
           description: Pages in the brain.
@@ -596,6 +602,50 @@ paths:
           $ref: "#/components/responses/Error401"
         "404":
           $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+
+  /v1/brains/{brainId}/pages/{slug}/resolve:
+    parameters:
+      - $ref: "#/components/parameters/BrainId"
+      - $ref: "#/components/parameters/Slug"
+    post:
+      operationId: resolvePage
+      tags:
+        - Pages
+      summary: Resolve a contested page
+      description: |
+        Resolves a contested page with a note and returns it to `active`. When `title`,
+        `summary` or `body` is supplied, a new immutable version is recorded first. A page
+        that is not `contested` returns `409`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PageResolve"
+      responses:
+        "200":
+          description: The resolved page.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Page"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
         "429":
           $ref: "#/components/responses/Error429"
         "500":
@@ -2096,6 +2146,24 @@ components:
           type: integer
           minimum: 1
           description: The version the client last read. A mismatch returns `409`.
+
+    PageResolve:
+      type: object
+      description: A human decision that resolves a contested page.
+      required:
+        - note
+      properties:
+        note:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          description: Why the page was resolved. Recorded as the change summary.
+        title:
+          type: string
+        summary:
+          type: string
+        body:
+          type: string
 
     PageVersionSummary:
       type: object

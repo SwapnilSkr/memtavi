@@ -1036,6 +1036,14 @@ client.pages.list_pages(
 <dl>
 <dd>
 
+**status:** `typing.Optional[PageStatus]` — Only return pages with this status.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
 **request_options:** `typing.Optional[RequestOptions]` — Request-specific configuration.
     
 </dd>
@@ -1354,6 +1362,124 @@ client.pages.update_page(
 <dd>
 
 **version:** `typing.Optional[int]` — The version the client last read. A mismatch returns `409`.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**request_options:** `typing.Optional[RequestOptions]` — Request-specific configuration.
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.pages.<a href="src/memtavi/pages/client.py">resolve_page</a>(...) -> Page</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Resolves a contested page with a note and returns it to `active`. When `title`,
+`summary` or `body` is supplied, a new immutable version is recorded first. A page
+that is not `contested` returns `409`.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```python
+from memtavi import MemtaviApi
+from memtavi.environment import MemtaviApiEnvironment
+
+client = MemtaviApi(
+    api_key="<value>",
+    subject_id="<x-subject-id>",
+    environment=MemtaviApiEnvironment.DEFAULT,
+)
+
+client.pages.resolve_page(
+    brain_id="brainId",
+    slug="slug",
+    note="note",
+)
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**brain_id:** `str` — Prefixed brain id, `brn_` followed by 32 lowercase hex characters.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**slug:** `str` — The page slug within the brain.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**note:** `str` — Why the page was resolved. Recorded as the change summary.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**title:** `typing.Optional[str]` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**summary:** `typing.Optional[str]` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**body:** `typing.Optional[str]` 
     
 </dd>
 </dl>

@@ -56,10 +56,11 @@ export class PagesClient {
         request: MemtaviApi.ListPagesRequest,
         requestOptions?: PagesClient.RequestOptions,
     ): Promise<core.WithRawResponse<MemtaviApi.ListPagesResponse>> {
-        const { brainId, limit, offset } = request;
+        const { brainId, limit, offset, status } = request;
         const _queryParams: Record<string, unknown> = {
             limit,
             offset,
+            status: status != null ? status : undefined,
         };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -457,6 +458,127 @@ export class PagesClient {
             _response.rawResponse,
             "PATCH",
             "/v1/brains/{brainId}/pages/{slug}",
+        );
+    }
+
+    /**
+     * Resolves a contested page with a note and returns it to `active`. When `title`,
+     * `summary` or `body` is supplied, a new immutable version is recorded first. A page
+     * that is not `contested` returns `409`.
+     *
+     * @param {MemtaviApi.PageResolve} request
+     * @param {PagesClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link MemtaviApi.BadRequestError}
+     * @throws {@link MemtaviApi.UnauthorizedError}
+     * @throws {@link MemtaviApi.ForbiddenError}
+     * @throws {@link MemtaviApi.NotFoundError}
+     * @throws {@link MemtaviApi.ConflictError}
+     * @throws {@link MemtaviApi.TooManyRequestsError}
+     * @throws {@link MemtaviApi.InternalServerError}
+     * @throws {@link errors.MemtaviApiError}
+     * @throws {@link errors.MemtaviApiTimeoutError}
+     *
+     * @example
+     *     await client.pages.resolvePage({
+     *         brainId: "brainId",
+     *         slug: "slug",
+     *         note: "note"
+     *     })
+     */
+    public resolvePage(
+        request: MemtaviApi.PageResolve,
+        requestOptions?: PagesClient.RequestOptions,
+    ): core.HttpResponsePromise<MemtaviApi.Page> {
+        return core.HttpResponsePromise.fromPromise(this.__resolvePage(request, requestOptions));
+    }
+
+    private async __resolvePage(
+        request: MemtaviApi.PageResolve,
+        requestOptions?: PagesClient.RequestOptions,
+    ): Promise<core.WithRawResponse<MemtaviApi.Page>> {
+        const { brainId, slug, ..._body } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({ "x-subject-id": requestOptions?.subjectId ?? this._options?.subjectId }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.MemtaviApiEnvironment.Default,
+                `v1/brains/${core.url.encodePathParam(brainId, errors.MemtaviApiError)}/pages/${core.url.encodePathParam(slug, errors.MemtaviApiError)}/resolve`,
+            ),
+            method: "POST",
+            headers: _headers,
+            contentType: "application/json",
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            requestType: "json",
+            body: mergeAdditionalBodyParameters(_body, requestOptions?.additionalBodyParameters),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as MemtaviApi.Page, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new MemtaviApi.BadRequestError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 401:
+                    throw new MemtaviApi.UnauthorizedError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 403:
+                    throw new MemtaviApi.ForbiddenError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 404:
+                    throw new MemtaviApi.NotFoundError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 409:
+                    throw new MemtaviApi.ConflictError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 429:
+                    throw new MemtaviApi.TooManyRequestsError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                case 500:
+                    throw new MemtaviApi.InternalServerError(
+                        _response.error.body as MemtaviApi.ErrorEnvelope,
+                        _response.rawResponse,
+                    );
+                default:
+                    throw new errors.MemtaviApiError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "POST",
+            "/v1/brains/{brainId}/pages/{slug}/resolve",
         );
     }
 

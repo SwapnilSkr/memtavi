@@ -6,8 +6,8 @@ file by hand; run `bun run spec:docs`.
 - OpenAPI: 3.1.0
 - Version: 1.0.0
 - Server: https://api.memtavi.com
-- Endpoints: 37 operations across 28 paths
-- Schemas: 47 component schemas
+- Endpoints: 38 operations across 29 paths
+- Schemas: 48 component schemas
 
 ## Authentication
 
@@ -34,6 +34,7 @@ Subject routes (require `x-subject-id`):
 - `/v1/brains/{brainId}/pages`
 - `/v1/brains/{brainId}/pages/{slug}`
 - `/v1/brains/{brainId}/pages/{slug}/diff`
+- `/v1/brains/{brainId}/pages/{slug}/resolve`
 - `/v1/brains/{brainId}/pages/{slug}/versions`
 - `/v1/brains/{brainId}/pages/{slug}/versions/{version}`
 - `/v1/brains/{brainId}/profile`
@@ -76,6 +77,7 @@ Tenant routes (do not accept `x-subject-id`):
 - [`PATCH /v1/brains/{brainId}/pages/{slug}`](#patch-v1brainsbrainidpagesslug) — Pages
 - [`DELETE /v1/brains/{brainId}/pages/{slug}`](#delete-v1brainsbrainidpagesslug) — Pages
 - [`GET /v1/brains/{brainId}/pages/{slug}/diff`](#get-v1brainsbrainidpagesslugdiff) — Pages
+- [`POST /v1/brains/{brainId}/pages/{slug}/resolve`](#post-v1brainsbrainidpagesslugresolve) — Pages
 - [`GET /v1/brains/{brainId}/pages/{slug}/versions`](#get-v1brainsbrainidpagesslugversions) — Pages
 - [`GET /v1/brains/{brainId}/pages/{slug}/versions/{version}`](#get-v1brainsbrainidpagesslugversionsversion) — Pages
 - [`GET /v1/brains/{brainId}/profile`](#get-v1brainsbrainidprofile) — Profile
@@ -121,6 +123,7 @@ Tenant routes (do not accept `x-subject-id`):
   - [`Member`](#member)
   - [`MemberRole`](#memberrole)
   - [`Page`](#page)
+  - [`PageResolve`](#pageresolve)
   - [`PageStatus`](#pagestatus)
   - [`PageType`](#pagetype)
   - [`PageUpdate`](#pageupdate)
@@ -612,6 +615,7 @@ Lists pages without bumping `lastReferencedAt`.
 | `brainId` | path | yes | `string` | Prefixed brain id, `brn_` followed by 32 lowercase hex characters. Matches `^brn_[0-9a-f]{32}$`. |
 | `limit` | query | no | `integer` | Maximum number of items to return. Default `50`. Minimum 1. Maximum 200. |
 | `offset` | query | no | `integer` | Number of items to skip before collecting the page. Default `0`. Minimum 0. |
+| `status` | query | no | [`PageStatus`](#pagestatus) | Only return pages with this status. |
 
 **Responses**
 
@@ -749,6 +753,42 @@ not bump `lastReferencedAt`.
 | 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
 | 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
 | 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
+| 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
+| 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
+
+### POST /v1/brains/{brainId}/pages/{slug}/resolve
+
+`resolvePage` · Tags: Pages
+
+Resolve a contested page
+
+Resolves a contested page with a note and returns it to `active`. When `title`,
+`summary` or `body` is supplied, a new immutable version is recorded first. A page
+that is not `contested` returns `409`.
+
+**Security:** `x-api-key` + `x-subject-id`
+
+**Parameters**
+
+| Name | In | Required | Type | Notes |
+| --- | --- | --- | --- | --- |
+| `brainId` | path | yes | `string` | Prefixed brain id, `brn_` followed by 32 lowercase hex characters. Matches `^brn_[0-9a-f]{32}$`. |
+| `slug` | path | yes | `string` | The page slug within the brain. Minimum length 1. |
+
+**Request body** (required)
+
+`PageResolve` (`application/json`)
+
+**Responses**
+
+| Status | Description | Schema |
+| --- | --- | --- |
+| 200 | The resolved page. | `Page` |
+| 400 | Malformed body, a wrong enum, both `content` and `fetchUrl`, or a malformed subject id. | `ErrorEnvelope` |
+| 401 | Missing, unknown, expired or revoked API key. | `ErrorEnvelope` |
+| 403 | The key role does not permit this operation or granting a higher role. | `ErrorEnvelope` |
+| 404 | Not found, or owned by another tenant. Cross-tenant access is 404, never 403. | `ErrorEnvelope` |
+| 409 | Conflict with the current state, such as a page version conflict or a duplicate slug. | `ErrorEnvelope` |
 | 429 | Rate limited. Retry after the number of seconds in `Retry-After`. | `ErrorEnvelope` |
 | 500 | Unexpected server error. Never used for a provider's error. | `ErrorEnvelope` |
 
@@ -1542,6 +1582,19 @@ Required: `id`, `subjectId`, `brainId`, `slug`, `title`, `summary`, `body`, `pag
 | `lastReferencedAt` | `string (date-time) \| null` | yes |  |
 | `userEditedAt` | `string (date-time) \| null` | yes |  |
 | `deletionState` | [`DeletionState`](#deletionstate) | yes |  |
+
+### PageResolve
+
+A human decision that resolves a contested page.
+
+Required: `note`
+
+| Property | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `note` | `string` | yes | Why the page was resolved. Recorded as the change summary. Minimum length 1. Maximum length 2000. |
+| `title` | `string` | no |  |
+| `summary` | `string` | no |  |
+| `body` | `string` | no |  |
 
 ### PageStatus
 

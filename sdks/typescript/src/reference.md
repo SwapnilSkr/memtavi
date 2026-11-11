@@ -939,6 +939,75 @@ await client.pages.updatePage({
 </dl>
 </details>
 
+<details><summary><code>client.pages.<a href="/src/api/resources/pages/client/Client.ts">resolvePage</a>({ ...params }) -> MemtaviApi.Page</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Resolves a contested page with a note and returns it to `active`. When `title`,
+`summary` or `body` is supplied, a new immutable version is recorded first. A page
+that is not `contested` returns `409`.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.pages.resolvePage({
+    brainId: "brainId",
+    slug: "slug",
+    note: "note"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `MemtaviApi.PageResolve` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `PagesClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
 <details><summary><code>client.pages.<a href="/src/api/resources/pages/client/Client.ts">listPageVersions</a>({ ...params }) -> MemtaviApi.ListPageVersionsResponse</code></summary>
 <dl>
 <dd>
