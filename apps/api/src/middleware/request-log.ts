@@ -1,5 +1,6 @@
 import type { Logger } from "@memtavi/shared/logging";
 import { createLogger } from "@memtavi/shared/logging";
+import { currentTraceId } from "@memtavi/shared/telemetry";
 import { Elysia } from "elysia";
 
 export function requestLog(logger?: Logger) {
@@ -17,6 +18,7 @@ export function requestLog(logger?: Logger) {
       const status = typeof set.status === "number" ? set.status : 200;
       const fields = {
         requestId: String(set.headers["x-request-id"] ?? request.headers.get("x-request-id") ?? ""),
+        traceId: currentTraceId(),
         method: request.method,
         path: new URL(request.url).pathname,
         status,

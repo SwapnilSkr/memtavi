@@ -19,6 +19,7 @@ export interface ClaimedJob {
   payload: Record<string, unknown>;
   attempts: number;
   maxAttempts: number;
+  traceContext?: string | null;
 }
 
 export interface JobContext {

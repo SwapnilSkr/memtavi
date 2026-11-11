@@ -640,6 +640,7 @@ export const jobs = pgTable(
     type: text("type").notNull(),
     payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
     idempotencyKey: text("idempotency_key").notNull(),
+    traceContext: text("trace_context"),
     status: jobStatus("status").notNull().default("pending"),
     attempts: integer("attempts").notNull().default(0),
     maxAttempts: integer("max_attempts").notNull().default(5),

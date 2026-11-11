@@ -7,6 +7,7 @@ import {
   type FetchedDocument,
   type FetchFailureCode,
 } from "@memtavi/fetch";
+import { extractTraceContext, withSpan } from "@memtavi/shared/telemetry";
 import type { ObjectStore } from "@memtavi/storage/types";
 import type { PoolClient } from "pg";
 import { compileCapture } from "./compile";
@@ -49,7 +50,7 @@ const CLAIM_SQL = `
       LIMIT 1
     )
   RETURNING id, tenant_id AS "tenantId", brain_id AS "brainId", type, payload,
-            attempts, max_attempts AS "maxAttempts"
+            attempts, max_attempts AS "maxAttempts", trace_context AS "traceContext"
 `;
 
 const COMPLETE_SQL = `
@@ -181,117 +182,128 @@ export function createWorker(config: WorkerConfig): Worker {
   async function process(job: ClaimedJob): Promise<void> {
     const startedAt = Date.now();
     const handler = handlers[job.type];
-    try {
-      if (!handler) throw new JobError("permanent", "Unknown job type");
-      const context = {
-        job,
-        store,
-        fetchDocument,
-        withTenant,
-        postJson,
-        ...(config.webhookSecretKey === undefined
-          ? {}
-          : { webhookSecretKey: config.webhookSecretKey }),
-        compiler: config.compiler,
-        recordUsage: async (usage: CompilerUsage) => {
-          await withTenant(job.tenantId, (usageClient) =>
-            usageClient.query(
-              `INSERT INTO usage_ledger
-               (tenant_id, brain_id, job_id, provider, model, kind, input_tokens, output_tokens, cost_usd)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-              [
-                job.tenantId,
-                job.brainId,
-                job.id,
-                usage.provider,
-                usage.model,
-                usage.kind,
-                usage.inputTokens,
-                usage.outputTokens,
-                usage.costUsd,
-              ],
-            ),
-          );
-        },
-      };
-      if (handler === discoverConnections) await discoverConnections(context);
-      else if (handler === sweepRetention) {
-        await sweepRetention({ ...context, ...(config.now ? { now: config.now } : {}) });
-      } else await withTenant(job.tenantId, (client) => handler({ ...context, client }));
-      await withTenant(job.tenantId, (client) =>
-        client.query(COMPLETE_SQL, [job.tenantId, job.id]),
-      );
-      log({
-        requestId: job.id,
-        tenantId: job.tenantId,
-        route: "worker",
-        event: "job.completed",
-        jobType: job.type,
-        attempts: job.attempts,
-        durationMs: Date.now() - startedAt,
-      });
-    } catch (error) {
-      const failure = classify(error);
-      const dead = failure.kind === "permanent" || job.attempts >= job.maxAttempts;
-      try {
-        if (job.type === "capture.compile" && typeof job.payload.sourceId === "string") {
+    const parent = extractTraceContext(job.traceContext);
+    await withSpan(
+      `job ${job.type}`,
+      { "job.id": job.id, "job.type": job.type, "job.attempt": job.attempts },
+      async (span) => {
+        try {
+          if (!handler) throw new JobError("permanent", "Unknown job type");
+          const context = {
+            job,
+            store,
+            fetchDocument,
+            withTenant,
+            postJson,
+            ...(config.webhookSecretKey === undefined
+              ? {}
+              : { webhookSecretKey: config.webhookSecretKey }),
+            compiler: config.compiler,
+            recordUsage: async (usage: CompilerUsage) => {
+              await withTenant(job.tenantId, (usageClient) =>
+                usageClient.query(
+                  `INSERT INTO usage_ledger
+                   (tenant_id, brain_id, job_id, provider, model, kind, input_tokens, output_tokens, cost_usd)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+                  [
+                    job.tenantId,
+                    job.brainId,
+                    job.id,
+                    usage.provider,
+                    usage.model,
+                    usage.kind,
+                    usage.inputTokens,
+                    usage.outputTokens,
+                    usage.costUsd,
+                  ],
+                ),
+              );
+            },
+          };
+          if (handler === discoverConnections) await discoverConnections(context);
+          else if (handler === sweepRetention) {
+            await sweepRetention({ ...context, ...(config.now ? { now: config.now } : {}) });
+          } else await withTenant(job.tenantId, (client) => handler({ ...context, client }));
           await withTenant(job.tenantId, (client) =>
-            client.query(
-              `UPDATE ingest_sources SET status = $5, last_error = $4
-             WHERE tenant_id = $1 AND brain_id = $2 AND id = $3
-               AND deleted_at IS NULL AND status <> 'completed'`,
-              [
-                job.tenantId,
-                job.brainId,
-                job.payload.sourceId,
-                failure.message,
-                dead ? "failed" : "pending",
-              ],
-            ),
+            client.query(COMPLETE_SQL, [job.tenantId, job.id]),
           );
-        }
-        if (dead) {
-          await withTenant(job.tenantId, (client) =>
-            client.query(DEAD_SQL, [job.tenantId, job.id, failure.message]),
-          );
-          if (job.type === "capture.compile") {
-            await withTenant(job.tenantId, (client) =>
-              enqueueScoreSnapshot(client, job.tenantId, job.brainId),
-            );
+          span.setAttribute("job.outcome", "completed");
+          log({
+            requestId: job.id,
+            tenantId: job.tenantId,
+            route: "worker",
+            event: "job.completed",
+            jobType: job.type,
+            attempts: job.attempts,
+            durationMs: Date.now() - startedAt,
+          });
+        } catch (error) {
+          const failure = classify(error);
+          const dead = failure.kind === "permanent" || job.attempts >= job.maxAttempts;
+          span.setAttribute("job.outcome", dead ? "dead" : "retry");
+          span.setAttribute("job.error_code", failure.code);
+          try {
+            if (job.type === "capture.compile" && typeof job.payload.sourceId === "string") {
+              await withTenant(job.tenantId, (client) =>
+                client.query(
+                  `UPDATE ingest_sources SET status = $5, last_error = $4
+                 WHERE tenant_id = $1 AND brain_id = $2 AND id = $3
+                   AND deleted_at IS NULL AND status <> 'completed'`,
+                  [
+                    job.tenantId,
+                    job.brainId,
+                    job.payload.sourceId,
+                    failure.message,
+                    dead ? "failed" : "pending",
+                  ],
+                ),
+              );
+            }
+            if (dead) {
+              await withTenant(job.tenantId, (client) =>
+                client.query(DEAD_SQL, [job.tenantId, job.id, failure.message]),
+              );
+              if (job.type === "capture.compile") {
+                await withTenant(job.tenantId, (client) =>
+                  enqueueScoreSnapshot(client, job.tenantId, job.brainId),
+                );
+              }
+            } else {
+              await withTenant(job.tenantId, (client) =>
+                client.query(RETRY_SQL, [
+                  job.tenantId,
+                  job.id,
+                  backoffSeconds(job.attempts, random),
+                  failure.message,
+                ]),
+              );
+            }
+          } catch (recordError) {
+            log({
+              requestId: job.id,
+              tenantId: job.tenantId,
+              route: "worker",
+              event: "job.record_failed",
+              jobType: job.type,
+              errorCode: classify(recordError).code,
+              durationMs: Date.now() - startedAt,
+            });
           }
-        } else {
-          await withTenant(job.tenantId, (client) =>
-            client.query(RETRY_SQL, [
-              job.tenantId,
-              job.id,
-              backoffSeconds(job.attempts, random),
-              failure.message,
-            ]),
-          );
+          log({
+            requestId: job.id,
+            tenantId: job.tenantId,
+            route: "worker",
+            event: dead ? "job.dead" : "job.retry",
+            jobType: job.type,
+            outcome: dead ? "dead" : "retry",
+            errorCode: failure.code,
+            attempts: job.attempts,
+            durationMs: Date.now() - startedAt,
+          });
         }
-      } catch (recordError) {
-        log({
-          requestId: job.id,
-          tenantId: job.tenantId,
-          route: "worker",
-          event: "job.record_failed",
-          jobType: job.type,
-          errorCode: classify(recordError).code,
-          durationMs: Date.now() - startedAt,
-        });
-      }
-      log({
-        requestId: job.id,
-        tenantId: job.tenantId,
-        route: "worker",
-        event: dead ? "job.dead" : "job.retry",
-        jobType: job.type,
-        outcome: dead ? "dead" : "retry",
-        errorCode: failure.code,
-        attempts: job.attempts,
-        durationMs: Date.now() - startedAt,
-      });
-    }
+      },
+      parent === undefined ? {} : { parent },
+    );
   }
 
   async function seedRetention(): Promise<void> {

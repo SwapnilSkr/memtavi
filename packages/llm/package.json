@@ -9,5 +9,8 @@
     "./openai-embeddings": "./src/openai-embeddings.ts",
     "./fake": "./src/fake.ts",
     "./cost": "./src/cost.ts"
+  },
+  "dependencies": {
+    "@memtavi/shared": "workspace:*"
   }
 }

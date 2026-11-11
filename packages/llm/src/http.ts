@@ -11,6 +11,11 @@ export interface PostJsonOptions {
   timeoutMs: number;
 }
 
+export interface PostJsonResult {
+  payload: unknown;
+  status: number;
+}
+
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -33,7 +38,7 @@ export function classifyStatus(status: number): ProviderError {
   return new ProviderError("bad_request", false, "Provider rejected the request", status);
 }
 
-export async function postJson(url: string, options: PostJsonOptions): Promise<unknown> {
+export async function postJson(url: string, options: PostJsonOptions): Promise<PostJsonResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), options.timeoutMs);
 
@@ -51,7 +56,7 @@ export async function postJson(url: string, options: PostJsonOptions): Promise<u
     const text = await response.text();
     if (!response.ok) throw classifyStatus(response.status);
     try {
-      return JSON.parse(text);
+      return { payload: JSON.parse(text), status: response.status };
     } catch {
       throw malformedResponse();
     }

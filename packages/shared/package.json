@@ -6,6 +6,16 @@
   "exports": {
     "./ids": "./src/ids.ts",
     "./logging": "./src/logging.ts",
+    "./telemetry": "./src/telemetry.ts",
     "./webhooks": "./src/webhooks.ts"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "1.9.0",
+    "@opentelemetry/context-async-hooks": "2.11.0",
+    "@opentelemetry/core": "2.11.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.222.0",
+    "@opentelemetry/resources": "2.11.0",
+    "@opentelemetry/sdk-trace-base": "2.11.0",
+    "@opentelemetry/sdk-trace-node": "2.11.0"
   }
 }

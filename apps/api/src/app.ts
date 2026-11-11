@@ -1,9 +1,11 @@
+import { withIsolatedTrace } from "@memtavi/shared/telemetry";
 import { Elysia } from "elysia";
 import type { AppConfig, RouteConfig } from "./lib/config";
 import { createRateLimiter } from "./lib/rate-limit";
 import { errors } from "./middleware/errors";
 import { requestId } from "./middleware/request-id";
 import { requestLog } from "./middleware/request-log";
+import { telemetry } from "./middleware/telemetry";
 import { apiKeyRoutes } from "./routes/api-keys";
 import { brainRoutes } from "./routes/brains";
 import { captureRoutes } from "./routes/captures";
@@ -28,8 +30,9 @@ export function createApp(config: AppConfig) {
       ...(config.now === undefined ? {} : { now: config.now }),
     }),
   };
-  return new Elysia()
+  const app = new Elysia()
     .decorate("securityDenials", securityDenials)
+    .use(telemetry())
     .use(requestId)
     .use(errors(config.now ?? (() => new Date()), securityDenials))
     .use(requestLog(config.logger))
@@ -47,4 +50,12 @@ export function createApp(config: AppConfig) {
     .use(webhookRoutes(routeConfig))
     .use(memberRoutes(routeConfig))
     .use(tenantRoutes(routeConfig));
+
+  const fetch = app.fetch.bind(app);
+  Object.defineProperty(app, "fetch", {
+    value: (request: Request) => withIsolatedTrace(() => fetch(request)),
+    configurable: true,
+    writable: true,
+  });
+  return app;
 }

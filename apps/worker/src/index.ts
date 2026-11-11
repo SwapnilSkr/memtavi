@@ -2,6 +2,7 @@ import { DEFAULT_CHAT_PRICES } from "@memtavi/llm/cost";
 import { createOpenAIImbeddings } from "@memtavi/llm/openai-embeddings";
 import { createOpenRouterChat } from "@memtavi/llm/openrouter";
 import { createLogger } from "@memtavi/shared/logging";
+import { initTelemetry } from "@memtavi/shared/telemetry";
 import { createWorker } from "./worker";
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -44,6 +45,7 @@ const tenantIds = (process.env.WORKER_TENANT_IDS ?? "")
 if (tenantIds.length === 0) throw new Error("WORKER_TENANT_IDS is required");
 if (tenantIds.some((id) => !uuidPattern.test(id))) throw new Error("Invalid WORKER_TENANT_IDS");
 
+const telemetry = initTelemetry();
 const { buildStoreFromEnv } = await import("@memtavi/storage/config");
 const { pool, withTenant } = await import("@memtavi/db/client");
 const store = await buildStoreFromEnv(process.env);
@@ -93,4 +95,5 @@ process.once("SIGINT", () => {
 });
 
 await worker.start();
+await telemetry.shutdown();
 await pool.end();

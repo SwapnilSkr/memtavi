@@ -1,3 +1,4 @@
+import { currentTraceparent } from "@memtavi/shared/telemetry";
 import { Pool, type PoolClient } from "pg";
 
 const url = process.env.APP_DATABASE_URL;
@@ -19,6 +20,10 @@ export async function withTenant<T>(
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [tenantId]);
     if (subjectId?.trim()) {
       await client.query("SELECT set_config('app.subject_id', $1, true)", [subjectId]);
+    }
+    const traceparent = currentTraceparent();
+    if (traceparent !== null) {
+      await client.query("SELECT set_config('app.traceparent', $1, true)", [traceparent]);
     }
     const result = await fn(client);
     await client.query("COMMIT");

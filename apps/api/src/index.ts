@@ -1,4 +1,5 @@
 import { createOpenAIImbeddings } from "@memtavi/llm/openai-embeddings";
+import { initTelemetry } from "@memtavi/shared/telemetry";
 import { Pool } from "pg";
 import { createApp } from "./app";
 
@@ -12,8 +13,10 @@ const rateLimitPerMinute = Number(process.env.RATE_LIMIT_PER_MINUTE ?? 300);
 if (!Number.isInteger(rateLimitPerMinute) || rateLimitPerMinute < 1) {
   throw new Error("Invalid RATE_LIMIT_PER_MINUTE");
 }
+const telemetry = initTelemetry();
 const { buildStoreFromEnv } = await import("@memtavi/storage/config");
 const { pool, withTenant } = await import("@memtavi/db/client");
+
 const ownerPool = new Pool({ connectionString: databaseUrl });
 const store = await buildStoreFromEnv(process.env);
 const embeddingKey = process.env.OPENAI_API_KEY;
@@ -35,6 +38,7 @@ const app = createApp({
 
 async function shutdown() {
   await app.stop();
+  await telemetry.shutdown();
   await Promise.all([ownerPool.end(), pool.end()]);
 }
 
