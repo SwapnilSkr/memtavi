@@ -27,6 +27,7 @@ interface SourceRow {
   status: string;
   deleted_at: Date | null;
   awaiting_approval: boolean;
+  body_dropped_at: Date | null;
 }
 
 interface PageRow {
@@ -119,7 +120,7 @@ async function compileSource({
   );
   if (!brain.rowCount) return;
   const sources = await client.query<SourceRow>(
-    `SELECT content, body_ref, subject_id, status, deleted_at, awaiting_approval FROM ingest_sources
+    `SELECT content, body_ref, subject_id, status, deleted_at, awaiting_approval, body_dropped_at FROM ingest_sources
      WHERE tenant_id = $1 AND brain_id = $2 AND id = $3 FOR UPDATE`,
     scope,
   );
@@ -127,6 +128,7 @@ async function compileSource({
   if (
     !source ||
     source.deleted_at ||
+    source.body_dropped_at ||
     source.awaiting_approval ||
     (!isReview && source.status === "completed")
   )
@@ -695,7 +697,7 @@ async function compileSource({
   } else {
     await client.query(
       `UPDATE ingest_sources SET status = 'completed', compiled_at = now(), affected_page_ids = $4,
-       metadata = metadata || $5::jsonb, last_error = NULL
+       metadata = metadata || $5::jsonb, last_error = NULL, summary = $6
      WHERE tenant_id = $1 AND brain_id = $2 AND id = $3`,
       [
         ...scope,
@@ -706,6 +708,10 @@ async function compileSource({
             patch: promptVersion("patch"),
           },
         }),
+        facts
+          .map((fact) => fact.claim)
+          .join("\n")
+          .slice(0, 4_000),
       ],
     );
   }

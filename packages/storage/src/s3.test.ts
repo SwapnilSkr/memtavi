@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import type { S3Client } from "@aws-sdk/client-s3";
+import { YAML } from "bun";
 import { createS3Store, type SignedUrlInput } from "./s3";
 import { StorageError } from "./types";
 
@@ -30,6 +31,28 @@ const base = {
 };
 
 const key = "sources/tenant/source/hash.txt";
+
+test("storage template limits worker bucket listing to retention body prefixes", async () => {
+  const template = YAML.parse(
+    await Bun.file(new URL("../../../infra/storage.yaml", import.meta.url)).text(),
+  ) as {
+    Resources: {
+      WorkerStoragePolicy: {
+        Properties: { PolicyDocument: { Statement: Record<string, unknown>[] } };
+      };
+    };
+  };
+  const statements = template.Resources.WorkerStoragePolicy.Properties.PolicyDocument.Statement;
+  expect(statements).toHaveLength(2);
+  expect(statements[1]).toEqual({
+    Effect: "Allow",
+    Action: "s3:ListBucket",
+    Resource: "MediaBucket.Arn",
+    Condition: {
+      StringLike: { "s3:prefix": ["sources/*", "chunks/*", "originals/*"] },
+    },
+  });
+});
 
 function failure(status: number, name: string): Error {
   return Object.assign(new Error(name), { name, $metadata: { httpStatusCode: status } });
@@ -191,5 +214,47 @@ test("rejects a traversing key before calling the client", async () => {
     .catch((cause: unknown) => cause);
   expect(error).toBeInstanceOf(StorageError);
   expect(error).toMatchObject({ code: "invalid_key", transient: false });
+  expect(calls).toHaveLength(0);
+});
+
+test("lists every page within the exact source directory", async () => {
+  const { client, calls } = fakeClient(async (_name, input) =>
+    input.ContinuationToken
+      ? {
+          Contents: [
+            { Key: "sources/tenant/source/b.txt" },
+            { Key: "sources/foreign/source/c.txt" },
+          ],
+          IsTruncated: false,
+        }
+      : {
+          Contents: [{ Key: "sources/tenant/source/nested/a.txt" }],
+          IsTruncated: true,
+          NextContinuationToken: "next-page",
+        },
+  );
+  const store = createS3Store({ ...base, client });
+  expect(await store.list?.("sources/tenant/source")).toEqual([
+    "sources/tenant/source/b.txt",
+    "sources/tenant/source/nested/a.txt",
+  ]);
+  expect(calls.map((call) => call.name)).toEqual(["ListObjectsV2Command", "ListObjectsV2Command"]);
+  expect(calls[0]?.input).toEqual({ Bucket: base.bucket, Prefix: "sources/tenant/source/" });
+  expect(calls[1]?.input.ContinuationToken).toBe("next-page");
+});
+
+test("refuses incomplete object listings instead of losing cleanup keys", async () => {
+  const { client } = fakeClient(async () => ({ IsTruncated: true }));
+  const store = createS3Store({ ...base, client });
+  await expect(store.list?.("sources/tenant/source")).rejects.toMatchObject({
+    code: "unavailable",
+    transient: true,
+  });
+});
+
+test("rejects a traversing listing prefix before sending a request", async () => {
+  const { client, calls } = fakeClient();
+  const store = createS3Store({ ...base, client });
+  await expect(store.list?.("../escape")).rejects.toMatchObject({ code: "invalid_key" });
   expect(calls).toHaveLength(0);
 });

@@ -2,6 +2,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -100,6 +101,34 @@ export function createS3Store(options: S3StoreOptions): ObjectStore {
   const { bucket, keyPairId, privateKey } = options;
 
   return {
+    async list(prefix: string): Promise<string[]> {
+      const directory = `${assertSafeKey(prefix)}/`;
+      const keys = new Set<string>();
+      let token: string | undefined;
+      try {
+        do {
+          const page = await client.send(
+            new ListObjectsV2Command({
+              Bucket: bucket,
+              Prefix: directory,
+              ...(token === undefined ? {} : { ContinuationToken: token }),
+            }),
+          );
+          for (const item of page.Contents ?? []) {
+            if (item.Key?.startsWith(directory)) keys.add(assertSafeKey(item.Key));
+          }
+          if (!page.IsTruncated) break;
+          if (!page.NextContinuationToken || page.NextContinuationToken === token) {
+            throw new StorageError("unavailable", true, "Object listing is incomplete");
+          }
+          token = page.NextContinuationToken;
+        } while (token !== undefined);
+        return [...keys].sort();
+      } catch (error) {
+        throw toStorageError(error);
+      }
+    },
+
     async put(key: string, body: ObjectBody, contentType: string): Promise<void> {
       assertSafeKey(key);
       try {

@@ -30,7 +30,7 @@ export async function purgeBrain({ job, store, withTenant }: JobContext): Promis
     if (operation.state === "purging") return operation;
 
     const sources = await client.query<{ id: string; body_ref: string | null; metadata: unknown }>(
-      "SELECT id, body_ref, metadata FROM ingest_sources WHERE tenant_id = $1 AND brain_id = $2",
+      "SELECT id, body_ref, metadata, body_delete_keys FROM ingest_sources WHERE tenant_id = $1 AND brain_id = $2",
       scope,
     );
     const chunks = await client.query<{ body_ref: string | null }>(

@@ -35,7 +35,7 @@ Keys are content-addressed and immutable, so a changed body is a new object and 
 - CloudFront reaches the bucket only through OAC, and the bucket policy scopes `s3:GetObject` to this distribution's ARN.
 - Every viewer request must be a signed URL. An unsigned request returns `403`.
 - The CloudFront private key lives in SSM SecureString and in `infra/.keys/<env>/` (gitignored). It is never committed.
-- IAM: `memtavi-storage-worker-dev` can put/get/delete under `sources/`, `chunks/`, `originals/`; `memtavi-storage-api-dev` can get those and put under `exports/`. No wildcard `s3:*`, no bucket-wide list.
+- IAM: after updating the storage stack, `memtavi-storage-worker-dev` can put/get/delete under `sources/`, `chunks/`, `originals/` and list only those prefixes; `memtavi-storage-api-dev` can get those and put under `exports/`. No wildcard `s3:*`, no bucket-wide list.
 
 ## Lifecycle
 

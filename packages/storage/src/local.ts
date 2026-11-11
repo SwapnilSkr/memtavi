@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, resolve, sep } from "node:path";
 import { assertSafeKey, bodyBytes, sameBytes } from "./keys";
 import { type ObjectBody, type ObjectStore, StorageError } from "./types";
@@ -32,6 +32,26 @@ export function createLocalStore(rootDir = ".storage"): ObjectStore {
   const root = resolve(rootDir);
 
   return {
+    async list(prefix: string): Promise<string[]> {
+      const keys: string[] = [];
+      async function visit(directory: string): Promise<void> {
+        const entries = await readdir(resolveKey(root, directory), { withFileTypes: true });
+        for (const entry of entries) {
+          const key = `${directory}/${entry.name}`;
+          if (entry.isDirectory()) await visit(key);
+          else if (entry.isFile()) keys.push(key);
+        }
+      }
+      try {
+        await visit(prefix);
+        return keys.sort();
+      } catch (error) {
+        const mapped = toStorageError(error);
+        if (mapped.code === "not_found") return [];
+        throw mapped;
+      }
+    },
+
     async put(key: string, body: ObjectBody): Promise<void> {
       const target = resolveKey(root, key);
       const bytes = bodyBytes(body);

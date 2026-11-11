@@ -266,8 +266,12 @@ export const ingestSources = pgTable(
     brainId: text("brain_id").notNull(),
     kind: captureKind("kind").notNull(),
     content: text("content").notNull(),
+    summary: text("summary").notNull().default(""),
     bodyRef: text("body_ref"),
     bodyBytes: integer("body_bytes").notNull().default(0),
+    uncitedSince: timestamp("uncited_since", { withTimezone: true }),
+    bodyDroppedAt: timestamp("body_dropped_at", { withTimezone: true }),
+    bodyDeleteKeys: text("body_delete_keys").array().notNull().default(sql`'{}'::text[]`),
     contentHash: text("content_hash").notNull(),
     originRef: text("origin_ref"),
     label: text("label"),
@@ -286,6 +290,12 @@ export const ingestSources = pgTable(
   },
   (table) => [
     unique("ingest_sources_tenant_id_unique").on(table.tenantId, table.id),
+    index("ingest_sources_retention_idx")
+      .on(table.tenantId, table.uncitedSince, table.id)
+      .where(sql`${table.bodyDroppedAt} IS NULL AND ${table.status} = 'completed'`),
+    index("ingest_sources_body_cleanup_idx")
+      .on(table.tenantId, table.id)
+      .where(sql`cardinality(${table.bodyDeleteKeys}) > 0`),
     index("ingest_sources_brain_created_idx").on(
       table.tenantId,
       table.subjectId,
@@ -420,6 +430,7 @@ export const pageSources = pgTable(
   },
   (table) => [
     index("page_sources_tenant_idx").on(table.tenantId),
+    index("page_sources_retention_idx").on(table.tenantId, table.ingestSourceId),
     foreignKey({
       columns: [table.tenantId, table.pageId],
       foreignColumns: [pages.tenantId, pages.id],
@@ -640,6 +651,11 @@ export const jobs = pgTable(
     unique("jobs_tenant_brain_id_unique").on(table.tenantId, table.brainId, table.id),
     unique("jobs_tenant_idempotency_unique").on(table.tenantId, table.idempotencyKey),
     index("jobs_status_available_idx").on(table.status, table.availableAt),
+    index("jobs_retention_source_idx").on(
+      table.tenantId,
+      table.brainId,
+      sql`(${table.payload}->>'sourceId')`,
+    ),
     foreignKey({
       columns: [table.tenantId, table.brainId],
       foreignColumns: [brains.tenantId, brains.id],
@@ -741,7 +757,14 @@ export const idempotencyKeys = pgTable(
     responseBody: jsonb("response_body").$type<unknown>().notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   },
-  (table) => [primaryKey({ columns: [table.tenantId, table.scope, table.key] })],
+  (table) => [
+    primaryKey({ columns: [table.tenantId, table.scope, table.key] }),
+    index("idempotency_keys_retention_idx").on(
+      table.tenantId,
+      table.scope,
+      sql`(${table.responseBody}->>'id')`,
+    ),
+  ],
 );
 
 export const deletionOps = pgTable(

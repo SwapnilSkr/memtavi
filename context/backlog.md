@@ -19,7 +19,6 @@ Ordered by product value per unit of risk. Remove items as they land.
 
 ## Product gaps
 
-- **Retention**: sources and chunks never expire; add the citation-aware 90-day body drop.
 - **Webhooks UI**: API and CLI exist; the inspector has no webhooks screen.
 - **Inspector read cost**: the pages table fetches full bodies; switch to `/index` and add pagination.
 - **Eval quality**: 15% exact / 0.205 F1 on a 20-question slice, 37 reviews; run full LoCoMo before tuning prompts.
@@ -32,6 +31,7 @@ Ordered by product value per unit of risk. Remove items as they land.
 - API and worker are not hosted; only S3 and CloudFront exist.
 - Custom domain + ACM certificate for CloudFront (TLS 1.2 minimum).
 - CloudFront standard logging v2, AWS Budget alarm.
+- Update the storage stack (worker `s3:ListBucket` on source prefixes, for retention).
 - Attach `memtavi-storage-*` policies to task roles; stop using the root CLI identity.
 - Choose a hosting shape: single VPS + systemd, Fly/Render, or ECS/Fargate.
 

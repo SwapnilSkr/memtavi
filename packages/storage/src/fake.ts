@@ -5,6 +5,11 @@ export function createFakeStore(): ObjectStore {
   const objects = new Map<string, Uint8Array>();
 
   return {
+    async list(prefix: string): Promise<string[]> {
+      const directory = `${assertSafeKey(prefix)}/`;
+      return [...objects.keys()].filter((key) => key.startsWith(directory)).sort();
+    },
+
     async put(key: string, body: ObjectBody): Promise<void> {
       assertSafeKey(key);
       const bytes = bodyBytes(body);
