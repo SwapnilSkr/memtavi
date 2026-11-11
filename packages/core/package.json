@@ -5,6 +5,8 @@
   "type": "module",
   "exports": {
     "./compile/chunk": "./src/compile/chunk.ts",
+    "./compile/connect": "./src/compile/connect.ts",
+    "./compile/policies/crs": "./src/compile/policies/crs.ts",
     "./compile/schemas": "./src/compile/schemas.ts",
     "./compile/extract": "./src/compile/extract.ts",
     "./compile/policies/mws": "./src/compile/policies/mws.ts",

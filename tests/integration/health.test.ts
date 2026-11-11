@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { createApp } from "@memtavi/api/app";
 import type { ExtractedFact } from "@memtavi/core/compile/schemas";
 import type { HealthFactor } from "@memtavi/core/health/compute";
@@ -206,6 +206,14 @@ describe.skipIf(!ownerUrl || !appUrl)("brain health snapshots", () => {
     failChat = undefined;
   });
 
+  afterEach(async () => {
+    const instance = worker();
+    for (let i = 0; i < 20; i += 1) {
+      if (!(await instance.runOnce())) return;
+    }
+    throw new Error("Health fixture queue did not drain");
+  });
+
   afterAll(async () => {
     if (fixturesAuthorized) {
       const actors = await owner.query<{ created_by: string }>(
@@ -230,7 +238,8 @@ describe.skipIf(!ownerUrl || !appUrl)("brain health snapshots", () => {
     expect(await instance.runOnce()).toBe(true);
 
     const queued = await owner.query<{ type: string; status: string }>(
-      "SELECT type, status FROM jobs WHERE brain_id = $1 ORDER BY type",
+      `SELECT type, status FROM jobs WHERE brain_id = $1
+       AND type IN ('capture.compile', 'score.snapshot') ORDER BY type`,
       [brainId],
     );
     expect(queued.rows).toEqual([
@@ -241,7 +250,8 @@ describe.skipIf(!ownerUrl || !appUrl)("brain health snapshots", () => {
 
     expect(await instance.runOnce()).toBe(true);
     const jobs = await owner.query<{ type: string; status: string }>(
-      "SELECT type, status FROM jobs WHERE brain_id = $1 ORDER BY type",
+      `SELECT type, status FROM jobs WHERE brain_id = $1
+       AND type IN ('capture.compile', 'score.snapshot') ORDER BY type`,
       [brainId],
     );
     expect(jobs.rows).toEqual([

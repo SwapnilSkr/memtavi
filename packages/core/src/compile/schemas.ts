@@ -78,3 +78,21 @@ export const routeDecisionSchema = z.discriminatedUnion("action", [
 export type ExtractedFact = z.infer<typeof extractedFactSchema>;
 export type PatchResult = z.infer<typeof patchResultSchema>;
 export type RouteDecision = z.infer<typeof routeDecisionSchema>;
+
+export const connectionResultSchema = z.object({
+  connections: z.array(
+    z.object({
+      pageAId: z.string().min(1),
+      pageBId: z.string().min(1),
+      strength: z.enum(["strong", "medium", "weak", "noise"]),
+      reasoning: z
+        .string()
+        .trim()
+        .min(1)
+        .max(500)
+        .regex(/^[^\r\n\u2028\u2029]+$/u),
+    }),
+  ),
+});
+
+export type ConnectionJudgement = z.infer<typeof connectionResultSchema>["connections"][number];
