@@ -9,6 +9,8 @@ links: status
 
 Newest first. One line per shipped change: what, where, why. Not a commit log.
 
+- **2026-11-11** — `POST /pages/{slug}/resolve` (`resolvePage`): a contested page goes back to `active` with a note on an `updated` change event; an edited body writes a user version and re-embeds. `listPages` takes `status` (the contested queue). User page edits now fan out webhooks.
+
 - **2026-11-11** — Page versions: `listPageVersions`, `getPageVersion` and `diffPageVersions` (line diff, 3 lines of context, `diff@9.0.0`, 5000-line cap). Reading versions never bumps `lastReferencedAt`.
 
 - **2026-11-11** — `POST /sources/{sourceId}/retry` (`retryIngestSource`): a `failed` source goes back to `pending` with one recompile (or re-ingest when no body is stored), same source id, no extra storage usage; anything else is `409`. `attempts` counts manual retries.

@@ -15,6 +15,29 @@ export const pageColumns = `id, subject_id AS "subjectId", brain_id AS "brainId"
 
 const recency = `COALESCE(last_compiled_at, last_referenced_at)`;
 
+export interface LockedPage {
+  id: string;
+  version: number;
+  title: string;
+  summary: string;
+  body: string;
+  status: string;
+  bucket: string;
+  pinned: boolean;
+  archived: boolean;
+}
+
+export type ChangeAction =
+  | "created"
+  | "updated"
+  | "renamed"
+  | "merged"
+  | "split"
+  | "archived"
+  | "restored"
+  | "recovered"
+  | "routed";
+
 export async function requireBrain(
   client: PoolClient,
   tenantId: string,
@@ -29,26 +52,106 @@ export async function requireBrain(
   if (!result.rowCount) throw new DomainError("NotFoundError", 404, "Not found");
 }
 
+export async function lockPageBySlug(
+  client: PoolClient,
+  tenantId: string,
+  subjectId: string,
+  brainId: string,
+  slug: string,
+): Promise<LockedPage> {
+  const result = await client.query<LockedPage>(
+    `SELECT ${pageColumns} FROM pages
+     WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND slug = $4
+     AND deletion_state = 'active'
+     FOR UPDATE`,
+    [tenantId, subjectId, brainId, slug],
+  );
+  const page = result.rows[0];
+  if (!page) throw new DomainError("NotFoundError", 404, "Not found");
+  return page;
+}
+
+export async function insertPageVersion(
+  client: PoolClient,
+  tenantId: string,
+  pageId: string,
+  version: number,
+  title: string,
+  summary: string,
+  body: string,
+): Promise<void> {
+  await client.query(
+    `INSERT INTO page_versions (tenant_id, page_id, version, title, summary, body, ingest_source_id, actor)
+     VALUES ($1, $2, $3, $4, $5, $6, NULL, 'user')`,
+    [tenantId, pageId, version, title, summary, body],
+  );
+}
+
+export async function insertChangeEvent(
+  client: PoolClient,
+  tenantId: string,
+  brainId: string,
+  pageId: string,
+  action: ChangeAction,
+  changeSummary: string,
+  fromVersion: number | null,
+  toVersion: number,
+): Promise<string> {
+  const id = newId("change");
+  await client.query(
+    `INSERT INTO change_events
+       (id, tenant_id, brain_id, page_id, action, change_summary, from_version, to_version, contradictions)
+     VALUES ($1, $2, $3, $4, $5::change_action, $6, $7, $8, '[]'::jsonb)`,
+    [id, tenantId, brainId, pageId, action, changeSummary, fromVersion, toVersion],
+  );
+  return id;
+}
+
+export async function enqueueWebhooks(
+  client: PoolClient,
+  tenantId: string,
+  brainId: string,
+  eventId: string,
+  subjectId: string,
+  action: ChangeAction,
+): Promise<void> {
+  await client.query(
+    `INSERT INTO jobs (tenant_id, brain_id, type, payload, idempotency_key, max_attempts)
+     SELECT $1, $2, 'webhook.deliver',
+       jsonb_build_object('webhookId', w.id, 'eventId', $3::text),
+       'webhook:' || $3::text || ':' || w.id::text,
+       5
+     FROM webhooks w
+     WHERE w.tenant_id = $1 AND w.subject_id = $4 AND w.active = true
+       AND $5::text = ANY(w.events)
+     ON CONFLICT (tenant_id, idempotency_key) DO NOTHING`,
+    [tenantId, brainId, eventId, subjectId, action],
+  );
+}
+
 export async function listPages(
   client: PoolClient,
   tenantId: string,
   subjectId: string,
   brainId: string,
+  status: string | null,
   limit: number,
   offset: number,
 ) {
   await requireBrain(client, tenantId, subjectId, brainId);
   const total = await client.query<{ total: number }>(
     `SELECT count(*)::int AS total FROM pages
-     WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND deletion_state = 'active'`,
-    [tenantId, subjectId, brainId],
+     WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND deletion_state = 'active'
+     AND ($4::page_status IS NULL OR status = $4::page_status)`,
+    [tenantId, subjectId, brainId, status],
   );
   const items = await client.query(
     `SELECT ${pageColumns} FROM pages
      WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND deletion_state = 'active'
+     AND ($4::page_status IS NULL OR status = $4::page_status)
      ORDER BY pinned DESC, ${recency} DESC NULLS LAST, slug, id
-     LIMIT $4 OFFSET $5`,
-    [tenantId, subjectId, brainId, limit, offset],
+     LIMIT $5 OFFSET $6`,
+    [tenantId, subjectId, brainId, status, limit, offset],
   );
   return { items: items.rows, total: total.rows[0]?.total ?? 0, limit, offset };
 }
@@ -150,6 +253,46 @@ export async function deletePagePermanently(
   return { id: page.id, targetType: "page", state: "deleted" };
 }
 
+export async function refreshPageEmbedding(
+  client: PoolClient,
+  tenantId: string,
+  subjectId: string,
+  brainId: string,
+  pageId: string,
+  embeddingText: string,
+  hash: string,
+  embeddings: EmbeddingProvider,
+): Promise<unknown> {
+  await client.query("SAVEPOINT page_embedding");
+  try {
+    const embedded = await embeddings.embed([embeddingText]);
+    const vector = embedded.vectors[0];
+    if (!vector) {
+      await client.query("RELEASE SAVEPOINT page_embedding");
+      return null;
+    }
+    await client.query(
+      `INSERT INTO page_embeddings (tenant_id, page_id, model, dimensions, embedding, content_hash)
+       VALUES ($1, $2, $3, $4, $5::vector, $6)
+       ON CONFLICT (page_id, model) DO UPDATE SET embedding = EXCLUDED.embedding,
+       dimensions = EXCLUDED.dimensions, content_hash = EXCLUDED.content_hash
+       WHERE page_embeddings.tenant_id = $1`,
+      [tenantId, pageId, embedded.model, embedded.dimensions, JSON.stringify(vector), hash],
+    );
+    const embeddedPage = await client.query(
+      `UPDATE pages SET embedding_model = $5
+       WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND id = $4
+       RETURNING ${pageColumns}`,
+      [tenantId, subjectId, brainId, pageId, embedded.model],
+    );
+    await client.query("RELEASE SAVEPOINT page_embedding");
+    return embeddedPage.rows[0] ?? null;
+  } catch {
+    await client.query("ROLLBACK TO SAVEPOINT page_embedding");
+    return null;
+  }
+}
+
 export async function updatePageBySlug(
   client: PoolClient,
   tenantId: string,
@@ -160,15 +303,7 @@ export async function updatePageBySlug(
   embeddings: EmbeddingProvider | null,
 ) {
   await requireBrain(client, tenantId, subjectId, brainId);
-  const current = await client.query(
-    `SELECT ${pageColumns} FROM pages
-     WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND slug = $4
-     AND deletion_state = 'active'
-     FOR UPDATE`,
-    [tenantId, subjectId, brainId, slug],
-  );
-  const page = current.rows[0];
-  if (!page) throw new DomainError("NotFoundError", 404, "Not found");
+  const page = await lockPageBySlug(client, tenantId, subjectId, brainId, slug);
   if (update.version !== undefined && update.version !== page.version) {
     throw new DomainError("ConflictError", 409, "Version conflict");
   }
@@ -203,45 +338,32 @@ export async function updatePageBySlug(
     ],
   );
 
-  await client.query(
-    `INSERT INTO page_versions (tenant_id, page_id, version, title, summary, body, ingest_source_id, actor)
-     VALUES ($1, $2, $3, $4, $5, $6, NULL, 'user')`,
-    [tenantId, page.id, version, title, summary, body],
+  await insertPageVersion(client, tenantId, page.id, version, title, summary, body);
+  const eventId = await insertChangeEvent(
+    client,
+    tenantId,
+    brainId,
+    page.id,
+    "updated",
+    "Edited by user",
+    page.version,
+    version,
   );
-  await client.query(
-    `INSERT INTO change_events
-       (id, tenant_id, brain_id, page_id, action, change_summary, from_version, to_version)
-     VALUES ($1, $2, $3, $4, 'updated', 'Edited by user', $5, $6)`,
-    [newId("change"), tenantId, brainId, page.id, page.version, version],
-  );
+  await enqueueWebhooks(client, tenantId, brainId, eventId, subjectId, "updated");
 
   let result = updated.rows[0];
   if (embeddings) {
-    await client.query("SAVEPOINT page_embedding");
-    try {
-      const embedded = await embeddings.embed([embeddingText]);
-      const vector = embedded.vectors[0];
-      if (vector) {
-        await client.query(
-          `INSERT INTO page_embeddings (tenant_id, page_id, model, dimensions, embedding, content_hash)
-           VALUES ($1, $2, $3, $4, $5::vector, $6)
-           ON CONFLICT (page_id, model) DO UPDATE SET embedding = EXCLUDED.embedding,
-           dimensions = EXCLUDED.dimensions, content_hash = EXCLUDED.content_hash
-           WHERE page_embeddings.tenant_id = $1`,
-          [tenantId, page.id, embedded.model, embedded.dimensions, JSON.stringify(vector), hash],
-        );
-        const embeddedPage = await client.query(
-          `UPDATE pages SET embedding_model = $5
-           WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND id = $4
-           RETURNING ${pageColumns}`,
-          [tenantId, subjectId, brainId, page.id, embedded.model],
-        );
-        result = embeddedPage.rows[0] ?? result;
-      }
-      await client.query("RELEASE SAVEPOINT page_embedding");
-    } catch {
-      await client.query("ROLLBACK TO SAVEPOINT page_embedding");
-    }
+    const embeddedPage = await refreshPageEmbedding(
+      client,
+      tenantId,
+      subjectId,
+      brainId,
+      page.id,
+      embeddingText,
+      hash,
+      embeddings,
+    );
+    if (embeddedPage) result = embeddedPage;
   }
 
   return result;
