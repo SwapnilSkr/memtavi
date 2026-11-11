@@ -263,6 +263,16 @@ Resources:
               - !Sub "${MediaBucket.Arn}/chunks/*"
               - !Sub "${MediaBucket.Arn}/originals/*"
 
+          - Effect: Allow
+            Action: s3:ListBucket
+            Resource: !GetAtt MediaBucket.Arn
+            Condition:
+              StringLike:
+                s3:prefix:
+                  - sources/*
+                  - chunks/*
+                  - originals/*
+
   ApiStoragePolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:

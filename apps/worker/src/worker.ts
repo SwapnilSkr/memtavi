@@ -14,6 +14,7 @@ import { CONNECTION_CANDIDATES_SQL, discoverConnections } from "./connections";
 import { snapshotScore } from "./health";
 import { ingestCapture } from "./ingest";
 import { purgeBrain } from "./purge";
+import { sweepRetention } from "./retention";
 import {
   type ClaimedJob,
   type CompilerConfig,
@@ -24,6 +25,7 @@ import {
 } from "./types";
 import { deliverWebhook } from "./webhook";
 
+export { RETENTION_BATCH_SIZE, RETENTION_CANDIDATES_SQL, sweepRetention } from "./retention";
 export { CONNECTION_CANDIDATES_SQL };
 
 const CLAIM_SQL = `
@@ -41,7 +43,7 @@ const CLAIM_SQL = `
           (status = 'pending' AND available_at <= now())
           OR (status = 'running' AND lease_until <= now())
         )
-      ORDER BY (type IN ('score.snapshot', 'connections.discover')),
+      ORDER BY (type = 'retention.sweep'), (type IN ('score.snapshot', 'connections.discover')),
         (type = 'connections.discover'), available_at, id
       FOR UPDATE SKIP LOCKED
       LIMIT 1
@@ -93,6 +95,7 @@ export interface WorkerConfig {
   pollIntervalMs?: number;
   random?: () => number;
   log?: (event: Record<string, unknown>) => void;
+  now?: () => Date;
 }
 
 export interface Worker {
@@ -135,7 +138,7 @@ export function createWorker(config: WorkerConfig): Worker {
   const tenantIds = [...new Set(config.tenantIds.filter((id) => id.trim()))];
   if (tenantIds.length === 0) throw new Error("At least one tenant id is required");
 
-  const handlers = config.handlers ?? {
+  const handlers: Record<string, JobHandler> = config.handlers ?? {
     "capture.ingest": ingestCapture,
     "capture.compile": compileCapture,
     "connections.discover": discoverConnections,
@@ -143,6 +146,7 @@ export function createWorker(config: WorkerConfig): Worker {
     "score.snapshot": snapshotScore,
     "webhook.deliver": deliverWebhook,
     "brain.purge": purgeBrain,
+    "retention.sweep": sweepRetention,
   };
   const types = Object.keys(handlers);
   if (types.length === 0) throw new Error("At least one job handler is required");
@@ -211,7 +215,9 @@ export function createWorker(config: WorkerConfig): Worker {
         },
       };
       if (handler === discoverConnections) await discoverConnections(context);
-      else await withTenant(job.tenantId, (client) => handler({ ...context, client }));
+      else if (handler === sweepRetention) {
+        await sweepRetention({ ...context, ...(config.now ? { now: config.now } : {}) });
+      } else await withTenant(job.tenantId, (client) => handler({ ...context, client }));
       await withTenant(job.tenantId, (client) =>
         client.query(COMPLETE_SQL, [job.tenantId, job.id]),
       );
@@ -282,6 +288,28 @@ export function createWorker(config: WorkerConfig): Worker {
     }
   }
 
+  async function seedRetention(): Promise<void> {
+    if (handlers["retention.sweep"]) {
+      for (const tenantId of tenantIds) {
+        await withTenant(tenantId, async (client) => {
+          await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
+            `retention:${tenantId}`,
+          ]);
+          await client.query(
+            `INSERT INTO jobs (tenant_id, brain_id, type, payload, idempotency_key)
+               SELECT $1, b.id, 'retention.sweep', '{}', 'retention:' || gen_random_uuid()::text
+               FROM brains b WHERE b.tenant_id = $1 AND b.deletion_state = 'active'
+                 AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.tenant_id = $1
+                   AND j.type = 'retention.sweep' AND j.status IN ('pending', 'running'))
+               ORDER BY b.id LIMIT 1
+               FOR SHARE OF b`,
+            [tenantId],
+          );
+        });
+      }
+    }
+  }
+
   async function runOnce(): Promise<boolean> {
     const job = await claimNext();
     if (!job) return false;
@@ -307,7 +335,10 @@ export function createWorker(config: WorkerConfig): Worker {
     while (!stopping) {
       try {
         const worked = await runOnce();
-        if (!worked) await wait(pollIntervalMs);
+        if (!worked) {
+          await seedRetention();
+          await wait(pollIntervalMs);
+        }
       } catch (error) {
         log({
           requestId: null,
@@ -323,6 +354,7 @@ export function createWorker(config: WorkerConfig): Worker {
 
   async function start(): Promise<void> {
     if (loops.length > 0) throw new Error("Worker already started");
+    await seedRetention();
     for (let index = 0; index < concurrency; index += 1) loops.push(loop());
     await Promise.all(loops);
   }

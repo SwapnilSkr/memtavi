@@ -6,6 +6,7 @@ export type ObjectStore = {
   delete(key: string): Promise<void>;
   signedUrl(key: string, ttlSeconds: number): Promise<string | null>;
   exists(key: string): Promise<boolean>;
+  list?(prefix: string): Promise<string[]>;
 };
 
 export type StorageErrorCode =

@@ -12,11 +12,14 @@ interface SourceRow {
   content: string;
   metadata: Record<string, unknown>;
   awaiting_approval: boolean;
+  status: string;
 }
 
 const SOURCE_SQL = `
-  SELECT id, kind, content, metadata, awaiting_approval FROM ingest_sources
+  SELECT id, kind, content, metadata, awaiting_approval, status FROM ingest_sources
   WHERE tenant_id = $1 AND brain_id = $2 AND id = $3 AND deleted_at IS NULL
+    AND body_dropped_at IS NULL
+  FOR UPDATE
 `;
 
 const COMPILING_SQL = `
@@ -27,7 +30,11 @@ const COMPILING_SQL = `
 const STORE_SQL = `
   UPDATE ingest_sources
   SET content = $4, content_hash = $5, original_bytes = $6, body_ref = $7, body_bytes = $8,
-      metadata = metadata || $9::jsonb, status = 'compiling', last_error = NULL
+      metadata = metadata || $9::jsonb || CASE WHEN body_ref IS NOT NULL AND body_ref <> $7
+        THEN jsonb_build_object('bodyRefs',
+          CASE WHEN jsonb_typeof(metadata->'bodyRefs') = 'array' THEN metadata->'bodyRefs' ELSE '[]'::jsonb END
+          || jsonb_build_array(body_ref)) ELSE '{}'::jsonb END,
+      status = 'compiling', last_error = NULL
   WHERE tenant_id = $1 AND brain_id = $2 AND id = $3
 `;
 
@@ -108,7 +115,7 @@ export async function ingestCapture({
   const result = await client.query<SourceRow>(SOURCE_SQL, [job.tenantId, brainId, sourceId]);
   const source = result.rows[0];
   if (!source) throw new JobError("permanent", "Source not found");
-  if (source.awaiting_approval) return;
+  if (source.awaiting_approval || source.status === "completed") return;
 
   if (source.kind === "url") {
     await storeFetched(

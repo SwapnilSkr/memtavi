@@ -99,3 +99,27 @@ test("behaves the same as the local driver", async () => {
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("lists all nested objects only within a source directory in fake and local stores", async () => {
+  const root = await mkdtemp(join(tmpdir(), "memtavi-storage-list-"));
+  try {
+    for (const store of [createFakeStore(), createLocalStore(root)]) {
+      for (const key of [
+        "sources/tenant/source/b.txt",
+        "sources/tenant/source/nested/a.txt",
+        "sources/tenant/source-other/c.txt",
+        "sources/foreign/source/d.txt",
+      ]) {
+        await store.put(key, "body", "text/plain");
+      }
+      expect(await store.list?.("sources/tenant/source")).toEqual([
+        "sources/tenant/source/b.txt",
+        "sources/tenant/source/nested/a.txt",
+      ]);
+      expect(await store.list?.("sources/tenant/missing")).toEqual([]);
+      await expect(store.list?.("../escape")).rejects.toMatchObject({ code: "invalid_key" });
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

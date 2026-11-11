@@ -34,8 +34,10 @@ const fields = [
   "deletedAt",
 ] as const;
 
-export const sourceColumns = `id, brain_id AS "brainId", kind, content AS "contentPreview",
-  content_hash AS "contentHash", body_ref AS "bodyRef",
+export const sourceColumns = `id, brain_id AS "brainId", kind,
+  CASE WHEN body_dropped_at IS NULL THEN content ELSE '' END AS "contentPreview",
+  content_hash AS "contentHash",
+  CASE WHEN body_dropped_at IS NULL THEN body_ref END AS "bodyRef",
   origin_ref AS "originRef", label, bucket, metadata, status, awaiting_approval AS "awaitingApproval", attempts,
   last_error AS "lastError", affected_page_ids AS "affectedPageIds",
   original_bytes AS "originalBytes", created_at AS "createdAt", compiled_at AS "compiledAt",
@@ -441,7 +443,7 @@ export async function getSourceContent(
   const result = await client.query<{ bodyRef: string | null }>(
     `SELECT body_ref AS "bodyRef" FROM ingest_sources
      WHERE tenant_id = $1 AND subject_id = $2 AND brain_id = $3 AND id = $4
-     AND deleted_at IS NULL`,
+     AND deleted_at IS NULL AND body_dropped_at IS NULL`,
     [tenantId, subjectId, brainId, sourceId],
   );
   const bodyRef = result.rows[0]?.bodyRef;
