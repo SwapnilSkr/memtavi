@@ -3,6 +3,20 @@
 import typing
 
 WebhookCreateEventsItem = typing.Union[
-    typing.Literal["created", "updated", "renamed", "merged", "split", "archived", "restored", "recovered", "routed"],
+    typing.Literal[
+        "created",
+        "updated",
+        "renamed",
+        "merged",
+        "split",
+        "archived",
+        "restored",
+        "recovered",
+        "routed",
+        "brain.page.updated",
+        "brain.change.new",
+        "brain.connection.new",
+        "brain.import.progress",
+    ],
     typing.Any,
 ]

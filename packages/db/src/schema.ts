@@ -669,6 +669,32 @@ export const webhooks = pgTable(
   ],
 );
 
+export const webhookEvents = pgTable(
+  "webhook_events",
+  {
+    id: text("id").primaryKey(),
+    tenantId: uuid("tenant_id").notNull(),
+    brainId: text("brain_id").notNull(),
+    subjectId: uuid("subject_id").notNull(),
+    kind: text("kind").notNull(),
+    action: text("action"),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+  },
+  (table) => [
+    unique("webhook_events_tenant_id_unique").on(table.tenantId, table.id),
+    index("webhook_events_tenant_brain_idx").on(table.tenantId, table.brainId),
+    check("webhook_events_kind", sql`${table.kind} IN ('change', 'connection', 'import')`),
+    check(
+      "webhook_events_action",
+      sql`(${table.kind} = 'change' AND ${table.action} IS NOT NULL) OR (${table.kind} <> 'change' AND ${table.action} IS NULL)`,
+    ),
+    foreignKey({
+      columns: [table.tenantId, table.subjectId, table.brainId],
+      foreignColumns: [brains.tenantId, brains.subjectId, brains.id],
+    }).onDelete("cascade"),
+  ],
+);
+
 export const webhookDeliveries = pgTable(
   "webhook_deliveries",
   {
@@ -685,13 +711,18 @@ export const webhookDeliveries = pgTable(
   },
   (table) => [
     index("webhook_deliveries_tenant_idx").on(table.tenantId),
+    unique("webhook_deliveries_tenant_webhook_event_unique").on(
+      table.tenantId,
+      table.webhookId,
+      table.eventId,
+    ),
     foreignKey({
       columns: [table.tenantId, table.webhookId],
       foreignColumns: [webhooks.tenantId, webhooks.id],
     }).onDelete("cascade"),
     foreignKey({
       columns: [table.tenantId, table.eventId],
-      foreignColumns: [changeEvents.tenantId, changeEvents.id],
+      foreignColumns: [webhookEvents.tenantId, webhookEvents.id],
     }).onDelete("cascade"),
   ],
 );

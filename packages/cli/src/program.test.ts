@@ -408,6 +408,32 @@ describe("webhooks", () => {
     expect(h.out[0]).toContain("cannot be retrieved again");
   });
 
+  test("accepts all PRD event names", async () => {
+    const client = createFakeClient({ createdWebhook: { ...hook, secret: "whsec_once" } });
+    const h = harness(client);
+    const events = [
+      "brain.page.updated",
+      "brain.change.new",
+      "brain.connection.new",
+      "brain.import.progress",
+    ];
+    const code = await runCli(
+      [
+        "webhook",
+        "create",
+        "--url",
+        "https://example.com/hooks",
+        ...events.flatMap((event) => ["--event", event]),
+      ],
+      h.deps,
+    );
+    expect(code).toBe(0);
+    expect(call(client, "createWebhook")).toEqual({
+      method: "createWebhook",
+      args: [{ url: "https://example.com/hooks", events }],
+    });
+  });
+
   test("includes the secret in --json output", async () => {
     const client = createFakeClient({
       createdWebhook: { ...hook, secret: "whsec_once" },

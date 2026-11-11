@@ -843,6 +843,25 @@ describe.skipIf(!hasTestDatabase)("the API contract", () => {
     });
   });
 
+  test.each([
+    "brain.page.updated",
+    "brain.change.new",
+    "brain.connection.new",
+    "brain.import.progress",
+  ])("a webhook can subscribe to %s", async (event) => {
+    const response = await harness.request("/v1/webhooks", {
+      method: "POST",
+      body: { url: "https://example.invalid/prd", events: [event] },
+    });
+    const body = (await response.json()) as { id: string; events: string[] };
+    expect(response.status).toBe(201);
+    contract.expectContract(response, body, { method: "POST", path: "/v1/webhooks" });
+    expect(body.events).toEqual([event]);
+    expect((await harness.request(`/v1/webhooks/${body.id}`, { method: "DELETE" })).status).toBe(
+      204,
+    );
+  });
+
   test("invalid webhook events answer 422 and the length bounds answer 400", async () => {
     const cases: Array<{ label: string; events: string[]; status: number; message: string }> = [
       {

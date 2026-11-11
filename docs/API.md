@@ -7,7 +7,7 @@ file by hand; run `bun run spec:docs`.
 - Version: 1.0.0
 - Server: https://api.memtavi.com
 - Endpoints: 43 operations across 34 paths
-- Schemas: 57 component schemas
+- Schemas: 61 component schemas
 
 ## Authentication
 
@@ -161,7 +161,11 @@ Tenant routes (do not accept `x-subject-id`):
   - [`TargetType`](#targettype)
   - [`Tenant`](#tenant)
   - [`Webhook`](#webhook)
+  - [`WebhookChangePayload`](#webhookchangepayload)
+  - [`WebhookConnectionPayload`](#webhookconnectionpayload)
   - [`WebhookCreate`](#webhookcreate)
+  - [`WebhookImportPayload`](#webhookimportpayload)
+  - [`WebhookPayload`](#webhookpayload)
 
 ## Endpoints
 
@@ -2078,6 +2082,41 @@ Required: `id`, `subjectId`, `url`, `events`, `active`
 | `active` | `boolean` | yes |  |
 | `secret` | `string` | no | The plaintext signing secret. Returned only by the create response and never shown again; list and delete responses omit it. |
 
+### WebhookChangePayload
+
+Required: `deliveryId`, `eventId`, `type`, `brainId`, `pageId`, `changeSummary`, `fromVersion`, `toVersion`, `createdAt`
+
+| Property | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `deliveryId` | `string (uuid)` | yes |  |
+| `eventId` | `string` | yes |  |
+| `type` | `string` | yes | One of `created`, `updated`, `renamed`, `merged`, `split`, `archived`, `restored`, `recovered`, `routed`, `brain.page.updated`, `brain.change.new`. |
+| `action` | `string` | no | Present for PRD event names; omitted for legacy raw-action deliveries. One of `created`, `updated`, `renamed`, `merged`, `split`, `archived`, `restored`, `recovered`, `routed`. |
+| `brainId` | `string` | yes |  |
+| `pageId` | `string` | yes |  |
+| `changeSummary` | `string` | yes |  |
+| `fromVersion` | `integer \| null` | yes |  |
+| `toVersion` | `integer` | yes |  |
+| `createdAt` | `string (date-time)` | yes |  |
+
+### WebhookConnectionPayload
+
+Required: `deliveryId`, `eventId`, `type`, `brainId`, `connectionId`, `pageAId`, `pageBId`, `similarity`, `strength`, `reasoning`, `createdAt`
+
+| Property | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `deliveryId` | `string (uuid)` | yes |  |
+| `eventId` | `string` | yes |  |
+| `type` | `string` | yes | One of `brain.connection.new`. |
+| `brainId` | `string` | yes |  |
+| `connectionId` | `string` | yes |  |
+| `pageAId` | `string` | yes |  |
+| `pageBId` | `string` | yes |  |
+| `similarity` | `number` | yes |  |
+| `strength` | `string` | yes | One of `weak`, `medium`, `strong`. |
+| `reasoning` | `string` | yes |  |
+| `createdAt` | `string (date-time)` | yes |  |
+
 ### WebhookCreate
 
 Required: `url`, `events`
@@ -2085,4 +2124,25 @@ Required: `url`, `events`
 | Property | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `url` | `string (uri)` | yes | An `http` or `https` URL with no embedded credentials, at most 2,048 characters. Maximum length 2048. |
-| `events` | `string[]` | yes | One to twenty distinct change actions. At least 1 item. |
+| `events` | `string[]` | yes | One to twenty distinct event names. Raw change actions remain supported with their original payloads. brain.change.new fires for every change event. brain.page.updated fires for every current action (created, updated, renamed, merged, split, archived, restored, recovered, routed), which changes page content or status. brain.connection.new fires only when discovery inserts an automatic connection, not when it updates one. brain.import.progress fires whenever an ingest source transitions to completed or failed. Each underlying event produces at most one delivery per webhook. When subscriptions overlap, the raw action takes precedence, then brain.page.updated, then brain.change.new. See WebhookPayload for the signed JSON body. x-memtavi-event equals its type; x-memtavi-delivery equals deliveryId; x-memtavi-signature is sha256= followed by the hexadecimal HMAC-SHA256 of the exact body using the one-time signing secret. At least 1 item. |
+
+### WebhookImportPayload
+
+Required: `deliveryId`, `eventId`, `type`, `brainId`, `sourceId`, `status`, `affectedPageIds`, `createdAt`
+
+| Property | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `deliveryId` | `string (uuid)` | yes |  |
+| `eventId` | `string` | yes | Opaque transition identifier; repeated transitions have distinct identifiers. |
+| `type` | `string` | yes | One of `brain.import.progress`. |
+| `brainId` | `string` | yes |  |
+| `sourceId` | `string` | yes |  |
+| `status` | `string` | yes | One of `completed`, `failed`. |
+| `affectedPageIds` | `string[]` | yes |  |
+| `createdAt` | `string (date-time)` | yes |  |
+
+### WebhookPayload
+
+Informational schema for outbound deliveries. eventId identifies the underlying event; deliveryId identifies its delivery to one webhook. Both and the body remain stable on retry. Events are snapshots taken in the transaction that changes the resource.
+
+Type: `unknown`

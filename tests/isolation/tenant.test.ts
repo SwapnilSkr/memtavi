@@ -27,6 +27,7 @@ describe.skipIf(!ownerUrl || !appUrl)("tenant isolation", () => {
     "score_snapshots",
     "briefs",
     "webhook_deliveries",
+    "webhook_events",
     "memory_settings",
   ] as const;
   const embedding = JSON.stringify(Array.from({ length: 1536 }, () => 0));
@@ -238,9 +239,9 @@ describe.skipIf(!ownerUrl || !appUrl)("tenant isolation", () => {
 
     test(`${table} rejects a cross-tenant update`, async () => {
       await db.withTenant(tenantA, async (client) => {
-        if (table === "page_versions") {
+        if (table === "page_versions" || table === "webhook_events") {
           await expect(
-            client.query("UPDATE page_versions SET title = 'Forbidden' WHERE tenant_id = $1", [
+            client.query(`UPDATE ${table} SET tenant_id = tenant_id WHERE tenant_id = $1`, [
               tenantB,
             ]),
           ).rejects.toMatchObject({ code: "42501" });
@@ -399,6 +400,15 @@ describe.skipIf(!ownerUrl || !appUrl)("tenant isolation", () => {
       mixed: [
         [brainB, pageA],
         [brainA, pageB],
+      ],
+    },
+    {
+      table: "webhook_events",
+      sql: "INSERT INTO webhook_events (id, tenant_id, brain_id, subject_id, kind, payload) VALUES ('src_isolation_transition', $1, $2, $3, 'import', '{}')",
+      foreign: [brainB, subjectB],
+      mixed: [
+        [brainB, subjectA],
+        [brainA, subjectB],
       ],
     },
     {

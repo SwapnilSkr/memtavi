@@ -10,7 +10,7 @@ import {
 const key = Buffer.alloc(32, 7).toString("base64");
 
 describe("WEBHOOK_EVENTS", () => {
-  test("lists the change actions in enum order", () => {
+  test("lists legacy actions followed by the supported PRD events", () => {
     expect([...WEBHOOK_EVENTS]).toEqual([
       "created",
       "updated",
@@ -21,6 +21,10 @@ describe("WEBHOOK_EVENTS", () => {
       "restored",
       "recovered",
       "routed",
+      "brain.page.updated",
+      "brain.change.new",
+      "brain.connection.new",
+      "brain.import.progress",
     ]);
   });
 });

@@ -71,7 +71,7 @@ export async function purgeBrain({ job, store, withTenant }: JobContext): Promis
       connections: "brain_id = $2",
       change_events: "brain_id = $2",
       webhook_deliveries:
-        "event_id IN (SELECT id FROM change_events WHERE tenant_id = $1 AND brain_id = $2)",
+        "event_id IN (SELECT id FROM webhook_events WHERE tenant_id = $1 AND brain_id = $2)",
       ingest_sources: "brain_id = $2",
       source_chunks: "brain_id = $2",
       routing_reviews: "brain_id = $2",
@@ -91,7 +91,14 @@ export async function purgeBrain({ job, store, withTenant }: JobContext): Promis
       );
       counts[table] = result.rows[0]?.count ?? 0;
     }
-    for (const table of ["pages", "ingest_sources", "profiles", "score_snapshots", "briefs"]) {
+    for (const table of [
+      "webhook_events",
+      "pages",
+      "ingest_sources",
+      "profiles",
+      "score_snapshots",
+      "briefs",
+    ]) {
       await client.query(`DELETE FROM ${table} WHERE tenant_id = $1 AND brain_id = $2`, scope);
     }
     await client.query("DELETE FROM jobs WHERE tenant_id = $1 AND brain_id = $2 AND id <> $3", [

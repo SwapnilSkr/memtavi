@@ -4,11 +4,12 @@ import { promptVersion } from "@memtavi/core/compile/prompts";
 import { createFakeProvider } from "@memtavi/llm/fake";
 import { ProviderError } from "@memtavi/llm/provider";
 import { newId } from "@memtavi/shared/ids";
+import { signWebhookPayload } from "@memtavi/shared/webhooks";
 import { createFakeStore } from "@memtavi/storage/fake";
 import { contentHash } from "@memtavi/storage/keys";
 import { CONNECTION_CANDIDATES_SQL, createWorker } from "@memtavi/worker";
 import type { CompilerConfig } from "@memtavi/worker/types";
-import { createHarness, type Harness } from "../support/harness";
+import { createHarness, type Harness, WEBHOOK_SECRET_KEY } from "../support/harness";
 
 describe("connections.discover", () => {
   let h: Harness;
@@ -227,6 +228,83 @@ describe("connections.discover", () => {
     ]);
     const call = provider.calls.find((call) => call.kind === "chat");
     expect(call?.kind === "chat" && call.request.temperature).toBe(0);
+  });
+
+  test("discovery delivers a signed connection event once and updates do not emit a new event", async () => {
+    const subscription = await h.request("/v1/webhooks", {
+      method: "POST",
+      body: { url: "https://subscriber.example/connections", events: ["brain.connection.new"] },
+    });
+    expect(subscription.status).toBe(201);
+    const hook = (await subscription.json()) as { id: string; secret: string };
+    const received: { body: string; signature: string | null; type: string | null }[] = [];
+    const server = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      async fetch(request) {
+        received.push({
+          body: await request.text(),
+          signature: request.headers.get("x-memtavi-signature"),
+          type: request.headers.get("x-memtavi-event"),
+        });
+        return new Response(null, { status: 204 });
+      },
+    });
+    try {
+      const instance = createWorker({
+        withTenant: db.withTenant,
+        tenantIds: [h.tenants.a],
+        store,
+        compiler: compiler(),
+        webhookSecretKey: WEBHOOK_SECRET_KEY,
+        random: () => 0,
+        postJson: async (_url, body, headers) => {
+          const response = await fetch(server.url, { method: "POST", body, headers });
+          return {
+            status: response.status,
+            finalUrl: "https://subscriber.example/connections",
+            contentType: null,
+            text: "",
+          };
+        },
+      });
+      const pages = [await seedPage("source"), await seedPage("related")].sort();
+      await enqueue(pages);
+      expect(await instance.runOnce()).toBe(true);
+      expect(await instance.runOnce()).toBe(true);
+      expect(received).toHaveLength(1);
+      const receipt = received[0];
+      if (!receipt) throw new Error("Missing connection delivery");
+      const connection = (await connections())[0];
+      if (!connection) throw new Error("Missing discovered connection");
+      expect(receipt.signature).toBe(`sha256=${signWebhookPayload(hook.secret, receipt.body)}`);
+      expect(receipt.type).toBe("brain.connection.new");
+      expect(JSON.parse(receipt.body)).toMatchObject({
+        type: "brain.connection.new",
+        brainId,
+        connectionId: connection.id,
+        eventId: connection.id,
+        pageAId: pages[0],
+        pageBId: pages[1],
+        similarity: 1,
+        strength,
+        reasoning,
+      });
+      await enqueue(pages);
+      expect(await instance.runOnce()).toBe(true);
+      expect(await instance.runOnce()).toBe(false);
+      expect(received).toHaveLength(1);
+      expect(
+        (
+          await h.owner.query(
+            "SELECT id FROM webhook_events WHERE tenant_id = $1 AND kind = 'connection'",
+            [h.tenants.a],
+          )
+        ).rows,
+      ).toHaveLength(1);
+    } finally {
+      server.stop(true);
+    }
   });
 
   test("a committed compile discovers a canonical connection with reasoning and graph", async () => {

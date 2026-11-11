@@ -14,19 +14,16 @@ interface WebhookRow {
 
 interface EventRow {
   id: string;
-  action: string;
-  brainId: string;
-  pageId: string;
-  changeSummary: string;
-  fromVersion: number | null;
-  toVersion: number;
-  createdAt: Date;
+  kind: "change" | "connection" | "import";
+  action: string | null;
+  payload: Record<string, unknown>;
   subjectId: string;
 }
 
 interface DeliveryRow {
   id: string;
   status: string;
+  payload: Record<string, unknown>;
 }
 
 type OutcomeStatus = "delivered" | "failed" | "dead";
@@ -55,16 +52,12 @@ const WEBHOOK_SQL = `
 `;
 
 const EVENT_SQL = `
-  SELECT e.id, e.action, e.brain_id AS "brainId", e.page_id AS "pageId",
-    e.change_summary AS "changeSummary", e.from_version AS "fromVersion",
-    e.to_version AS "toVersion", e.created_at AS "createdAt", p.subject_id AS "subjectId"
-  FROM change_events e
-  JOIN pages p ON p.tenant_id = e.tenant_id AND p.brain_id = e.brain_id AND p.id = e.page_id
-  WHERE e.tenant_id = $1 AND e.id = $2
+  SELECT id, kind, action, payload, subject_id AS "subjectId"
+  FROM webhook_events WHERE tenant_id = $1 AND id = $2 AND brain_id = $3
 `;
 
 const DELIVERY_SQL = `
-  SELECT id, status FROM webhook_deliveries
+  SELECT id, status, payload FROM webhook_deliveries
   WHERE tenant_id = $1 AND webhook_id = $2 AND event_id = $3
   ORDER BY id LIMIT 1
 `;
@@ -114,13 +107,14 @@ async function prepare(
   tenantId: string,
   webhookId: string,
   eventId: string,
+  brainId: string,
   key: string | undefined,
 ): Promise<Prepared> {
   const hooks = await client.query<WebhookRow>(WEBHOOK_SQL, [tenantId, webhookId]);
   const webhook = hooks.rows[0];
   if (!webhook?.active) return { kind: "skip" };
 
-  const events = await client.query<EventRow>(EVENT_SQL, [tenantId, eventId]);
+  const events = await client.query<EventRow>(EVENT_SQL, [tenantId, eventId, brainId]);
   const event = events.rows[0];
   if (!event || event.subjectId !== webhook.subjectId) return { kind: "skip" };
 
@@ -130,18 +124,43 @@ async function prepare(
     return { kind: "skip" };
   }
 
+  const type =
+    event.kind === "change"
+      ? event.action !== null && webhook.events.includes(event.action)
+        ? event.action
+        : webhook.events.includes("brain.page.updated")
+          ? "brain.page.updated"
+          : "brain.change.new"
+      : event.kind === "connection"
+        ? "brain.connection.new"
+        : "brain.import.progress";
+  if (!webhook.events.includes(type)) return { kind: "skip" };
+
   const deliveryId = delivery?.id ?? crypto.randomUUID();
-  const body = JSON.stringify({
+  const payload = delivery?.payload ?? {
     deliveryId,
     eventId: event.id,
-    type: event.action,
-    brainId: event.brainId,
-    pageId: event.pageId,
-    changeSummary: event.changeSummary,
-    fromVersion: event.fromVersion,
-    toVersion: event.toVersion,
-    createdAt: event.createdAt.toISOString(),
-  });
+    type,
+    ...event.payload,
+    ...(event.kind === "change" && type !== event.action ? { action: event.action } : {}),
+  };
+  const body = JSON.stringify(
+    event.kind === "change" && payload.type === event.action
+      ? {
+          deliveryId: payload.deliveryId,
+          eventId: payload.eventId,
+          type: payload.type,
+          brainId: payload.brainId,
+          pageId: payload.pageId,
+          changeSummary: payload.changeSummary,
+          fromVersion: payload.fromVersion,
+          toVersion: payload.toVersion,
+          createdAt: payload.createdAt,
+        }
+      : Object.fromEntries(
+          Object.entries(payload).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+        ),
+  );
   if (!delivery) {
     await client.query(INSERT_DELIVERY_SQL, [deliveryId, tenantId, webhookId, eventId, body]);
   }
@@ -175,7 +194,7 @@ async function prepare(
     url: webhook.url,
     body,
     headers: {
-      "x-memtavi-event": event.action,
+      "x-memtavi-event": String(payload.type),
       "x-memtavi-delivery": deliveryId,
       "x-memtavi-signature": `sha256=${signWebhookPayload(secret, body)}`,
     },
@@ -224,7 +243,7 @@ export async function deliverWebhook(context: JobContext): Promise<void> {
   }
 
   const prepared = await withTenant(job.tenantId, (client) =>
-    prepare(client, job.tenantId, webhookId, eventId, context.webhookSecretKey),
+    prepare(client, job.tenantId, webhookId, eventId, job.brainId, context.webhookSecretKey),
   );
   if (prepared.kind === "skip") return;
   if (prepared.kind === "dead") throw new JobError("permanent", prepared.message);

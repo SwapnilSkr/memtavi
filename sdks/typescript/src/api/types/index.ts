@@ -46,3 +46,7 @@ export * from "./SourceStatus.js";
 export * from "./TargetType.js";
 export * from "./Tenant.js";
 export * from "./Webhook.js";
+export * from "./WebhookChangePayload.js";
+export * from "./WebhookConnectionPayload.js";
+export * from "./WebhookImportPayload.js";
+export * from "./WebhookPayload.js";

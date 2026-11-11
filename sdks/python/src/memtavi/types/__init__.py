@@ -65,6 +65,16 @@ if typing.TYPE_CHECKING:
     from .target_type import TargetType
     from .tenant import Tenant
     from .webhook import Webhook
+    from .webhook_change_payload import WebhookChangePayload
+    from .webhook_change_payload_action import WebhookChangePayloadAction
+    from .webhook_change_payload_type import WebhookChangePayloadType
+    from .webhook_connection_payload import WebhookConnectionPayload
+    from .webhook_connection_payload_strength import WebhookConnectionPayloadStrength
+    from .webhook_connection_payload_type import WebhookConnectionPayloadType
+    from .webhook_import_payload import WebhookImportPayload
+    from .webhook_import_payload_status import WebhookImportPayloadStatus
+    from .webhook_import_payload_type import WebhookImportPayloadType
+    from .webhook_payload import WebhookPayload
 _dynamic_imports: typing.Dict[str, str] = {
     "AckRequest": ".ack_request",
     "ApiKey": ".api_key",
@@ -125,6 +135,16 @@ _dynamic_imports: typing.Dict[str, str] = {
     "TargetType": ".target_type",
     "Tenant": ".tenant",
     "Webhook": ".webhook",
+    "WebhookChangePayload": ".webhook_change_payload",
+    "WebhookChangePayloadAction": ".webhook_change_payload_action",
+    "WebhookChangePayloadType": ".webhook_change_payload_type",
+    "WebhookConnectionPayload": ".webhook_connection_payload",
+    "WebhookConnectionPayloadStrength": ".webhook_connection_payload_strength",
+    "WebhookConnectionPayloadType": ".webhook_connection_payload_type",
+    "WebhookImportPayload": ".webhook_import_payload",
+    "WebhookImportPayloadStatus": ".webhook_import_payload_status",
+    "WebhookImportPayloadType": ".webhook_import_payload_type",
+    "WebhookPayload": ".webhook_payload",
 }
 
 
@@ -209,4 +229,14 @@ __all__ = [
     "TargetType",
     "Tenant",
     "Webhook",
+    "WebhookChangePayload",
+    "WebhookChangePayloadAction",
+    "WebhookChangePayloadType",
+    "WebhookConnectionPayload",
+    "WebhookConnectionPayloadStrength",
+    "WebhookConnectionPayloadType",
+    "WebhookImportPayload",
+    "WebhookImportPayloadStatus",
+    "WebhookImportPayloadType",
+    "WebhookPayload",
 ]
