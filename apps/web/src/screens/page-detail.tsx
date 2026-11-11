@@ -3,9 +3,11 @@ import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { Link, useNavigate, useParams } from "react-router";
 import remarkGfm from "remark-gfm";
-import { ErrorBanner, Loading } from "../components/feedback";
-import { ApiError, type Page, type PageUpdate } from "../lib/api";
+import { ErrorBanner, Loading, Pagination } from "../components/feedback";
+import { ApiError, type Page, type PageUpdate, type PageVersionDiff } from "../lib/api";
 import { useApi } from "../lib/api-context";
+import { diffRows, orderedVersions } from "../lib/diff-model";
+import { applyCacheEffect } from "../lib/invalidation";
 import { buildPageUpdate, type PageFields } from "../lib/page-update";
 
 function PageContent({
@@ -34,36 +36,13 @@ function PageContent({
     onSuccess: async (updated) => {
       queryClient.setQueryData(["page", brainId, { slug }], updated);
       setDraft(null);
-      await Promise.all(
-        queryClient
-          .getQueryCache()
-          .findAll()
-          .filter(
-            (query) =>
-              query.queryKey[1] === brainId &&
-              (query.queryKey[0] === "pages" ||
-                query.queryKey[0] === "search" ||
-                query.queryKey[0] === "graph"),
-          )
-          .map((query) => queryClient.invalidateQueries({ queryKey: query.queryKey, exact: true })),
-      );
+      await applyCacheEffect(queryClient, "updatePage", { brainId, slug });
     },
   });
   const remove = useMutation({
     mutationFn: () => api.deletePage(brainId, slug),
     onSuccess: async () => {
-      await Promise.all(
-        queryClient
-          .getQueryCache()
-          .findAll()
-          .filter(
-            (query) =>
-              query.queryKey[1] === brainId &&
-              (query.queryKey[0] === "pages" || query.queryKey[0] === "search"),
-          )
-          .map((query) => queryClient.invalidateQueries({ queryKey: query.queryKey, exact: true })),
-      );
-      queryClient.removeQueries({ queryKey: ["page", brainId, { slug }] });
+      await applyCacheEffect(queryClient, "deletePage", { brainId, slug });
       navigate(`/brains/${encodeURIComponent(brainId)}/pages`);
     },
   });
@@ -102,13 +81,9 @@ function PageContent({
           <p className="disputed" role="status">
             Disputed · contested: this page contains unresolved claims.
           </p>
-          <button
-            type="button"
-            disabled={busy || draft !== null || conflict}
-            onClick={() => update.mutate({ status: "active", version: data.version })}
-          >
-            {update.isPending ? "Resolving…" : "Resolve"}
-          </button>
+          <Link to={`/brains/${encodeURIComponent(brainId)}/conflicts`}>
+            Resolve this disputed page
+          </Link>
         </div>
       ) : null}
       {draft ? (
@@ -231,6 +206,7 @@ function PageContent({
           {data.body}
         </ReactMarkdown>
       </section>
+      <Versions brainId={brainId} slug={slug} currentVersion={data.version} />
       <section className="panel space-y-3" aria-labelledby="delete-page-heading">
         <h2 id="delete-page-heading">Delete this page</h2>
         <p className="text-slate-600">
@@ -276,6 +252,216 @@ function PageContent({
         </div>
       </section>
     </article>
+  );
+}
+
+function FieldDiff({ name, field }: { name: string; field: { from: string; to: string } }) {
+  if (field.from === field.to)
+    return (
+      <p>
+        {name}: {field.from || "Empty"}
+      </p>
+    );
+  return (
+    <div className="space-y-2">
+      <p>
+        <span className="font-semibold">removed</span> {name}: {field.from || "Empty"}
+      </p>
+      <p>
+        <span className="font-semibold">added</span> {name}: {field.to || "Empty"}
+      </p>
+    </div>
+  );
+}
+
+function DiffView({ diff }: { diff: PageVersionDiff }) {
+  return (
+    <div className="space-y-4">
+      <FieldDiff name="Title" field={diff.title} />
+      <FieldDiff name="Summary" field={diff.summary} />
+      {diff.hunks.length === 0 ? <p>No body lines changed.</p> : null}
+      <ol className="space-y-4" aria-label="Diff hunks">
+        {diff.hunks.map((hunk) => (
+          <li
+            key={`${hunk.oldStart}:${hunk.newStart}:${hunk.oldLines}:${hunk.newLines}`}
+            className="space-y-1"
+          >
+            <p className="text-sm text-slate-600">
+              Hunk at old line {hunk.oldStart}, new line {hunk.newStart}
+            </p>
+            <ol className="space-y-1">
+              {diffRows(hunk.lines).map((row) => (
+                <li
+                  key={row.key}
+                  className={`whitespace-pre-wrap break-words font-mono text-sm ${
+                    row.op === "add"
+                      ? "bg-green-50 text-green-950"
+                      : row.op === "remove"
+                        ? "bg-red-50 text-red-950"
+                        : ""
+                  }`}
+                >
+                  {row.op === "context" ? (
+                    <span className="sr-only">unchanged: </span>
+                  ) : (
+                    <span className="font-semibold">
+                      {row.label} {row.marker}{" "}
+                    </span>
+                  )}
+                  {row.text || " "}
+                </li>
+              ))}
+            </ol>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function Versions({
+  brainId,
+  slug,
+  currentVersion,
+}: {
+  brainId: string;
+  slug: string;
+  currentVersion: number;
+}) {
+  const api = useApi();
+  const [offset, setOffset] = useState(0);
+  const [version, setVersion] = useState<number | null>(null);
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [pair, setPair] = useState<{ from: number; to: number } | null>(null);
+  const versionParams = { slug, limit: 20, offset };
+  const versions = useQuery({
+    queryKey: ["page-versions", brainId, versionParams],
+    queryFn: () => api.listPageVersions(brainId, slug, { limit: 20, offset }),
+  });
+  const viewed = useQuery({
+    queryKey: ["page-version", brainId, { slug, version: version ?? 0 }],
+    queryFn: () => api.getPageVersion(brainId, slug, version ?? 0),
+    enabled: version !== null,
+  });
+  const comparable = pair !== null && orderedVersions(pair.from, pair.to);
+  const diff = useQuery({
+    queryKey: ["page-diff", brainId, { slug, from: pair?.from ?? 0, to: pair?.to ?? 0 }],
+    queryFn: () =>
+      api.diffPageVersions(
+        brainId,
+        slug,
+        pair ? { from: pair.from, to: pair.to } : { from: 1, to: 2 },
+      ),
+    enabled: comparable,
+  });
+  const fromNumber = Number(from);
+  const toNumber = Number(to);
+  const canCompare = orderedVersions(fromNumber, toNumber);
+  return (
+    <section className="panel space-y-4" aria-labelledby="versions-heading">
+      <h2 id="versions-heading">Versions</h2>
+      <ErrorBanner error={versions.error} />
+      {versions.isPending ? <Loading label="Loading versions" /> : null}
+      {versions.data?.items.length === 0 ? <p>No versions are recorded for this page.</p> : null}
+      {versions.data && versions.data.items.length > 0 ? (
+        <ul className="space-y-3">
+          {versions.data.items.map((item) => (
+            <li key={item.version} className="space-y-2 border-b border-slate-200 pb-3">
+              <p className="break-words">
+                Version {item.version}
+                {item.version === currentVersion ? " · current" : ""} · {item.actor}
+              </p>
+              <p className="break-words text-slate-600">{item.title}</p>
+              <p className="break-words text-sm text-slate-600">{item.summary || "No summary"}</p>
+              <time className="block text-sm text-slate-600" dateTime={item.createdAt}>
+                {new Date(item.createdAt).toLocaleString()}
+              </time>
+              <button
+                type="button"
+                onClick={() => setVersion(version === item.version ? null : item.version)}
+              >
+                {version === item.version
+                  ? `Hide version ${item.version}`
+                  : `View version ${item.version}`}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {versions.data ? (
+        <Pagination {...versions.data} pending={versions.isFetching} onChange={setOffset} />
+      ) : null}
+      {version !== null ? (
+        <div aria-live="polite" className="space-y-3">
+          <ErrorBanner error={viewed.error} />
+          {viewed.isPending ? <Loading label={`Loading version ${version}`} /> : null}
+          {viewed.data ? (
+            <article className="space-y-3" aria-label={`Version ${viewed.data.version}`}>
+              <h3>Version {viewed.data.version}</h3>
+              <p className="break-words">{viewed.data.title}</p>
+              <p className="break-words text-slate-600">{viewed.data.summary || "No summary"}</p>
+              <div className="markdown min-w-0">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  skipHtml
+                  components={{ img: ({ alt }) => <span>[Image: {alt || "unlabelled"}]</span> }}
+                >
+                  {viewed.data.body}
+                </ReactMarkdown>
+              </div>
+            </article>
+          ) : null}
+        </div>
+      ) : null}
+      <form
+        className="space-y-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!canCompare) return;
+          setPair({ from: fromNumber, to: toNumber });
+        }}
+      >
+        <h3>Compare two versions</h3>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="diff-from">From (older version)</label>
+            <input
+              id="diff-from"
+              type="number"
+              min={1}
+              step={1}
+              value={from}
+              onChange={(event) => setFrom(event.target.value)}
+            />
+          </div>
+          <div>
+            <label htmlFor="diff-to">To (newer version)</label>
+            <input
+              id="diff-to"
+              type="number"
+              min={1}
+              step={1}
+              value={to}
+              onChange={(event) => setTo(event.target.value)}
+            />
+          </div>
+        </div>
+        {from && to && !canCompare ? (
+          <p role="status">The older version must be the From version.</p>
+        ) : null}
+        <button className="primary" type="submit" disabled={!canCompare}>
+          Compare versions
+        </button>
+      </form>
+      {pair ? (
+        <div aria-live="polite" className="space-y-3">
+          <ErrorBanner error={diff.error} />
+          {diff.isPending ? <Loading label="Loading diff" /> : null}
+          {diff.data ? <DiffView diff={diff.data} /> : null}
+        </div>
+      ) : null}
+    </section>
   );
 }
 

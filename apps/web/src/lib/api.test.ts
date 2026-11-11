@@ -377,4 +377,242 @@ describe("API client", () => {
       kind: "permanent",
     });
   });
+
+  test.each([
+    {
+      name: "updateBrain",
+      path: "/v1/brains/brn%2Fa",
+      method: "PATCH",
+      body: { name: "Renamed" },
+      response: { id: "brn/a", name: "Renamed" },
+      call: (api: ReturnType<typeof createApi>) => api.updateBrain("brn/a", { name: "Renamed" }),
+    },
+    {
+      name: "deleteBrain",
+      path: "/v1/brains/brn%2Fa",
+      method: "DELETE",
+      body: undefined,
+      response: { id: "brn/a", targetType: "brain", state: "pending" },
+      call: (api: ReturnType<typeof createApi>) => api.deleteBrain("brn/a"),
+    },
+    {
+      name: "listIngestSources",
+      path: "/v1/brains/brn%2Fa/sources?limit=20&offset=40",
+      method: "GET",
+      body: undefined,
+      response: { items: [], total: 0, limit: 20, offset: 40 },
+      call: (api: ReturnType<typeof createApi>) =>
+        api.listIngestSources("brn/a", { limit: 20, offset: 40 }),
+    },
+    {
+      name: "retryIngestSource",
+      path: "/v1/brains/brn%2Fa/sources/src%2Fb%20%3F%23/retry",
+      method: "POST",
+      body: undefined,
+      response: { id: "src/b ?#", status: "pending" },
+      call: (api: ReturnType<typeof createApi>) => api.retryIngestSource("brn/a", "src/b ?#"),
+    },
+    {
+      name: "approveIngestSource",
+      path: "/v1/brains/brn%2Fa/sources/src%2Fb%20%3F%23/approve",
+      method: "POST",
+      body: undefined,
+      response: { id: "src/b ?#", status: "pending", awaitingApproval: false },
+      call: (api: ReturnType<typeof createApi>) => api.approveIngestSource("brn/a", "src/b ?#"),
+    },
+    {
+      name: "listPages status",
+      path: "/v1/brains/brn%2Fa/pages?limit=10&offset=20&status=contested",
+      method: "GET",
+      body: undefined,
+      response: { items: [], total: 0, limit: 10, offset: 20 },
+      call: (api: ReturnType<typeof createApi>) =>
+        api.listPages("brn/a", { limit: 10, offset: 20, status: "contested" }),
+    },
+    {
+      name: "getIndex",
+      path: "/v1/brains/brn%2Fa/index?limit=200",
+      method: "GET",
+      body: undefined,
+      response: { items: [], total: 0, limit: 200, offset: 0 },
+      call: (api: ReturnType<typeof createApi>) => api.getIndex("brn/a", { limit: 200 }),
+    },
+    {
+      name: "listPageVersions",
+      path: "/v1/brains/brn%2Fa/pages/a%2Fb%20%3F%23/versions?limit=20&offset=0",
+      method: "GET",
+      body: undefined,
+      response: { items: [{ version: 2 }], total: 1, limit: 20, offset: 0 },
+      call: (api: ReturnType<typeof createApi>) =>
+        api.listPageVersions("brn/a", "a/b ?#", { limit: 20, offset: 0 }),
+    },
+    {
+      name: "getPageVersion",
+      path: "/v1/brains/brn%2Fa/pages/a%2Fb%20%3F%23/versions/3",
+      method: "GET",
+      body: undefined,
+      response: { version: 3, body: "Text" },
+      call: (api: ReturnType<typeof createApi>) => api.getPageVersion("brn/a", "a/b ?#", 3),
+    },
+    {
+      name: "diffPageVersions",
+      path: "/v1/brains/brn%2Fa/pages/a%2Fb%20%3F%23/diff?from=1&to=2",
+      method: "GET",
+      body: undefined,
+      response: { from: 1, to: 2, hunks: [] },
+      call: (api: ReturnType<typeof createApi>) =>
+        api.diffPageVersions("brn/a", "a/b ?#", { from: 1, to: 2 }),
+    },
+    {
+      name: "diffPageVersions default to",
+      path: "/v1/brains/brn%2Fa/pages/topic/diff?from=1",
+      method: "GET",
+      body: undefined,
+      response: { from: 1, to: 4, hunks: [] },
+      call: (api: ReturnType<typeof createApi>) =>
+        api.diffPageVersions("brn/a", "topic", { from: 1 }),
+    },
+    {
+      name: "resolvePage",
+      path: "/v1/brains/brn%2Fa/pages/a%2Fb%20%3F%23/resolve",
+      method: "POST",
+      body: { note: "Kept the newer claim", body: "Revised" },
+      response: { slug: "a/b ?#", status: "active" },
+      call: (api: ReturnType<typeof createApi>) =>
+        api.resolvePage("brn/a", "a/b ?#", { note: "Kept the newer claim", body: "Revised" }),
+    },
+    {
+      name: "listRoutingReviews",
+      path: "/v1/brains/brn%2Fa/routing-reviews?limit=50&offset=0&status=open",
+      method: "GET",
+      body: undefined,
+      response: { items: [], total: 0, limit: 50, offset: 0 },
+      call: (api: ReturnType<typeof createApi>) =>
+        api.listRoutingReviews("brn/a", { limit: 50, offset: 0, status: "open" }),
+    },
+    {
+      name: "resolveRoutingReview candidate",
+      path: "/v1/brains/brn%2Fa/routing-reviews/rev%2F1/resolve",
+      method: "POST",
+      body: { pageId: "pg_1", note: "Place here" },
+      response: { id: "rev/1", status: "resolved" },
+      call: (api: ReturnType<typeof createApi>) =>
+        api.resolveRoutingReview("brn/a", "rev/1", { pageId: "pg_1", note: "Place here" }),
+    },
+    {
+      name: "resolveRoutingReview new page",
+      path: "/v1/brains/brn%2Fa/routing-reviews/rev%2F1/resolve",
+      method: "POST",
+      body: { newPage: true },
+      response: { id: "rev/1", status: "resolved" },
+      call: (api: ReturnType<typeof createApi>) =>
+        api.resolveRoutingReview("brn/a", "rev/1", { newPage: true }),
+    },
+    {
+      name: "dismissRoutingReview",
+      path: "/v1/brains/brn%2Fa/routing-reviews/rev%2F1/dismiss",
+      method: "POST",
+      body: { note: "Keep the source" },
+      response: { id: "rev/1", status: "dismissed" },
+      call: (api: ReturnType<typeof createApi>) =>
+        api.dismissRoutingReview("brn/a", "rev/1", { note: "Keep the source" }),
+    },
+    {
+      name: "dismissRoutingReview without a note",
+      path: "/v1/brains/brn%2Fa/routing-reviews/rev%2F1/dismiss",
+      method: "POST",
+      body: undefined,
+      response: { id: "rev/1", status: "dismissed" },
+      call: (api: ReturnType<typeof createApi>) => api.dismissRoutingReview("brn/a", "rev/1"),
+    },
+  ])("$name uses $method $path", async ({ path, method, body, response, call }) => {
+    const fetcher = (async (input, init) => {
+      expect(String(input)).toBe(path);
+      expect(init.method).toBe(method);
+      const headers = new Headers(init.headers);
+      expect(headers.get("x-api-key")).toBe(session.apiKey);
+      expect(headers.get("x-subject-id")).toBe(session.subjectId);
+      if (body === undefined) {
+        expect(init.body).toBeUndefined();
+        expect(headers.has("Content-Type")).toBe(false);
+      } else {
+        expect(JSON.parse(String(init.body))).toEqual(body);
+        expect(headers.get("Content-Type")).toBe("application/json");
+      }
+      return Response.json(response);
+    }) satisfies Fetcher;
+    const result: unknown = await call(createApi(session, fetcher));
+    expect(result).toEqual(response);
+  });
+
+  test.each([
+    {
+      name: "updateBrain",
+      call: (api: ReturnType<typeof createApi>) => api.updateBrain("brn_a", { name: "N" }),
+    },
+    {
+      name: "deleteBrain",
+      call: (api: ReturnType<typeof createApi>) => api.deleteBrain("brn_a"),
+    },
+    {
+      name: "retryIngestSource",
+      call: (api: ReturnType<typeof createApi>) => api.retryIngestSource("brn_a", "src_a"),
+    },
+    {
+      name: "approveIngestSource",
+      call: (api: ReturnType<typeof createApi>) => api.approveIngestSource("brn_a", "src_a"),
+    },
+    {
+      name: "listPageVersions",
+      call: (api: ReturnType<typeof createApi>) => api.listPageVersions("brn_a", "topic"),
+    },
+    {
+      name: "getPageVersion",
+      call: (api: ReturnType<typeof createApi>) => api.getPageVersion("brn_a", "topic", 2),
+    },
+    {
+      name: "diffPageVersions",
+      call: (api: ReturnType<typeof createApi>) =>
+        api.diffPageVersions("brn_a", "topic", { from: 1 }),
+    },
+    {
+      name: "resolvePage",
+      call: (api: ReturnType<typeof createApi>) =>
+        api.resolvePage("brn_a", "topic", { note: "Because" }),
+    },
+    {
+      name: "listRoutingReviews",
+      call: (api: ReturnType<typeof createApi>) =>
+        api.listRoutingReviews("brn_a", { status: "open" }),
+    },
+    {
+      name: "resolveRoutingReview",
+      call: (api: ReturnType<typeof createApi>) =>
+        api.resolveRoutingReview("brn_a", "rev_1", { newPage: true }),
+    },
+    {
+      name: "dismissRoutingReview",
+      call: (api: ReturnType<typeof createApi>) => api.dismissRoutingReview("brn_a", "rev_1"),
+    },
+    {
+      name: "getIndex",
+      call: (api: ReturnType<typeof createApi>) => api.getIndex("brn_a"),
+    },
+    {
+      name: "listIngestSources",
+      call: (api: ReturnType<typeof createApi>) => api.listIngestSources("brn_a"),
+    },
+  ])("$name maps the error envelope", async ({ call }) => {
+    const fetcher = (async () =>
+      Response.json(
+        { body: { message: "Client-safe API message", error: "ConflictError", statusCode: 409 } },
+        { status: 409 },
+      )) satisfies Fetcher;
+    await expect(call(createApi(session, fetcher))).rejects.toMatchObject({
+      status: 409,
+      code: "ConflictError",
+      message: "Client-safe API message",
+      kind: "permanent",
+    });
+  });
 });

@@ -9,10 +9,12 @@ import { clearSession, readSession, type Session } from "./lib/session";
 import { Brains } from "./screens/brains";
 import { Capture } from "./screens/capture";
 import { Changes } from "./screens/changes";
+import { Conflicts } from "./screens/conflicts";
 import { Connections } from "./screens/connections";
 import { GraphScreen } from "./screens/graph";
 import { Pages } from "./screens/pages";
 import { ProfileScreen } from "./screens/profile";
+import { Reviews } from "./screens/reviews";
 import { ScoreScreen } from "./screens/score";
 import { Search } from "./screens/search";
 import { Setup } from "./screens/setup";
@@ -53,6 +55,8 @@ function Inspector({ session, onDisconnect }: { session: Session; onDisconnect: 
             <Route index element={<Brains />} />
             <Route path="brains/:brainId/capture" element={<Capture />} />
             <Route path="brains/:brainId/pages" element={<Pages />} />
+            <Route path="brains/:brainId/conflicts" element={<Conflicts />} />
+            <Route path="brains/:brainId/reviews" element={<Reviews />} />
             <Route
               path="brains/:brainId/pages/:slug"
               element={
