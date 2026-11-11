@@ -237,10 +237,16 @@ export function createWorker(config: WorkerConfig): Worker {
         if (job.type === "capture.compile" && typeof job.payload.sourceId === "string") {
           await withTenant(job.tenantId, (client) =>
             client.query(
-              `UPDATE ingest_sources SET status = 'failed', last_error = $4
+              `UPDATE ingest_sources SET status = $5, last_error = $4
              WHERE tenant_id = $1 AND brain_id = $2 AND id = $3
                AND deleted_at IS NULL AND status <> 'completed'`,
-              [job.tenantId, job.brainId, job.payload.sourceId, failure.message],
+              [
+                job.tenantId,
+                job.brainId,
+                job.payload.sourceId,
+                failure.message,
+                dead ? "failed" : "pending",
+              ],
             ),
           );
         }

@@ -23,15 +23,20 @@ export interface FakeEmbeddingCall {
 
 export type FakeCall = FakeChatCall | FakeEmbeddingCall;
 
+export type FakeChatOutcome = string | ChatResult | ProviderError;
+
+export type FakeEmbedOutcome = "ok" | ProviderError;
+
 export interface FakeProviderOptions {
   dimensions?: number;
   embeddingModel?: string;
-  chatResponses?: Array<string | ChatResult>;
+  chatResponses?: FakeChatOutcome[];
 }
 
 export interface FakeProvider extends ChatProvider, EmbeddingProvider {
   readonly calls: readonly FakeCall[];
-  queueChat(...responses: Array<string | ChatResult>): void;
+  queueChat(...outcomes: FakeChatOutcome[]): void;
+  queueEmbed(...outcomes: FakeEmbedOutcome[]): void;
   reset(): void;
 }
 
@@ -76,18 +81,24 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
   const dimensions = options.dimensions ?? FAKE_DEFAULT_DIMENSIONS;
   const embeddingModel = options.embeddingModel ?? FAKE_DEFAULT_EMBEDDING_MODEL;
   const calls: FakeCall[] = [];
-  const queue: Array<string | ChatResult> = [...(options.chatResponses ?? [])];
+  const queue: FakeChatOutcome[] = [...(options.chatResponses ?? [])];
+  const embedQueue: FakeEmbedOutcome[] = [];
 
   return {
     calls,
 
-    queueChat(...responses: Array<string | ChatResult>): void {
-      queue.push(...responses);
+    queueChat(...outcomes: FakeChatOutcome[]): void {
+      queue.push(...outcomes);
+    },
+
+    queueEmbed(...outcomes: FakeEmbedOutcome[]): void {
+      embedQueue.push(...outcomes);
     },
 
     reset(): void {
       calls.length = 0;
       queue.length = 0;
+      embedQueue.length = 0;
     },
 
     async chat(request: ChatRequest): Promise<ChatResult> {
@@ -100,6 +111,7 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
           "Fake provider has no queued chat response",
         );
       }
+      if (next instanceof ProviderError) throw next;
       if (typeof next === "string") {
         return {
           text: next,
@@ -119,6 +131,8 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
     async embed(texts: readonly string[]): Promise<EmbeddingResult> {
       const recorded = [...texts];
       calls.push({ kind: "embed", texts: recorded });
+      const next = embedQueue.shift();
+      if (next instanceof ProviderError) throw next;
       return {
         vectors: recorded.map((text) => vectorFor(text, dimensions)),
         model: embeddingModel,

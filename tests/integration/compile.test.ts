@@ -1366,10 +1366,11 @@ describe("capture.compile", () => {
       .rows[0];
     expect(row?.status).toBe(transient ? "pending" : "dead");
     expect(row?.last_error).toBe("Compiler provider failed");
-    expect(
-      (await owner.query("SELECT status FROM ingest_sources WHERE id = $1", [sourceId])).rows[0]
-        ?.status,
-    ).toBe("failed");
+    const source = (
+      await owner.query("SELECT status, last_error FROM ingest_sources WHERE id = $1", [sourceId])
+    ).rows[0];
+    expect(source?.status).toBe(transient ? "pending" : "failed");
+    expect(source?.last_error).toBe("Compiler provider failed");
   });
 
   test("malformed patch output is permanent and preserves incurred usage after rollback", async () => {

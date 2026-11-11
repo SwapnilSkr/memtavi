@@ -15,7 +15,6 @@ Ordered by product value per unit of risk. Remove items as they land.
 - **FTS under RLS**: the GIN index is unreachable because `ts_match_vq` is not leakproof; scans are sequential (`docs/benchmarks.md`).
 - ~~Backup/restore rehearsal~~ (schema-only pass, 0.38 s RTO); still run it against the 10k-page shape for a real production RTO.
 - ~~Contract diff~~ (`spec:compat`, baseline in `tests/contract`); response validation against the spec is still missing and `test:contract` remains a placeholder.
-- **Provider failure drills**: rate limit, timeout, malformed output; assert retries and no partial pages.
 
 ## Product gaps
 
