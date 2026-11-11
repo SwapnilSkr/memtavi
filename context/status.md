@@ -12,9 +12,9 @@ Last updated 2026-11-11.
 ## Complete
 
 - **Phase 1–3**: capture, storage, worker, compiler, full read path, changes, graph, connections discovery, health scores with history and suggestions, profile with model suggestions, contested resolve, routing reviews, page versions and diff, memory modes, retention, export, brain update and delete, members, webhooks with PRD event names.
-- **Surfaces**: 47 spec operations, all routed; MCP (6 tools), CLI, inspector (14 screens incl. conflicts, reviews, health, settings), Fern TS and Python SDKs (unpublished).
-- **Phase 5**: budget caps, rate limits, request logs with trace ids, OpenTelemetry (off by default), provider failure drills, 10k search benchmark, backup/restore rehearsal, spec compat gate, strict response validation, HTTP isolation matrix.
-- **Tests**: 645 unit, 362 integration, 88 isolation, 18 contract, 296 web, 7 SDK smoke. CI green.
+- **Surfaces**: 47 spec operations, all routed; MCP (6 tools), CLI, inspector (14 screens, design pass done, checked at 390/1440 px), Fern TS and Python SDKs (unpublished).
+- **Phase 5**: keyword search on its GIN index under RLS, budget caps, rate limits, request logs with trace ids, OpenTelemetry (off by default), provider failure drills, 10k search benchmark, backup/restore rehearsal, spec compat gate, strict response validation, HTTP isolation matrix.
+- **Tests**: 660 unit, 370 integration, 88 isolation, 18 contract, 308 web, 7 SDK smoke. CI green.
 
 ## Blocked on the owner
 
@@ -24,7 +24,7 @@ Last updated 2026-11-11.
 
 ## Now
 
-- v1 product scope in the backlog is shipped (PRs 3–21). Remaining engineering: FTS under RLS (sequential scans), a full LoCoMo eval before prompt tuning, and a UI presentation pass on the inspector.
+- v1 product scope is shipped (PRs 3–25). Remaining engineering: a full LoCoMo eval (needs a model-spend budget) before any prompt tuning.
 - `gh` active account may differ from the repo owner; push with the owner's token.
 
 Full list: [backlog](./backlog.md).

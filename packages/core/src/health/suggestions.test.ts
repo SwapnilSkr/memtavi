@@ -157,4 +157,30 @@ describe("buildSuggestions", () => {
     const factors = computeHealth(metrics({ failedSources: 2, contestedPages: 3 })).factors;
     expect(buildSuggestions(factors)).toEqual(buildSuggestions(structuredClone(factors)));
   });
+
+  test("suggestions depend on factor values, not tones", () => {
+    const factors = computeHealth(
+      metrics({ failedSources: 2, contestedPages: 3, recentCaptures: 0 }),
+    ).factors;
+    const flipped = structuredClone(factors);
+    for (const group of ["freshness", "readiness", "strain"] as const) {
+      for (const factor of flipped[group]) {
+        factor.tone = factor.tone === "negative" ? "positive" : "negative";
+      }
+    }
+    expect(buildSuggestions(flipped)).toEqual(buildSuggestions(factors));
+  });
+
+  test("an empty brain still asks for a capture and a filled profile", () => {
+    const items = suggestions({
+      pageCount: 0,
+      searchablePages: 0,
+      recentCaptures: 0,
+      recentPageChanges: 0,
+      profileFields: 0,
+      lastCaptureAt: null,
+      lastPageChangeAt: null,
+    });
+    expect(items.map((item) => item.key)).toEqual(["capture_recent_input", "fill_profile"]);
+  });
 });

@@ -44,8 +44,44 @@ const strained = metrics({
   unackedConnections: 8,
 });
 
+const TONE_CASES: {
+  group: "freshness" | "readiness" | "strain";
+  key: string;
+  one: Partial<HealthMetrics>;
+  tone: "positive" | "negative";
+}[] = [
+  { group: "freshness", key: "recent_captures", one: { recentCaptures: 1 }, tone: "positive" },
+  {
+    group: "freshness",
+    key: "recent_page_changes",
+    one: { recentPageChanges: 1 },
+    tone: "positive",
+  },
+  { group: "readiness", key: "pages", one: { pageCount: 1 }, tone: "positive" },
+  { group: "readiness", key: "searchable_pages", one: { searchablePages: 1 }, tone: "positive" },
+  {
+    group: "readiness",
+    key: "profile_completeness",
+    one: { profileFields: 1 },
+    tone: "positive",
+  },
+  { group: "readiness", key: "failed_sources", one: { failedSources: 1 }, tone: "negative" },
+  { group: "readiness", key: "contested_pages", one: { contestedPages: 1 }, tone: "negative" },
+  { group: "strain", key: "failed_sources", one: { failedSources: 1 }, tone: "negative" },
+  { group: "strain", key: "compile_backlog", one: { backlogSources: 1 }, tone: "negative" },
+  { group: "strain", key: "contested_pages", one: { contestedPages: 1 }, tone: "negative" },
+  { group: "strain", key: "deprecated_pages", one: { deprecatedPages: 1 }, tone: "negative" },
+  { group: "strain", key: "unacked_changes", one: { unackedChanges: 1 }, tone: "negative" },
+  {
+    group: "strain",
+    key: "unacked_connections",
+    one: { unackedConnections: 1 },
+    tone: "negative",
+  },
+];
+
 describe("computeHealth", () => {
-  test("an empty brain scores zero on every metric", () => {
+  test("an empty brain scores zero and reports neutral factors", () => {
     const score = computeHealth(metrics());
     expect(score.freshness).toBe(0);
     expect(score.readiness).toBe(0);
@@ -59,14 +95,34 @@ describe("computeHealth", () => {
       value: HEALTH_WEIGHTS.freshnessDecayDays,
       tone: "negative",
     });
+    const tones = [...score.factors.freshness, ...score.factors.readiness, ...score.factors.strain]
+      .filter((factor) => factor.key !== "days_since_input")
+      .map((factor) => factor.tone);
+    expect(tones).toHaveLength(13);
+    expect(tones.every((tone) => tone === "neutral")).toBe(true);
   });
+
+  test.each(TONE_CASES)(
+    "the $group factor $key is neutral at 0 and $tone at 1",
+    ({ group, key, one, tone }) => {
+      const empty = computeHealth(metrics()).factors[group].find((factor) => factor.key === key);
+      expect(empty).toMatchObject({ value: 0, tone: "neutral" });
+      const raised = computeHealth(metrics(one)).factors[group].find(
+        (factor) => factor.key === key,
+      );
+      expect(raised).toMatchObject({ value: 1, tone });
+    },
+  );
 
   test("a healthy brain is fresh, ready and unstressed", () => {
     const score = computeHealth(healthy);
     expect(score).toMatchObject({ freshness: 100, readiness: 100, strain: 0 });
-    for (const factor of score.factors.readiness.filter((factor) => factor.tone !== "negative")) {
-      expect(factor.tone).toBe("positive");
-    }
+    const tones = new Map(score.factors.readiness.map((factor) => [factor.key, factor.tone]));
+    expect(tones.get("pages")).toBe("positive");
+    expect(tones.get("searchable_pages")).toBe("positive");
+    expect(tones.get("profile_completeness")).toBe("positive");
+    expect(tones.get("failed_sources")).toBe("neutral");
+    expect(tones.get("contested_pages")).toBe("neutral");
   });
 
   test("a strained brain scores low readiness and high strain with negative factors", () => {
