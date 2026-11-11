@@ -19,7 +19,7 @@ Ordered by product value per unit of risk. Remove items as they land.
 
 ## Product gaps
 
-- **Connection discovery + CRS**: `connections` is empty in practice; add the post-compile LLM-judged connection step with strength, reasoning and ack.
+- **Webhook event types**: PRD §8.4 names (`brain.connection.new` etc.) are not subscribable or deliverable; brief `p7-webhook-events`.
 - **Memory modes**: `memory_settings` exists but is unenforced. Wire `auto`/`ask`/`off` into capture and `remember`.
 - **Retention**: sources and chunks never expire; add the citation-aware 90-day body drop.
 - **Webhooks UI**: API and CLI exist; the inspector has no webhooks screen.

@@ -10,17 +10,21 @@ import {
 import type { ObjectStore } from "@memtavi/storage/types";
 import type { PoolClient } from "pg";
 import { compileCapture } from "./compile";
+import { CONNECTION_CANDIDATES_SQL, discoverConnections } from "./connections";
 import { snapshotScore } from "./health";
 import { ingestCapture } from "./ingest";
 import { purgeBrain } from "./purge";
 import {
   type ClaimedJob,
   type CompilerConfig,
+  type CompilerUsage,
   JobError,
   type JobHandler,
   type PostJson,
 } from "./types";
 import { deliverWebhook } from "./webhook";
+
+export { CONNECTION_CANDIDATES_SQL };
 
 const CLAIM_SQL = `
   UPDATE jobs
@@ -37,7 +41,8 @@ const CLAIM_SQL = `
           (status = 'pending' AND available_at <= now())
           OR (status = 'running' AND lease_until <= now())
         )
-      ORDER BY (type = 'score.snapshot'), available_at, id
+      ORDER BY (type IN ('score.snapshot', 'connections.discover')),
+        (type = 'connections.discover'), available_at, id
       FOR UPDATE SKIP LOCKED
       LIMIT 1
     )
@@ -133,6 +138,7 @@ export function createWorker(config: WorkerConfig): Worker {
   const handlers = config.handlers ?? {
     "capture.ingest": ingestCapture,
     "capture.compile": compileCapture,
+    "connections.discover": discoverConnections,
     "review.apply": compileCapture,
     "score.snapshot": snapshotScore,
     "webhook.deliver": deliverWebhook,
@@ -173,40 +179,39 @@ export function createWorker(config: WorkerConfig): Worker {
     const handler = handlers[job.type];
     try {
       if (!handler) throw new JobError("permanent", "Unknown job type");
-      await withTenant(job.tenantId, (client) =>
-        handler({
-          job,
-          client,
-          store,
-          fetchDocument,
-          withTenant,
-          postJson,
-          ...(config.webhookSecretKey === undefined
-            ? {}
-            : { webhookSecretKey: config.webhookSecretKey }),
-          compiler: config.compiler,
-          recordUsage: async (usage) => {
-            await withTenant(job.tenantId, (usageClient) =>
-              usageClient.query(
-                `INSERT INTO usage_ledger
+      const context = {
+        job,
+        store,
+        fetchDocument,
+        withTenant,
+        postJson,
+        ...(config.webhookSecretKey === undefined
+          ? {}
+          : { webhookSecretKey: config.webhookSecretKey }),
+        compiler: config.compiler,
+        recordUsage: async (usage: CompilerUsage) => {
+          await withTenant(job.tenantId, (usageClient) =>
+            usageClient.query(
+              `INSERT INTO usage_ledger
                (tenant_id, brain_id, job_id, provider, model, kind, input_tokens, output_tokens, cost_usd)
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-                [
-                  job.tenantId,
-                  job.brainId,
-                  job.id,
-                  usage.provider,
-                  usage.model,
-                  usage.kind,
-                  usage.inputTokens,
-                  usage.outputTokens,
-                  usage.costUsd,
-                ],
-              ),
-            );
-          },
-        }),
-      );
+              [
+                job.tenantId,
+                job.brainId,
+                job.id,
+                usage.provider,
+                usage.model,
+                usage.kind,
+                usage.inputTokens,
+                usage.outputTokens,
+                usage.costUsd,
+              ],
+            ),
+          );
+        },
+      };
+      if (handler === discoverConnections) await discoverConnections(context);
+      else await withTenant(job.tenantId, (client) => handler({ ...context, client }));
       await withTenant(job.tenantId, (client) =>
         client.query(COMPLETE_SQL, [job.tenantId, job.id]),
       );

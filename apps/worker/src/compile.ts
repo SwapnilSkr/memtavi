@@ -703,5 +703,18 @@ async function compileSource({
     );
   }
   for (const event of routing) onRouting?.(event);
+  if (affected.size > 0) {
+    await client.query(
+      `INSERT INTO jobs (tenant_id, brain_id, type, payload, idempotency_key)
+       VALUES ($1, $2, 'connections.discover', $3, $4)
+       ON CONFLICT (tenant_id, idempotency_key) DO NOTHING`,
+      [
+        job.tenantId,
+        job.brainId,
+        JSON.stringify({ brainId: job.brainId, pageIds: [...affected].sort() }),
+        `connections:${sourceId}${isReview ? `:${job.id}` : ""}`,
+      ],
+    );
+  }
   await enqueueScoreSnapshot(client, job.tenantId, job.brainId);
 }
